@@ -1,8 +1,16 @@
 {
-    "python.analysis.extraPaths": [
-        "C:\\Users\\grego\\AppData\\Roaming\\Python\\Python314\\site-packages"
-    ],
-    "python.autoComplete.extraPaths": [
-        "C:\\Users\\grego\\AppData\\Roaming\\Python\\Python314\\site-packages"
+    "css.validate": true,
+    "css.lint.unknownAtRules": "ignore",
+    "files.associations": {
+        "*.css": "tailwindcss"
+    },
+    "editor.quickSuggestions": {
+        "strings": true
+    },
+    "tailwindCSS.experimental.classRegex": [
+        [
+            "[a-zA-Z]*ClassName['\"`]\\s*:\\s*['\"`]([^'\"`]*)['\"`]",
+            "([a-zA-Z0-9\\-:]+)"
+        ]
     ]
 }
