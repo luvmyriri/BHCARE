@@ -130,6 +130,15 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [barangay, setBarangay] = useState('');
   const [city, setCity] = useState('');
   const [province, setProvince] = useState('');
+
+  // Detailed street address fields
+  const [houseNumber, setHouseNumber] = useState('');
+  const [blockNumber, setBlockNumber] = useState('');
+  const [lotNumber, setLotNumber] = useState('');
+  const [streetName, setStreetName] = useState('');
+  const [subdivision, setSubdivision] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [fullAddress, setFullAddress] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [registerPwVisible, setRegisterPwVisible] = useState(false);
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
@@ -333,6 +342,15 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
         }, 1500);
       }
 
+      // Auto-populate detailed street address fields
+      if (fields.house_number) setHouseNumber(fields.house_number);
+      if (fields.block_number) setBlockNumber(fields.block_number);
+      if (fields.lot_number) setLotNumber(fields.lot_number);
+      if (fields.street_name) setStreetName(fields.street_name);
+      if (fields.subdivision) setSubdivision(fields.subdivision);
+      if (fields.zip_code) setZipCode(fields.zip_code);
+      if (fields.full_address) setFullAddress(fields.full_address);
+
       setConfidence(conf || {});
       setDetectedIDType(identifyIDType(data.raw_front || ''));
       setOcrProcessed(true);
@@ -369,6 +387,16 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     formData.append('barangay', barangay);
     formData.append('city', city);
     formData.append('province', province);
+
+    // Detailed street address fields
+    formData.append('house_number', houseNumber);
+    formData.append('block_number', blockNumber);
+    formData.append('lot_number', lotNumber);
+    formData.append('street_name', streetName);
+    formData.append('subdivision', subdivision);
+    formData.append('zip_code', zipCode);
+    formData.append('full_address', fullAddress);
+
 
     setLoading(true);
     try {
@@ -792,6 +820,61 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                   placeholder="Barangay 174"
                 />
               </div>
+
+              {/* Detailed Street Address */}
+              <h4 style={{ fontSize: '11px', fontWeight: 600, color: '#718096', marginTop: '12px', marginBottom: '6px' }}>📍 Street Address Details (Optional)</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <Input
+                  label="Block"
+                  icon="🔢"
+                  confidence={confidence.block_number}
+                  value={blockNumber}
+                  onChange={(e) => setBlockNumber(e.target.value)}
+                  placeholder="Block 9"
+                />
+                <Input
+                  label="Lot"
+                  icon="🔢"
+                  confidence={confidence.lot_number}
+                  value={lotNumber}
+                  onChange={(e) => setLotNumber(e.target.value)}
+                  placeholder="Lot 30"
+                />
+                <Input
+                  label="House #"
+                  icon="🏠"
+                  confidence={confidence.house_number}
+                  value={houseNumber}
+                  onChange={(e) => setHouseNumber(e.target.value)}
+                  placeholder="123"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <Input
+                  label="Street Name"
+                  icon="🛣️"
+                  confidence={confidence.street_name}
+                  value={streetName}
+                  onChange={(e) => setStreetName(e.target.value)}
+                  placeholder="Ruby St"
+                />
+                <Input
+                  label="ZIP Code"
+                  icon="📮"
+                  confidence={confidence.zip_code}
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="1421"
+                />
+              </div>
+              <Input
+                label="Subdivision/Village"
+                icon="🏘️"
+                confidence={confidence.subdivision}
+                value={subdivision}
+                onChange={(e) => setSubdivision(e.target.value)}
+                placeholder="Celina Homes 3"
+              />
 
 
               <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>

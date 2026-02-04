@@ -353,6 +353,9 @@ class PHIDParser:
                         self.fields['full_address'] = addr_line
                         self.confidence['full_address'] = 0.70
                         
+                        # Parse detailed address components
+                        self._parse_address_components(addr_line)
+                        
                         # Try to extract street/block/lot info
                         if 'BLK' in addr_line.upper() or 'LOT' in addr_line.upper():
                             self.confidence['full_address'] = 0.80
@@ -375,6 +378,88 @@ class PHIDParser:
                         self.fields['full_address'] = full
                         self.confidence['full_address'] = 0.60
                     break
+    
+    def _parse_address_components(self, address_text):
+        """Parse detailed address components from full address string"""
+        upper_addr = address_text.upper()
+        
+        # Extract Block Number (e.g., "BLK 9", "BLOCK 9")
+        block_match = re.search(r'BLK\.?\s*(\d+)|BLOCK\s+(\d+)', upper_addr)
+        if block_match:
+            block_num = block_match.group(1) or block_match.group(2)
+            self.fields['block_number'] = f"Block {block_num}"
+            self.confidence['block_number'] = 0.90
+            print(f"[ADDRESS] Block: {block_num}")
+        
+        # Extract Lot Number (e.g., "LOT 30", "L30")
+        lot_match = re.search(r'LOT\.?\s*(\d+)|L\.?\s*(\d+)', upper_addr)
+        if lot_match:
+            lot_num = lot_match.group(1) or lot_match.group(2)
+            self.fields['lot_number'] = f"Lot {lot_num}"
+            self.confidence['lot_number'] = 0.90
+            print(f"[ADDRESS] Lot: {lot_num}")
+        
+        # Extract House Number (standalone number at beginning, e.g., "123 Main St")
+        house_match = re.match(r'^#?(\d+)\s+[A-Z]', upper_addr)
+        if house_match:
+            self.fields['house_number'] = house_match.group(1)
+            self.confidence['house_number'] = 0.85
+            print(f"[ADDRESS] House: {house_match.group(1)}")
+        
+        # Extract Street Name
+        # Common patterns: "RUBY ST", "MAIN STREET", "SAMPAGUITA RD"
+        street_patterns = [
+            r'([A-Z][A-Z\s]+?)\s+(ST\b|STREET|RD\b|ROAD|AVE\b|AVENUE|BLVD|DRIVE|LANE)',
+            r',\s*([A-Z][A-Z\s]+?)\s+(ST\b|STREET|RD\b|ROAD)',  # After comma
+        ]
+        for pattern in street_patterns:
+            street_match = re.search(pattern, upper_addr)
+            if street_match:
+                street_name = street_match.group(1).strip()
+                street_type = street_match.group(2)
+                # Clean up - remove BLK/LOT numbers from street name
+                street_name = re.sub(r'(BLK|LOT|BLOCK)\s*\d+', '', street_name).strip()
+                if len(street_name) > 2:  # Valid street name
+                    self.fields['street_name'] = f"{street_name} {street_type}".title()
+                    self.confidence['street_name'] = 0.85
+                    print(f"[ADDRESS] Street: {self.fields['street_name']}")
+                    break
+        
+        # Extract Subdivision/Village (e.g., "CELINA HOMES 3", "VILLA VERDE")
+        # Look for: [NAME] + [HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES]
+        subdivision_patterns = [
+            r'([A-Z][A-Z\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES|HILLS|GARDENS|PARK|RESIDENCES)\s*\d*',
+            r',\s*([A-Z][A-Z\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION)',  # After comma
+        ]
+        for pattern in subdivision_patterns:
+            subdiv_match = re.search(pattern, upper_addr)
+            if subdiv_match:
+                subdiv_name = subdiv_match.group(1).strip()
+                subdiv_type = subdiv_match.group(2)
+                # Clean up
+                subdiv_name = re.sub(r'(BLK|LOT|BLOCK|ST\b|STREET|RD\b)\s*\d*', '', subdiv_name).strip()
+                if len(subdiv_name) > 2:
+                    # Include number if present (e.g., "CELINA HOMES 3")
+                    full_match = re.search(rf'{subdiv_name}\s+{subdiv_type}\s*(\d*)', upper_addr)
+                    if full_match and full_match.group(1):
+                        self.fields['subdivision'] = f"{subdiv_name} {subdiv_type} {full_match.group(1)}".title()
+                    else:
+                        self.fields['subdivision'] = f"{subdiv_name} {subdiv_type}".title()
+                    self.confidence['subdivision'] = 0.85
+                    print(f"[ADDRESS] Subdivision: {self.fields['subdivision']}")
+                    break
+        
+        # Extract ZIP Code (4-digit Philippine ZIP)
+        zip_match = re.search(r'\b(\d{4})\b', upper_addr)
+        if zip_match:
+            zip_code = zip_match.group(1)
+            # Validate it's likely a ZIP (common PH ZIP: 1000-9999)
+            if 1000 <= int(zip_code) <= 9999:
+                self.fields['zip_code'] = zip_code
+                self.confidence['zip_code'] = 0.90
+                print(f"[ADDRESS] ZIP: {zip_code}")
+
+
 
 # ============= DUAL OCR ENDPOINT =============
 @app.route("/ocr-dual", methods=["POST"])
@@ -554,6 +639,15 @@ def register():
         city = data.get('city')
         province = data.get('province')
         
+        # New detailed address fields (optional)
+        house_number = data.get('house_number', '')
+        block_number = data.get('block_number', '')
+        lot_number = data.get('lot_number', '')
+        street_name = data.get('street_name', '')
+        subdivision = data.get('subdivision', '')
+        zip_code = data.get('zip_code', '')
+        full_address = data.get('full_address', '')
+        
         if not all([email, password, first_name, last_name, dob, gender, contact, barangay, city, province]):
             return jsonify({"error": "Missing required fields"}), 400
         
@@ -563,10 +657,13 @@ def register():
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO users (email, password_hash, first_name, middle_name, last_name, 
-                              date_of_birth, gender, contact_number, barangay, city, province)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                              date_of_birth, gender, contact_number, barangay, city, province,
+                              house_number, block_number, lot_number, street_name, subdivision, 
+                              zip_code, full_address)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, barangay, city, province))
+        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, barangay, city, province,
+              house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address))
         
         user_id = cur.fetchone()[0]
         conn.commit()
@@ -579,6 +676,7 @@ def register():
         return jsonify({"error": "Email already exists"}), 409
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
