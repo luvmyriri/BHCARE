@@ -44,8 +44,14 @@ A full-stack healthcare application with React frontend and Flask backend using 
 ```powershell
 cd frontend
 npm install
+npm run dev
+# or
 npm start
 ```
+
+Frontend runs on: `http://localhost:3000`
+
+> **Note:** The project now uses **Vite** instead of Create React App for faster development and build times! See [VITE_MIGRATION.md](frontend/VITE_MIGRATION.md) for details.
 
 ---
 

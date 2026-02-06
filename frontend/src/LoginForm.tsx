@@ -68,11 +68,11 @@ const Select: React.FC<
             fontSize: '9px',
             padding: '2px 6px',
             borderRadius: '4px',
-            background: confidence > 0.8 ? '#c6f6d5' : '#fed7d7',
-            color: confidence > 0.8 ? '#22543d' : '#742a2a',
+            background: confidence >= 0.8 ? '#c6f6d5' : confidence > 0.5 ? '#fef3c7' : '#fed7d7',
+            color: confidence >= 0.8 ? '#22543d' : confidence > 0.5 ? '#744210' : '#742a2a',
             fontWeight: 700
           }}>
-            {confidence > 0.8 ? '✓ Auto' : '✗ Manual'}
+            {confidence >= 0.8 ? '✓ Auto' : confidence > 0.5 ? '~ Low' : '✗ Manual'}
           </span>
         )}
       </label>
@@ -81,8 +81,8 @@ const Select: React.FC<
         style={{
           display: 'flex',
           alignItems: 'center',
-          background: confidence && confidence > 0.8 ? 'rgba(198,246,213,0.3)' : 'rgba(255,255,255,0.8)',
-          border: invalid ? '1px solid #e53e3e' : confidence && confidence > 0.8 ? '1px solid #48bb78' : '1px solid #e2e8f0',
+          background: confidence && confidence >= 0.8 ? 'rgba(198,246,213,0.3)' : 'rgba(255,255,255,0.8)',
+          border: invalid ? '1px solid #e53e3e' : confidence && confidence >= 0.8 ? '1px solid #48bb78' : '1px solid #e2e8f0',
           borderRadius: '8px',
           padding: '8px 12px',
           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
@@ -130,6 +130,15 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [barangay, setBarangay] = useState('');
   const [city, setCity] = useState('');
   const [province, setProvince] = useState('');
+
+  // Detailed street address fields
+  const [houseNumber, setHouseNumber] = useState('');
+  const [blockNumber, setBlockNumber] = useState('');
+  const [lotNumber, setLotNumber] = useState('');
+  const [streetName, setStreetName] = useState('');
+  const [subdivision, setSubdivision] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [fullAddress, setFullAddress] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [registerPwVisible, setRegisterPwVisible] = useState(false);
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
@@ -301,6 +310,8 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
       if (fields.last_name) setLastName(fields.last_name);
       if (fields.dob) setDob(fields.dob);
       if (fields.gender) setGender(fields.gender);
+      if (fields.phone) setContact(fields.phone);
+
 
       // Auto-populate address cascade
       if (fields.region) {
@@ -332,6 +343,15 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
           setBarangay(fields.barangay);
         }, 1500);
       }
+
+      // Auto-populate detailed street address fields
+      if (fields.house_number) setHouseNumber(fields.house_number);
+      if (fields.block_number) setBlockNumber(fields.block_number);
+      if (fields.lot_number) setLotNumber(fields.lot_number);
+      if (fields.street_name) setStreetName(fields.street_name);
+      if (fields.subdivision) setSubdivision(fields.subdivision);
+      if (fields.zip_code) setZipCode(fields.zip_code);
+      if (fields.full_address) setFullAddress(fields.full_address);
 
       setConfidence(conf || {});
       setDetectedIDType(identifyIDType(data.raw_front || ''));
@@ -369,6 +389,16 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     formData.append('barangay', barangay);
     formData.append('city', city);
     formData.append('province', province);
+
+    // Detailed street address fields
+    formData.append('house_number', houseNumber);
+    formData.append('block_number', blockNumber);
+    formData.append('lot_number', lotNumber);
+    formData.append('street_name', streetName);
+    formData.append('subdivision', subdivision);
+    formData.append('zip_code', zipCode);
+    formData.append('full_address', fullAddress);
+
 
     setLoading(true);
     try {
@@ -748,7 +778,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                 required
               />
 
-              <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => setContact(e.target.value)} required />
+              <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => setContact(e.target.value)} confidence={confidence.phone} required />
               <Input label={t.email} icon="📧" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
               <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '8px', marginTop: '16px' }}>🏠 Address (Auto-filled via OCR)</h3>
@@ -792,6 +822,61 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                   placeholder="Barangay 174"
                 />
               </div>
+
+              {/* Detailed Street Address */}
+              <h4 style={{ fontSize: '11px', fontWeight: 600, color: '#718096', marginTop: '12px', marginBottom: '6px' }}>📍 Street Address Details (Optional)</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <Input
+                  label="Block"
+                  icon="🔢"
+                  confidence={confidence.block_number}
+                  value={blockNumber}
+                  onChange={(e) => setBlockNumber(e.target.value)}
+                  placeholder="Block 9"
+                />
+                <Input
+                  label="Lot"
+                  icon="🔢"
+                  confidence={confidence.lot_number}
+                  value={lotNumber}
+                  onChange={(e) => setLotNumber(e.target.value)}
+                  placeholder="Lot 30"
+                />
+                <Input
+                  label="House #"
+                  icon="🏠"
+                  confidence={confidence.house_number}
+                  value={houseNumber}
+                  onChange={(e) => setHouseNumber(e.target.value)}
+                  placeholder="123"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <Input
+                  label="Street Name"
+                  icon="🛣️"
+                  confidence={confidence.street_name}
+                  value={streetName}
+                  onChange={(e) => setStreetName(e.target.value)}
+                  placeholder="Ruby St"
+                />
+                <Input
+                  label="ZIP Code"
+                  icon="📮"
+                  confidence={confidence.zip_code}
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="1422"
+                />
+              </div>
+              <Input
+                label="Subdivision/Village"
+                icon="🏘️"
+                confidence={confidence.subdivision}
+                value={subdivision}
+                onChange={(e) => setSubdivision(e.target.value)}
+                placeholder="Celina Homes 3"
+              />
 
 
               <div style={{ marginTop: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>

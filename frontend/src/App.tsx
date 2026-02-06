@@ -7,6 +7,11 @@ import Appointments from './Appointments';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import LocationShowcase from './components/LocationShowcase';
+import ContactForm from './components/ContactForm';
+import Footer from './components/Footer';
+import FloatingParticles from './components/FloatingParticles';
+import FloatingImages from './components/FloatingImages';
+
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);
@@ -50,6 +55,8 @@ function App() {
 
   return (
     <div className="app">
+      <FloatingImages />
+      <FloatingParticles />
       <Navbar
         onLoginClick={openLogin}
         onLogoutClick={onLogoutClick}
@@ -60,6 +67,8 @@ function App() {
       <Hero onRegisterClick={openLogin} onLoginClick={openLogin} />
       <LocationShowcase />
       <Services />
+      <ContactForm />
+      <Footer />
 
       {showLogin && (
         <div className="modal-overlay" onClick={closeLogin}>
