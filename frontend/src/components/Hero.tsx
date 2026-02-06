@@ -3,7 +3,6 @@ import {
     Box,
     Button,
     Container,
-    Flex,
     Heading,
     Image,
     Stack,
@@ -47,6 +46,8 @@ interface HeroProps {
     onLoginClick?: () => void;
 }
 
+
+
 const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
     const { t } = useLanguage();
     // Gradient for the text "KALUSUGAN ANG UNA" (Mint Green -> Light Orange)
@@ -54,67 +55,12 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
 
     return (
         <Box
-            className="hero-animated-bg"
+            bg="transparent"
             minH="100vh"
             overflow="hidden"
             position="relative"
             pt={20}
         >
-            {/* Decorative Bubble 1 (Mint - Top Left) */}
-            <Box
-                className="hero-bubble-1"
-                position="absolute"
-                top="-10%"
-                left="-10%"
-                boxSize="800px"
-                bg="teal.100"
-                opacity="0.4"
-                filter="blur(100px)"
-                borderRadius="full"
-                zIndex="0"
-            />
-
-            {/* Decorative Bubble 2 (Orange - Bottom Right) */}
-            <Box
-                className="hero-bubble-2"
-                position="absolute"
-                bottom="10%"
-                right="-5%"
-                boxSize="600px"
-                bg="orange.200"
-                opacity="0.5"
-                filter="blur(90px)"
-                borderRadius="full"
-                zIndex="0"
-            />
-
-            {/* Decorative Bubble 3 (Extra Small - Top Right) */}
-            <Box
-                className="hero-bubble-3"
-                position="absolute"
-                top="20%"
-                right="10%"
-                boxSize="300px"
-                bg="blue.100"
-                opacity="0.3"
-                filter="blur(60px)"
-                borderRadius="full"
-                zIndex="0"
-            />
-
-            {/* Decorative Bubble 4 (Yellow - Bottom Left) */}
-            <Box
-                className="hero-bubble-2"
-                position="absolute"
-                bottom="20%"
-                left="20%"
-                boxSize="400px"
-                bg="yellow.100"
-                opacity="0.4"
-                filter="blur(80px)"
-                borderRadius="full"
-                zIndex="0"
-            />
 
             <Container maxW="7xl" position="relative" zIndex={1} pt={12}>
                 <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={12} alignItems="center">
@@ -217,11 +163,12 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             right="5%"
                             bottom="5%"
                             left="15%"
-                            bgGradient="linear(to-b, teal.50, white)"
+                            bg="whiteAlpha.200"
+                            backdropFilter="blur(8px)"
                             borderTopRadius="full"
                             borderBottomRadius="full"
                             border="1px solid"
-                            borderColor="white"
+                            borderColor="whiteAlpha.300"
                             boxShadow="2xl"
                             zIndex={0}
                         />
@@ -238,12 +185,13 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             pl={{ lg: 10 }}
                         >
                             <Image
-                                src="/images/doctor.png"
-                                alt="Barangay Doctor"
+                                src="/images/Logo.png"
+                                alt="Healthcare Logo"
                                 objectFit="contain"
                                 h={{ base: "90%", md: "105%" }}
                                 maxW="none"
                                 filter="drop-shadow(0px 20px 40px rgba(0,0,0,0.1))"
+                                transform="translateY(30px)"
                             />
                         </Box>
 

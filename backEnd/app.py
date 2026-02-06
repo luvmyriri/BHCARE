@@ -129,6 +129,7 @@ class PHIDParser:
             'last_name': None,
             'dob': None,
             'gender': None,
+            'phone': None,
             'address': None,
             'city': None,
         }
@@ -146,9 +147,12 @@ class PHIDParser:
         self._extract_dob(clean_text)
         
         # 3. Extract Gender
-        self._extract_gender(clean_text)
+        self._extract_gender(text)  # Use original text to preserve newlines
         
-        # 4. Extract Address
+        # 4. Extract Phone Number
+        self._extract_phone(text)  # Use original text
+        
+        # 5. Extract Address
         self._extract_address(lines, clean_text)
         
         return self.fields, self.confidence
@@ -293,11 +297,114 @@ class PHIDParser:
 
     
     def _extract_gender(self, text):
-        """Extract gender"""
+        """Extract gender with improved label detection"""
+        upper_text = text.upper()
+        
+        # Strategy 1: Look for "Sex:" or "Gender:" labels with flexible spacing
+        # Handles: "Sex M", "Sex: M", "Sex    M" (multiple spaces/tabs)
+        sex_patterns = [
+            r'(?:SEX|GENDER|KASARIAN)[:\s]+([MF])(?:\s|$|\b)',  # "Sex: M" with word boundary
+            r'(?:SEX|GENDER|KASARIAN)[:\s]+(MALE|FEMALE)',  # "Sex: MALE"
+            r'\b(MALE|FEMALE)\s+(?:SEX|GENDER)',  # "MALE Sex" (reversed)
+        ]
+        
+        for pattern in sex_patterns:
+            match = re.search(pattern, upper_text)
+            if match:
+                value = match.group(1)
+                gender, conf = FieldValidator.validate_gender(value)
+                if gender:
+                    self.fields['gender'] = gender
+                    self.confidence['gender'] = conf
+                    print(f"[GENDER] Found via label: {gender} (from '{value}')")
+                    return
+        
+        # Strategy 2: Pattern for table-like layout (e.g., Driver's License)
+        # Looks for M or F that appears after "Sex" within reasonable distance
+        table_pattern = r'(?:SEX|GENDER)(?:[\s\S]{0,50})\b([MF])\b(?![A-RT-Z])'
+        match = re.search(table_pattern, upper_text)
+        if match:
+            value = match.group(1)
+            gender, conf = FieldValidator.validate_gender(value)
+            if gender:
+                self.fields['gender'] = gender
+                self.confidence['gender'] = 0.85
+                print(f"[GENDER] Found in table layout: {gender}")
+                return
+        
+        # Strategy 3: Fallback - look for MALE/FEMALE anywhere in text
         gender, conf = FieldValidator.validate_gender(text)
         if gender:
             self.fields['gender'] = gender
-            self.confidence['gender'] = conf
+            self.confidence['gender'] = conf * 0.7  # Lower confidence without label
+            print(f"[GENDER] Found without label: {gender}")
+    
+    def _extract_phone(self, text):
+        """Extract phone number (mobile or landline)"""
+        upper_text = text.upper()
+        
+        # Strategy 1: Look for labeled phone numbers (highest confidence)
+        # Patterns: "Tel. No.:", "Mobile:", "Contact No:", "Phone:"
+        phone_label_patterns = [
+            r'(?:TEL\.?\s*NO\.?|TELEPHONE|MOBILE|CONTACT\s*NO\.?|PHONE)[:\s]*(\+?63|0)?[\s-]?([0-9]{3})[\s-]?([0-9]{3,4})[\s-]?([0-9]{3,4})',
+            r'(?:TEL\.?\s*NO\.?|MOBILE)[:\s]*([0-9]{4})([0-9]{3})([0-9]{4})',  # 10-digit format
+        ]
+        
+        for pattern in phone_label_patterns:
+            match = re.search(pattern, upper_text)
+            if match:
+                # Reconstruct phone number from groups
+                if len(match.groups()) == 4:
+                    country = match.group(1) or ''
+                    part1 = match.group(2)
+                    part2 = match.group(3)
+                    part3 = match.group(4)
+                    phone = f"{country}{part1}{part2}{part3}".strip()
+                elif len(match.groups()) == 3:
+                    phone = f"{match.group(1)}{match.group(2)}{match.group(3)}"
+                else:
+                    phone = ''.join(g for g in match.groups() if g)
+                
+                # Clean and validate
+                phone = re.sub(r'[\s-]+', '', phone)  # Remove spaces and dashes
+                
+                # Validate it looks like a Philippine number
+                if len(phone) >= 10 and len(phone) <= 13:
+                    self.fields['phone'] = phone
+                    self.confidence['phone'] = 0.90
+                    print(f"[PHONE] Found via label: {phone}")
+                    return
+        
+        # Strategy 2: Look for Philippine mobile number patterns (09XX XXX XXXX)
+        mobile_patterns = [
+            r'\b(09[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',  # 09XX XXX XXXX
+            r'\b(\+639[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',  # +639XX XXX XXXX
+        ]
+        
+        for pattern in mobile_patterns:
+            match = re.search(pattern, text)
+            if match:
+                phone = ''.join(match.groups()).replace(' ', '').replace('-', '')
+                self.fields['phone'] = phone
+                self.confidence['phone'] = 0.80
+                print(f"[PHONE] Found mobile: {phone}")
+                return
+        
+        # Strategy 3: Look for landline patterns (02 XXXX XXXX or similar)
+        landline_patterns = [
+            r'\b(02|032|033|034|035|036|038|042|043|044|045|046|047|048|049|052|053|054|055|056|062|063|064|065|072|074|075|077|078|082|083|084|085|086|088)[\s-]?([0-9]{3,4})[\s-]?([0-9]{4})\b',
+        ]
+        
+        for pattern in landline_patterns:
+            match = re.search(pattern, text)
+            if match:
+                phone = ''.join(match.groups()).replace(' ', '').replace('-', '')
+                self.fields['phone'] = phone
+                self.confidence['phone'] = 0.75
+                print(f"[PHONE] Found landline: {phone}")
+                return
+        
+        print("[PHONE] Not found")
     
     def _extract_address(self, lines, text):
         """Extract address components with enhanced Caloocan detection"""
@@ -341,6 +448,7 @@ class PHIDParser:
                 break
         
         # Extract full street address
+        full_address_extracted = False
         address_keywords = ['ADDRESS', 'RESIDENCE', 'HOME', 'STREET']
         for i, line in enumerate(lines):
             ul = line.upper()
@@ -352,6 +460,10 @@ class PHIDParser:
                     if len(addr_line) > 10:  # Reasonable address length
                         self.fields['full_address'] = addr_line
                         self.confidence['full_address'] = 0.70
+                        
+                        # Parse detailed address components
+                        self._parse_address_components(addr_line)
+                        full_address_extracted = True
                         
                         # Try to extract street/block/lot info
                         if 'BLK' in addr_line.upper() or 'LOT' in addr_line.upper():
@@ -374,7 +486,184 @@ class PHIDParser:
                     if len(full) > 15:
                         self.fields['full_address'] = full
                         self.confidence['full_address'] = 0.60
+                        full_address_extracted = True
+                        # Parse components from this address
+                        self._parse_address_components(full)
                     break
+        
+        # NEW: Always attempt to parse address components from entire text
+        # This ensures we extract block/lot/street even if no explicit "ADDRESS:" label exists
+        if not full_address_extracted:
+            print("[ADDRESS] No labeled address found, parsing from full text...")
+            self._parse_address_components(text)
+            
+            # If we extracted components, construct full_address from them
+            if any(self.fields.get(f) for f in ['block_number', 'lot_number', 'street_name', 'subdivision']):
+                parts = []
+                if self.fields.get('block_number'): parts.append(self.fields['block_number'])
+                if self.fields.get('lot_number'): parts.append(self.fields['lot_number'])
+                if self.fields.get('street_name'): parts.append(self.fields['street_name'])
+                if self.fields.get('subdivision'): parts.append(self.fields['subdivision'])
+                if self.fields.get('barangay'): parts.append(self.fields['barangay'])
+                if self.fields.get('city'): parts.append(self.fields['city'])
+                
+                if parts:
+                    self.fields['full_address'] = ', '.join(parts)
+                    self.confidence['full_address'] = 0.70
+                    print(f"[ADDRESS] Constructed full address from components: {self.fields['full_address']}")
+    
+    def _parse_address_components(self, address_text):
+        """Parse detailedaddress components from full address string"""
+        upper_addr = address_text.upper()
+        
+        # Extract Block Number (e.g., "BLK 9", "BLOCK 9", "BLK. 9", "B-9")
+        block_patterns = [
+            r'BLK\.?\s*#?\s*(\d+)',
+            r'BLOCK\s+#?\s*(\d+)',
+            r'\bB\.?\s*-?\s*(\d+)',  # B-9 or B.9
+        ]
+        for pattern in block_patterns:
+            block_match = re.search(pattern, upper_addr)
+            if block_match:
+                block_num = block_match.group(1)
+                self.fields['block_number'] = f"Block {block_num}"
+                self.confidence['block_number'] = 0.90
+                print(f"[ADDRESS] Block: {block_num}")
+                break
+        
+        # Extract Lot Number (e.g., "LOT 30", "L30", "LOT. 30", "L. 30", "L-30")
+        lot_patterns = [
+            r'LOT\.?\s*#?\s*(\d+)',
+            r'\bL\.?\s*-?\s*(\d+)',  # L-30 or L.30 or L30
+        ]
+        for pattern in lot_patterns:
+            lot_match = re.search(pattern, upper_addr)
+            if lot_match:
+                lot_num = lot_match.group(1)
+                self.fields['lot_number'] = f"Lot {lot_num}"
+                self.confidence['lot_number'] = 0.90
+                print(f"[ADDRESS] Lot: {lot_num}")
+                break
+        
+        # Extract House Number (standalone number at beginning, e.g., "123 Main St", "#123")
+        house_patterns = [
+            r'^#?\s*(\d+)\s+[A-Z]',  # Beginning of address
+            r'(?:HOUSE|H)\s*#?\s*(\d+)',  # "HOUSE #123" or "H 123"
+        ]
+        for pattern in house_patterns:
+            house_match = re.search(pattern, upper_addr)
+            if house_match:
+                self.fields['house_number'] = house_match.group(1)
+                self.confidence['house_number'] = 0.85
+                print(f"[ADDRESS] House: {house_match.group(1)}")
+                break
+        
+        # Extract Street Name
+        # Common patterns: "RUBY ST", "MAIN STREET", "SAMPAGUITA RD"
+        street_patterns = [
+            r'([A-Z][A-Z\s]+?)\s+(ST\b|STREET|RD\b|ROAD|AVE\b|AVENUE|BLVD|DRIVE|LANE)',
+            r',\s*([A-Z][A-Z\s]+?)\s+(ST\b|STREET|RD\b|ROAD)',  # After comma
+        ]
+        for pattern in street_patterns:
+            street_match = re.search(pattern, upper_addr)
+            if street_match:
+                street_name = street_match.group(1).strip()
+                street_type = street_match.group(2)
+                # Clean up - remove BLK/LOT numbers from street name
+                street_name = re.sub(r'(BLK|LOT|BLOCK)\s*\d+', '', street_name).strip()
+                if len(street_name) > 2:  # Valid street name
+                    self.fields['street_name'] = f"{street_name} {street_type}".title()
+                    self.confidence['street_name'] = 0.85
+                    print(f"[ADDRESS] Street: {self.fields['street_name']}")
+                    break
+        
+        # Extract Subdivision/Village (e.g., "CELINA HOMES 3", "VILLA VERDE")
+        # Look for: [NAME] + [HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES]
+        subdivision_patterns = [
+            r'([A-Z][A-Z\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES|HILLS|GARDENS|PARK|RESIDENCES)\s*\d*',
+            r',\s*([A-Z][A-Z\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION)',  # After comma
+        ]
+        for pattern in subdivision_patterns:
+            subdiv_match = re.search(pattern, upper_addr)
+            if subdiv_match:
+                subdiv_name = subdiv_match.group(1).strip()
+                subdiv_type = subdiv_match.group(2)
+                # Clean up
+                subdiv_name = re.sub(r'(BLK|LOT|BLOCK|ST\b|STREET|RD\b)\s*\d*', '', subdiv_name).strip()
+                if len(subdiv_name) > 2:
+                    # Include number if present (e.g., "CELINA HOMES 3")
+                    full_match = re.search(rf'{subdiv_name}\s+{subdiv_type}\s*(\d*)', upper_addr)
+                    if full_match and full_match.group(1):
+                        self.fields['subdivision'] = f"{subdiv_name} {subdiv_type} {full_match.group(1)}".title()
+                    else:
+                        self.fields['subdivision'] = f"{subdiv_name} {subdiv_type}".title()
+                    self.confidence['subdivision'] = 0.85
+                    print(f"[ADDRESS] Subdivision: {self.fields['subdivision']}")
+                    break
+        
+        # Fallback: Handle Phil National ID format (e.g., "LOT 3 NORTHVILLE 2B")
+        if not self.fields.get('subdivision'):
+            # Extract text between LOT number and BARANGAY/comma
+            fallback_pattern = r'LOT\s+\d+\s+([A-Z0-9\s]{3,30}?)(?:\s+(?:BAGUMBONG|BARANGAY)|,)'
+            match = re.search(fallback_pattern, upper_addr)
+            if match:
+                subdiv = match.group(1).strip()
+                # Remove "BAGUMBONG" if captured
+                subdiv = subdiv.replace('BAGUMBONG', '').strip()
+                if subdiv and len(subdiv) > 2:
+                    self.fields['subdivision'] = subdiv.title()
+                    self.confidence['subdivision'] = 0.75
+                    print(f"[ADDRESS] Subdivision (Phil ID): {subdiv}")
+
+        
+        # Extract ZIP Code with improved multi-pattern matching
+        # Philippine ZIP codes are 4 digits (1000-9999)
+        
+        # Pattern 1: Explicit ZIP label (highest confidence)
+        zip_labeled = re.search(r'(?:ZIP|POSTAL)\s*(?:CODE)?[:\s]*(\d{4})', upper_addr, re.I)
+        if zip_labeled:
+            zip_code = zip_labeled.group(1)
+            if 1000 <= int(zip_code) <= 9999:
+                self.fields['zip_code'] = zip_code
+                self.confidence['zip_code'] = 0.95
+                print(f"[ADDRESS] ZIP (labeled): {zip_code}")
+        
+        # Pattern 2: At end of address line (e.g., "Caloocan City 1427")
+        if not self.fields.get('zip_code'):
+            zip_at_end = re.search(r'(?:CITY|CALOOCAN|METRO)\s*,?\s*(\d{4})\s*$', upper_addr, re.I)
+            if zip_at_end:
+                zip_code = zip_at_end.group(1)
+                if 1000 <= int(zip_code) <= 9999:
+                    self.fields['zip_code'] = zip_code
+                    self.confidence['zip_code'] = 0.90
+                    print(f"[ADDRESS] ZIP (at end): {zip_code}")
+        
+        # Pattern 3: After city/barangay (e.g., "Brgy 174, Caloocan 1427")
+        if not self.fields.get('zip_code'):
+            zip_after_loc = re.search(r'(?:CALOOCAN|BARANGAY|BRGY)\s+[\w\s,]*?(\d{4})(?:\s|$)', upper_addr, re.I)
+            if zip_after_loc:
+                zip_code = zip_after_loc.group(1)
+                if 1000 <= int(zip_code) <= 9999:
+                    self.fields['zip_code'] = zip_code
+                    self.confidence['zip_code'] = 0.85
+                    print(f"[ADDRESS] ZIP (after location): {zip_code}")
+        
+        # Pattern 4: Fallback - last 4-digit number, excluding years
+        if not self.fields.get('zip_code'):
+            zip_matches = list(re.finditer(r'\b(\d{4})\b', upper_addr))
+            if zip_matches:
+                for match in reversed(zip_matches):
+                    zip_code = match.group(1)
+                    zip_int = int(zip_code)
+                    # Valid ZIP range, excluding years (1900-2099)
+                    if 1000 <= zip_int <= 9999 and not (1900 <= zip_int <= 2099):
+                        self.fields['zip_code'] = zip_code
+                        self.confidence['zip_code'] = 0.70
+                        print(f"[ADDRESS] ZIP (fallback): {zip_code}")
+                        break
+
+
+
 
 # ============= DUAL OCR ENDPOINT =============
 @app.route("/ocr-dual", methods=["POST"])
@@ -554,6 +843,15 @@ def register():
         city = data.get('city')
         province = data.get('province')
         
+        # New detailed address fields (optional)
+        house_number = data.get('house_number', '')
+        block_number = data.get('block_number', '')
+        lot_number = data.get('lot_number', '')
+        street_name = data.get('street_name', '')
+        subdivision = data.get('subdivision', '')
+        zip_code = data.get('zip_code', '')
+        full_address = data.get('full_address', '')
+        
         if not all([email, password, first_name, last_name, dob, gender, contact, barangay, city, province]):
             return jsonify({"error": "Missing required fields"}), 400
         
@@ -563,10 +861,13 @@ def register():
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO users (email, password_hash, first_name, middle_name, last_name, 
-                              date_of_birth, gender, contact_number, barangay, city, province)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                              date_of_birth, gender, contact_number, barangay, city, province,
+                              house_number, block_number, lot_number, street_name, subdivision, 
+                              zip_code, full_address)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, barangay, city, province))
+        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, barangay, city, province,
+              house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address))
         
         user_id = cur.fetchone()[0]
         conn.commit()
@@ -579,6 +880,7 @@ def register():
         return jsonify({"error": "Email already exists"}), 409
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

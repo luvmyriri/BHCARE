@@ -20,14 +20,13 @@ html {
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg-page);
+  background: transparent;
   color: var(--text-main);
 }
 
 /* App container */
 .app {
   min-height: 100vh;
-  background: linear-gradient(to bottom right, #ffe6dd, #ffffff);
 }
 
 /* Navbar */
