@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import {
     Box,
     Container,
@@ -13,6 +13,7 @@ import {
     Badge,
 } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
+import GoogleMapModal from './GoogleMapModal';
 
 const MapPinIcon = (props: any) => (
     <Icon viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -33,25 +34,28 @@ const PhoneIcon = (props: any) => (
 );
 
 const LocationShowcase = () => {
+    const [isMapOpen, setIsMapOpen] = useState(false);
+
     return (
-        <Box py={20} position="relative" bgGradient="linear(to-b, #fffaf0 0%, white 100%)">
+        <Box pt={10} pb={32} position="relative" bg="transparent" className="animate-fade-in-up">
             {/* Decorative Background Element */}
             <Box
                 position="absolute"
                 left="-5%"
-                top="20%"
+                top="10%"
                 boxSize="400px"
-                bg="teal.50"
+                bg="teal.100"
                 borderRadius="full"
-                filter="blur(80px)"
+                filter="blur(100px)"
+                opacity={0.3}
                 zIndex={0}
             />
 
-            <Container maxW="7xl" position="relative" zIndex={1}>
+            <Container maxW="6xl" position="relative" zIndex={1}>
                 {/* Section Header */}
-                <Flex direction="column" alignItems="center" mb={16} textAlign="center">
-                    <Badge colorScheme="orange" px={3} py={1} rounded="full" mb={4}>
-                        OUR FACILITY
+                <Flex direction="column" alignItems="center" mb={12} textAlign="center">
+                    <Badge colorScheme="purple" px={3} py={1} rounded="full" mb={2}>
+                        FACILITY & COMMUNITY
                     </Badge>
                     <Heading
                         as="h2"
@@ -59,164 +63,147 @@ const LocationShowcase = () => {
                         color="teal.900"
                         fontWeight="800"
                         letterSpacing="tight"
-                        mb={4}
+                        mb={3}
                     >
-                        Modern. Accessible. Community-Centered.
+                        Hub of Health & Life.
                     </Heading>
-                    <Text fontSize="lg" color="gray.500" maxW="2xl">
-                        Located at the heart of Barangay 174, our newly renovated center is designed to provide a comfortable and welcoming environment for all patients.
+                    <Text fontSize="lg" color="gray.600" maxW="2xl">
+                        A modern center for medical excellence and vibrant community engagement.
                     </Text>
                 </Flex>
 
-                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={10} alignItems="center">
-                    {/* Architectural Image Card */}
-                    <Box position="relative">
-                        <Box
-                            bg="white"
-                            p={2}
-                            borderRadius="3xl"
-                            boxShadow="2xl"
-                            position="relative"
-                            zIndex={2}
-                        >
-                            <Image
-                                src="/images/center_architecture.png"
-                                alt="Brgy 174 Health Center Architecture"
-                                borderRadius="2xl"
-                                objectFit="cover"
-                                w="100%"
-                                h={{ base: "300px", md: "450px" }}
-                            />
+                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={12} alignItems="center">
+                    {/* Unbalanced Masonry Grid (Left Side) */}
+                    <Box>
+                        <SimpleGrid columns={2} spacing={5}>
+                            <Stack spacing={5}>
+                                <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.3 }}>
+                                    <Box borderRadius="2xl" overflow="hidden" boxShadow="xl" h="260px" position="relative">
+                                        <Image src="/images/OIP (2).webp" w="100%" h="100%" objectFit="cover" />
+                                        <Box position="absolute" inset={0} bgGradient="linear(to-t, blackAlpha.800 0%, transparent 60%)" />
+                                        <Box position="absolute" bottom={4} left={4}>
+                                            <Text color="white" fontWeight="bold" fontSize="sm">Community</Text>
+                                        </Box>
+                                    </Box>
+                                </motion.div>
+                                <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.3 }}>
+                                    <Box borderRadius="2xl" overflow="hidden" boxShadow="xl" h="180px" position="relative">
+                                        <Image src="/images/center_architecture.png" w="100%" h="100%" objectFit="cover" />
+                                        <Box position="absolute" inset={0} bgGradient="linear(to-t, blackAlpha.800 0%, transparent 60%)" />
+                                        <Box position="absolute" bottom={4} left={4}>
+                                            <Text color="white" fontWeight="bold" fontSize="sm">Facilities</Text>
+                                        </Box>
+                                    </Box>
+                                </motion.div>
+                            </Stack>
 
-                            {/* Floating "Live Status" Pill */}
-                            <Box
-                                position="absolute"
-                                top={6}
-                                left={6}
-                                bg="rgba(255, 255, 255, 0.9)"
-                                backdropFilter="blur(10px)"
-                                px={4}
-                                py={2}
-                                borderRadius="full"
-                                display="flex"
-                                alignItems="center"
-                                gap={2}
-                                boxShadow="md"
-                            >
-                                <Box w="8px" h="8px" bg="green.400" borderRadius="full" className="animate-pulse" />
-                                <Text fontSize="xs" fontWeight="bold" color="teal.800">OPEN NOW</Text>
-                            </Box>
-                        </Box>
-
-                        {/* Background Decor Behind Image */}
-                        <Box
-                            position="absolute"
-                            top="5%"
-                            right="-5%"
-                            w="100%"
-                            h="100%"
-                            bg="orange.100"
-                            borderRadius="3xl"
-                            zIndex={1}
-                            transform="rotate(3deg)"
-                        />
+                            <Stack spacing={5} mt={12}> {/* Moderate Offset */}
+                                <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.3 }}>
+                                    <Box borderRadius="2xl" overflow="hidden" boxShadow="xl" h="200px" position="relative">
+                                        <Image src="/images/OIP.webp" w="100%" h="100%" objectFit="cover" />
+                                        <Box position="absolute" inset={0} bgGradient="linear(to-t, blackAlpha.800 0%, transparent 60%)" />
+                                        <Box position="absolute" bottom={4} left={4}>
+                                            <Text color="white" fontWeight="bold" fontSize="sm">Partnerships</Text>
+                                        </Box>
+                                    </Box>
+                                </motion.div>
+                                <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.3 }}>
+                                    <Box borderRadius="2xl" overflow="hidden" boxShadow="xl" h="240px" position="relative">
+                                        <Image src="/images/OIP (1).webp" w="100%" h="100%" objectFit="cover" />
+                                        <Box position="absolute" inset={0} bgGradient="linear(to-t, blackAlpha.800 0%, transparent 60%)" />
+                                        <Box position="absolute" bottom={4} left={4}>
+                                            <Text color="white" fontWeight="bold" fontSize="sm">Technology</Text>
+                                        </Box>
+                                    </Box>
+                                </motion.div>
+                            </Stack>
+                        </SimpleGrid>
                     </Box>
 
-                    {/* Info / Map Card Section */}
-                    <Stack spacing={6} pl={{ lg: 10 }}>
-                        {/* Address Card */}
-                        <motion.div whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
-                            <Box
-                                bg="white"
-                                p={6}
-                                borderRadius="2xl"
-                                boxShadow="lg"
-                                border="1px solid"
-                                borderColor="gray.100"
-                                position="relative"
-                                overflow="hidden"
-                            >
-                                <Box position="absolute" right={-4} top={-4} bg="teal.50" boxSize="80px" borderRadius="full" />
-                                <Flex alignItems="center" gap={4} position="relative">
-                                    <Box bg="teal.500" p={3} borderRadius="xl" color="white">
-                                        <MapPinIcon boxSize={6} />
+                    {/* Unified Glass Panel (Right Side) */}
+                    <Box>
+                        <Box
+                            bg="rgba(255, 255, 255, 0.6)"
+                            backdropFilter="blur(20px)"
+                            borderRadius="3xl"
+                            p={8}
+                            boxShadow="xl"
+                            border="1px solid"
+                            borderColor="whiteAlpha.400"
+                            position="relative"
+                            overflow="hidden"
+                        >
+                            {/* Decorative element */}
+                            <Box position="absolute" top={0} right={0} w="120px" h="120px" bgGradient="radial(teal.100, transparent)" opacity={0.5} />
+
+                            <Stack spacing={6}>
+                                {/* Visit Us */}
+                                <Flex align="start">
+                                    <Box bg="teal.500" p={2} rounded="lg" mr={4} color="white" mt={1}>
+                                        <MapPinIcon boxSize={5} />
                                     </Box>
                                     <Box>
-                                        <Heading size="md" color="teal.900" mb={1}>Main Location</Heading>
-                                        <Text color="gray.600" fontSize="sm">
-                                            Kanlaon St., Camarin, Barangay 174<br />
+                                        <Heading size="md" color="teal.900" mb={1}>Visit Us</Heading>
+                                        <Text color="gray.600" fontSize="sm" mb={2}>
+                                            Kanlaon St., Camarin, Barangay 174,<br />
                                             Caloocan City, Metro Manila
                                         </Text>
+                                        <Button
+                                            size="sm"
+                                            variant="link"
+                                            color="teal.600"
+                                            onClick={() => setIsMapOpen(true)}
+                                            rightIcon={<Icon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></Icon>}
+                                        >
+                                            Get Directions
+                                        </Button>
                                     </Box>
                                 </Flex>
-                            </Box>
-                        </motion.div>
 
-                        {/* Hours Card */}
-                        <motion.div whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
-                            <Box
-                                bg="white"
-                                p={6}
-                                borderRadius="2xl"
-                                boxShadow="lg"
-                                border="1px solid"
-                                borderColor="gray.100"
-                                position="relative"
-                            >
-                                <Flex alignItems="center" gap={4}>
-                                    <Box bg="orange.400" p={3} borderRadius="xl" color="white">
-                                        <ClockIcon boxSize={6} />
+                                <Box w="full" h="1px" bg="gray.200" />
+
+                                {/* Hours */}
+                                <Flex align="start">
+                                    <Box bg="orange.400" p={2} rounded="lg" mr={4} color="white" mt={1}>
+                                        <ClockIcon boxSize={5} />
+                                    </Box>
+                                    <Box flex={1}>
+                                        <Heading size="md" color="teal.900" mb={1}>Hours</Heading>
+                                        <Flex justify="space-between" w="full" maxW="220px" align="center" mb={1}>
+                                            <Text color="gray.600" fontSize="sm">Weekdays</Text>
+                                            <Text fontWeight="bold" color="teal.800" fontSize="sm">8:00 AM - 5:00 PM</Text>
+                                        </Flex>
+                                        <Flex justify="space-between" w="full" maxW="220px" align="center">
+                                            <Text color="gray.600" fontSize="sm">Emergency</Text>
+                                            <Badge colorScheme="red" variant="solid" rounded="full" fontSize="xs">24/7</Badge>
+                                        </Flex>
+                                    </Box>
+                                </Flex>
+
+                                <Box w="full" h="1px" bg="gray.200" />
+
+                                {/* Connect */}
+                                <Flex align="center">
+                                    <Box bg="blue.500" p={2} rounded="lg" mr={4} color="white">
+                                        <PhoneIcon boxSize={5} />
                                     </Box>
                                     <Box>
-                                        <Heading size="md" color="teal.900" mb={1}>Operating Hours</Heading>
-                                        <Text color="gray.600" fontSize="sm">
-                                            Monday - Friday: 8:00 AM - 5:00 PM<br />
-                                            <Text as="span" color="orange.500" fontWeight="bold">Emergency: 24/7</Text>
+                                        <Heading size="md" color="teal.900" mb={1}>Connect</Heading>
+                                        <Text color="teal.800" fontWeight="bold" fontSize="lg" lineHeight="1">
+                                            (02) 8961-1234
                                         </Text>
+                                        <Text color="gray.500" fontSize="xs">info@brgy174hc.gov.ph</Text>
                                     </Box>
                                 </Flex>
-                            </Box>
-                        </motion.div>
-
-                        {/* Contact Card */}
-                        <motion.div whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
-                            <Box
-                                bg="white"
-                                p={6}
-                                borderRadius="2xl"
-                                boxShadow="lg"
-                                border="1px solid"
-                                borderColor="gray.100"
-                                position="relative"
-                            >
-                                <Flex alignItems="center" gap={4}>
-                                    <Box bg="blue.500" p={3} borderRadius="xl" color="white">
-                                        <PhoneIcon boxSize={6} />
-                                    </Box>
-                                    <Box>
-                                        <Heading size="md" color="teal.900" mb={1}>Contact Us</Heading>
-                                        <Text color="gray.600" fontSize="sm">
-                                            (02) 8961-1234<br />
-                                            info@brgy174hc.gov.ph
-                                        </Text>
-                                    </Box>
-                                </Flex>
-                            </Box>
-                        </motion.div>
-
-                        <Button
-                            size="lg"
-                            variant="link"
-                            color="teal.600"
-                            alignSelf="start"
-                            mt={4}
-                            rightIcon={<Icon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></Icon>}
-                        >
-                            View on Google Maps
-                        </Button>
-                    </Stack>
+                            </Stack>
+                        </Box>
+                    </Box>
                 </SimpleGrid>
             </Container>
+
+
+
+            <GoogleMapModal isOpen={isMapOpen} onClose={() => setIsMapOpen(false)} />
         </Box>
     );
 };

@@ -68,11 +68,11 @@ const Select: React.FC<
             fontSize: '9px',
             padding: '2px 6px',
             borderRadius: '4px',
-            background: confidence > 0.8 ? '#c6f6d5' : '#fed7d7',
-            color: confidence > 0.8 ? '#22543d' : '#742a2a',
+            background: confidence >= 0.8 ? '#c6f6d5' : confidence > 0.5 ? '#fef3c7' : '#fed7d7',
+            color: confidence >= 0.8 ? '#22543d' : confidence > 0.5 ? '#744210' : '#742a2a',
             fontWeight: 700
           }}>
-            {confidence > 0.8 ? '✓ Auto' : '✗ Manual'}
+            {confidence >= 0.8 ? '✓ Auto' : confidence > 0.5 ? '~ Low' : '✗ Manual'}
           </span>
         )}
       </label>
@@ -81,8 +81,8 @@ const Select: React.FC<
         style={{
           display: 'flex',
           alignItems: 'center',
-          background: confidence && confidence > 0.8 ? 'rgba(198,246,213,0.3)' : 'rgba(255,255,255,0.8)',
-          border: invalid ? '1px solid #e53e3e' : confidence && confidence > 0.8 ? '1px solid #48bb78' : '1px solid #e2e8f0',
+          background: confidence && confidence >= 0.8 ? 'rgba(198,246,213,0.3)' : 'rgba(255,255,255,0.8)',
+          border: invalid ? '1px solid #e53e3e' : confidence && confidence >= 0.8 ? '1px solid #48bb78' : '1px solid #e2e8f0',
           borderRadius: '8px',
           padding: '8px 12px',
           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
@@ -310,6 +310,8 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
       if (fields.last_name) setLastName(fields.last_name);
       if (fields.dob) setDob(fields.dob);
       if (fields.gender) setGender(fields.gender);
+      if (fields.phone) setContact(fields.phone);
+
 
       // Auto-populate address cascade
       if (fields.region) {
@@ -776,7 +778,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                 required
               />
 
-              <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => setContact(e.target.value)} required />
+              <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => setContact(e.target.value)} confidence={confidence.phone} required />
               <Input label={t.email} icon="📧" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
               <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '8px', marginTop: '16px' }}>🏠 Address (Auto-filled via OCR)</h3>
@@ -864,7 +866,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                   confidence={confidence.zip_code}
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
-                  placeholder="1421"
+                  placeholder="1422"
                 />
               </div>
               <Input
