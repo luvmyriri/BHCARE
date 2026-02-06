@@ -1,0 +1,64 @@
+/* Global Animations */
+
+/* Fade In Up - Elements slide up and appear */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 40px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    opacity: 0; /* Initially hidden */
+}
+
+/* Stagger delay classes */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* Gentle Hover Float */
+.hover-float {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hover-float:hover {
+    transform: translateY(-8px);
+}
+
+/* Shimmer Effect for Cards */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.shimmer-bg {
+    background: linear-gradient(105deg, 
+        rgba(255,255,255,0) 0%, 
+        rgba(255,255,255,0.4) 50%, 
+        rgba(255,255,255,0) 100%);
+    background-size: 200% auto;
+    animation: shimmer 3s infinite linear;
+}
+
+/* Pulse Glow (Reusable) */
+@keyframes pulseGlowSoft {
+    0% { box-shadow: 0 0 0 0 rgba(79, 209, 197, 0.4); }
+    70% { box-shadow: 0 0 0 15px rgba(79, 209, 197, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(79, 209, 197, 0); }
+}
+
+.pulse-glow:hover {
+    animation: pulseGlowSoft 2s infinite;
+}
