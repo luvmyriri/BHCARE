@@ -36,13 +36,34 @@ def init_db():
             barangay VARCHAR(100) NOT NULL,
             city VARCHAR(100) NOT NULL,
             province VARCHAR(100) NOT NULL,
+            house_number VARCHAR(50),
+            block_number VARCHAR(50),
+            lot_number VARCHAR(50),
+            street_name VARCHAR(100),
+            subdivision VARCHAR(100),
+            zip_code VARCHAR(10),
+            full_address TEXT,
             id_image_path VARCHAR(255),
             id_image BYTEA,
             ocr_text TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    cursor.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS id_image BYTEA;')
+    
+    # Ensure all columns exist for existing tables
+    columns_to_add = [
+        ('house_number', 'VARCHAR(50)'),
+        ('block_number', 'VARCHAR(50)'),
+        ('lot_number', 'VARCHAR(50)'),
+        ('street_name', 'VARCHAR(100)'),
+        ('subdivision', 'VARCHAR(100)'),
+        ('zip_code', 'VARCHAR(10)'),
+        ('full_address', 'TEXT'),
+        ('id_image', 'BYTEA')
+    ]
+    
+    for col_name, col_type in columns_to_add:
+        cursor.execute(f'ALTER TABLE users ADD COLUMN IF NOT EXISTS {col_name} {col_type};')
     
     conn.commit()
     cursor.close()

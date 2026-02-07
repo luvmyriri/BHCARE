@@ -95,7 +95,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
   };
 
   return (
-    <div className="auth-card" style={{ maxWidth: 600, margin: '0 auto', boxShadow: 'none' }}>
+    <div className="auth-card" style={{ maxWidth: 600, margin: '20px auto' }}>
       <h2 className="auth-title">My Profile</h2>
       <p className="auth-subtitle">Update your information</p>
       <Field label="First Name" icon="👤" value={form.first_name} onChange={updateField('first_name')} />
