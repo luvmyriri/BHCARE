@@ -14,6 +14,7 @@ export default defineConfig({
             '/register': 'http://localhost:5000',
             '/login': 'http://localhost:5000',
             '/ocr': 'http://localhost:5000',
+            '/ocr-dual': 'http://localhost:5000',
             '/user': 'http://localhost:5000',
             '/appointments': 'http://localhost:5000',
             '/services': 'http://localhost:5000',
