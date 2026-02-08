@@ -179,7 +179,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
     if (errorEl) errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const formatPHPhoneNumber = (input: string) => {
+  const formatPHPhone = (input: string) => {
     // Remove all non-numeric characters except +
     let cleaned = input.replace(/[^\d+]/g, '');
 
@@ -248,19 +248,6 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
     return "Government ID";
   };
 
-  const formatPHNumber = (val: string) => {
-    let cleaned = val.replace(/[^0-9+]/g, '');
-    if (cleaned.startsWith('09')) cleaned = '+63' + cleaned.substring(1);
-    else if (cleaned.startsWith('63') && !cleaned.startsWith('+63')) cleaned = '+' + cleaned;
-    else if (cleaned.startsWith('9')) cleaned = '+63' + cleaned;
-
-    if (!cleaned.startsWith('+63')) {
-      const digits = cleaned.replace(/\D/g, '');
-      cleaned = '+63' + digits;
-    }
-    if (cleaned.length > 13) cleaned = cleaned.substring(0, 13);
-    return cleaned;
-  };
 
   const formatName = (val: string) => {
     return val.replace(/[^a-zA-Z\s'-.]/g, '');
@@ -342,7 +329,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const handleInputChange = (field: string, value: string, setter: (v: string) => void) => {
     let finalValue = value;
     if (field === 'contact') {
-      finalValue = formatPHPhoneNumber(value);
+      finalValue = formatPHPhone(value);
     }
     setter(finalValue);
     // If the field is already invalid, validate immediately on change to clear error if fixed
@@ -471,8 +458,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       if (fields.last_name) setLastName(fields.last_name);
       if (fields.dob) setDob(fields.dob);
       if (fields.gender) setGender(fields.gender);
-      if (fields.contact) setContact(formatPHPhoneNumber(fields.contact));
-      if (fields.phone) setContact(formatPHPhoneNumber(fields.phone));
+      if (fields.contact) setContact(formatPHPhone(fields.contact));
+      if (fields.phone) setContact(formatPHPhone(fields.phone));
       if (fields.email) setEmail(fields.email);
       if (fields.philhealth_id) setPhilhealthId(fields.philhealth_id);
 
@@ -630,22 +617,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   // Unified Gradient Split-Screen Layout for All Modes
   return (
     <>
-      <div className="auth-card" style={{
-        maxWidth: '900px',
-        width: '100%',
-        margin: '0 auto',
-        background: 'white',
-        position: 'relative',
-        borderRadius: '24px',
-        padding: '0',
-        boxShadow: '0 20px 60px -15px rgba(0, 0, 0, 0.25)',
-        zIndex: 10,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'row',
-        minHeight: '600px',
-        maxHeight: '90vh'
-      }}>
+      <div className="auth-card">
         {/* LEFT SIDE - BRANDING (Persistent) */}
         <div style={{
           flex: '0 0 50%',
@@ -658,7 +630,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
           textAlign: 'center',
           color: 'white',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          minHeight: '200px' // Added for mobile stack visibility
         }}>
           <div style={{
             position: 'absolute',
@@ -710,12 +683,11 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
         {/* RIGHT SIDE - DYNAMIC CONTENT */}
         <div className="form-scroll" style={{
-          flex: '0 0 50%',
+          flex: '1',
           padding: '40px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'flex-start', // Changed from center to prevent top clipping
-          overflowY: 'auto',
+          justifyContent: 'flex-start',
           maxHeight: '100%'
         }}>
           {mode === 'login' ? (
@@ -821,7 +793,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
             </form>
           ) : (
             // REGISTER FORM
-            <form onSubmit={handleRegister} style={{ width: '100%', maxWidth: '500px', margin: 'auto' }}>
+            <form onSubmit={handleRegister} style={{ width: '100%', maxWidth: '800px', margin: 'auto' }}>
               <button
                 type="button"
                 onClick={() => setMode('login')}
@@ -1116,7 +1088,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   <div style={{ marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📝 Personal Details</h3>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="auth-form-row">
                       <Input
                         label="First Name"
                         icon="👤"
@@ -1140,10 +1112,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         required
                       />
                     </div>
-                    <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value))} />
-
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                    <div className="auth-form-row">
+                      <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value))} />
                       <Input
                         label={t.dob}
                         icon="📅"
@@ -1155,6 +1125,9 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         invalid={errors.dob}
                         required
                       />
+                    </div>
+
+                    <div className="auth-form-row">
                       <Select
                         label={t.gender}
                         icon="⚧"
@@ -1168,10 +1141,17 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         onChange={(e) => setGender(e.target.value)}
                         required
                       />
+                      <Input
+                        label="PhilHealth ID (Optional)"
+                        icon="🆔"
+                        value={philhealthId}
+                        onChange={(e) => setPhilhealthId(formatPhilHealthId(e.target.value))}
+                        placeholder="XX-XXXXXXXXX-X"
+                      />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => handleInputChange('contact', formatPHNumber(e.target.value), setContact)} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
+                    <div className="auth-form-row">
+                      <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => handleInputChange('contact', formatPHPhone(e.target.value), setContact)} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
                       <Input
                         label="Email Address"
                         icon="✉️"
@@ -1186,39 +1166,28 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       />
                     </div>
 
-                    <div style={{ marginTop: '12px' }}>
-                      <Input
-                        label="PhilHealth ID (Optional)"
-                        icon="🆔"
-                        value={philhealthId}
-                        onChange={(e) => setPhilhealthId(formatPhilHealthId(e.target.value))}
-                        placeholder="XX-XXXXXXXXX-X"
-                      />
+                    <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', marginTop: '24px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Address Details</h3>
+                    <div className="auth-form-row">
+                      <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => handleInputChange('province', e.target.value, setProvince)} onBlur={() => validateField('province', province)} invalid={errors.province} required />
+                      <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => handleInputChange('city', e.target.value, setCity)} onBlur={() => validateField('city', city)} invalid={errors.city} required />
                     </div>
 
-                    <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', marginTop: '24px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Address Details</h3>
-                    <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => handleInputChange('province', e.target.value, setProvince)} onBlur={() => validateField('province', province)} invalid={errors.province} required />
-                    <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => handleInputChange('city', e.target.value, setCity)} onBlur={() => validateField('city', city)} invalid={errors.city} required />
-                    <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => handleInputChange('barangay', e.target.value, setBarangay)} onBlur={() => validateField('barangay', barangay)} invalid={errors.barangay} required />
-
-                    <div style={{ marginTop: '12px' }}>
+                    <div className="auth-form-row">
+                      <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => handleInputChange('barangay', e.target.value, setBarangay)} onBlur={() => validateField('barangay', barangay)} invalid={errors.barangay} required />
                       <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                    <div className="auth-form-row">
                       <Input label="Block" icon="📍" confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
                       <Input label="Lot" icon="📍" confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
                     </div>
 
-                    <div style={{ marginTop: '12px' }}>
+                    <div className="auth-form-row">
                       <Input label="Street" icon="🛣️" confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
-                    </div>
-
-                    <div style={{ marginTop: '12px' }}>
                       <Input label="Village / Subdivision" icon="🏘️" confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
                     </div>
 
-                    <div style={{ marginTop: '12px' }}>
+                    <div className="auth-form-row">
                       <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
                     </div>
 

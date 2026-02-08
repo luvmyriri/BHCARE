@@ -32,6 +32,7 @@ import {
     DrawerContent,
     DrawerCloseButton,
     IconButton,
+    SimpleGrid,
 } from '@chakra-ui/react';
 import {
     FiHome,
@@ -96,7 +97,7 @@ const NavItem = ({ icon, children, active, onClick }: any) => {
 const StatCard = ({ label, value, icon, color, onClick }: any) => (
     <Box
         bg="white"
-        p={6}
+        p={{ base: 4, md: 6 }}
         borderRadius="2xl"
         boxShadow="sm"
         border="1px solid"
@@ -126,32 +127,32 @@ const StatCard = ({ label, value, icon, color, onClick }: any) => (
 const PageHero = ({ title, description, badge }: any) => (
     <Box
         bg="linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)"
-        p={10}
-        borderRadius="3xl"
+        p={{ base: 6, md: 10 }}
+        borderRadius={{ base: "2xl", md: "3xl" }}
         color="white"
         boxShadow="xl"
         position="relative"
         overflow="hidden"
-        mb={8}
+        mb={{ base: 6, md: 8 }}
     >
         <Box position="relative" zIndex={1}>
             <HStack spacing={4} mb={2}>
-                <Badge colorScheme="orange" variant="solid" px={3} borderRadius="full">{badge}</Badge>
-                <Text fontSize="sm" fontWeight="600" opacity={0.8}>BHCare Patient Portal</Text>
+                <Badge colorScheme="orange" variant="solid" px={3} borderRadius="full" fontSize={{ base: "xs", md: "sm" }}>{badge}</Badge>
+                <Text fontSize={{ base: "xs", md: "sm" }} fontWeight="600" opacity={0.8}>BHCare Patient Portal</Text>
             </HStack>
-            <Heading size="xl" mb={4}>
+            <Heading size={{ base: "lg", md: "xl" }} mb={4} lineHeight="shorter">
                 {title}
             </Heading>
-            <Text fontSize="lg" opacity={0.9} maxW="lg">
+            <Text fontSize={{ base: "md", md: "lg" }} opacity={0.9} maxW="lg">
                 {description}
             </Text>
         </Box>
         <Icon
             as={FiActivity}
             position="absolute"
-            right="-20px"
-            bottom="-20px"
-            boxSize="200px"
+            right={{ base: "-30px", md: "-20px" }}
+            bottom={{ base: "-30px", md: "-20px" }}
+            boxSize={{ base: "150px", md: "200px" }}
             opacity={0.15}
             transform="rotate(-15deg)"
         />
@@ -250,11 +251,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             description="Your health is our priority. Manage your appointments, health records, and profile details right here."
                         />
 
-                        <Flex gap={6} flexWrap="wrap">
+                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={6}>
                             <StatCard label="Upcoming Appointments" value="1" icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
                             <StatCard label="Health Records" value="12" icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
                             <StatCard label="Health Score" value="98%" icon={FiActivity} color="green" onClick={() => handleCardClick('health_score')} />
-                        </Flex>
+                        </SimpleGrid>
 
                         <Heading size="md" color="teal.800" mt={4}>
                             Recent Activity
@@ -443,35 +444,48 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             </Box>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p="8" position="relative">
-                <Flex justify="space-between" align="center" mb={10}>
-                    <HStack spacing={4}>
+            <Box ml={{ base: 0, md: '280px' }} p={{ base: 4, sm: 6, md: 8 }} position="relative">
+                <Flex 
+                    justify="space-between" 
+                    align={{ base: "start", sm: "center" }} 
+                    mb={{ base: 6, md: 10 }}
+                    direction={{ base: "column", sm: "row" }}
+                    gap={4}
+                >
+                    <HStack spacing={4} w="full">
                         <IconButton
                             display={{ base: 'flex', md: 'none' }}
                             onClick={onSidebarOpen}
                             variant="outline"
                             aria-label="open menu"
                             icon={<FiMenu />}
+                            size="md"
                         />
                         <VStack align="start" spacing={0}>
-                            <Heading size="md" color="teal.800" textTransform="capitalize">
+                            <Heading size={{ base: "sm", md: "md" }} color="teal.800" textTransform="capitalize">
                                 {activeTab.replace('-', ' ')}
                             </Heading>
-                            <Text color="gray.400" fontSize="sm">
+                            <Text color="gray.400" fontSize={{ base: "xs", md: "sm" }}>
                                 Healthcare Dashboard v4.0
                             </Text>
                         </VStack>
                     </HStack>
-                    <HStack spacing={4}>
-                        <VStack align="end" spacing={0} mr={2}>
-                            <Text fontWeight="700" color="teal.800" fontSize="sm">
+                    <HStack spacing={3} align={{ base: "start", sm: "center" }} pl={{ base: 12, sm: 0 }} maxW={{ base: "calc(100% - 60px)", sm: "auto" }}>
+                        <VStack align="end" spacing={0} mr={2} overflow="hidden">
+                            <Text 
+                                fontWeight="700" 
+                                color="teal.800" 
+                                fontSize={{ base: "sm", md: "md" }} 
+                                isTruncated
+                                maxW="full"
+                            >
                                 {user?.first_name} {user?.last_name}
                             </Text>
-                            <Text color="gray.500" fontSize="xs" fontWeight="500">
-                                Patient ID: #{user?.id?.toString().padStart(4, '0')}
-                            </Text>
+                            <Badge colorScheme="teal" variant="subtle" fontSize="10px" borderRadius="full" px={2}>
+                                Patient
+                            </Badge>
                         </VStack>
-                        <Avatar size="md" name={`${user?.first_name} ${user?.last_name}`} bg="teal.500" color="white" border="2px solid white" boxShadow="md" />
+                        <Avatar size={{ base: "sm", md: "md" }} name={`${user?.first_name} ${user?.last_name}`} bg="teal.500" color="white" border="2px solid white" boxShadow="md" flexShrink={0} />
                     </HStack>
                 </Flex>
 

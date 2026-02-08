@@ -80,15 +80,15 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                     <Stack spacing={{ base: 6, md: 8 }} textAlign={{ base: 'center', lg: 'left' }}>
                         <Box>
                             <Badge
-                                px={5}
-                                py={2}
+                                px={4}
+                                py={1.5}
                                 rounded="full"
                                 bg="teal.50"
                                 color="teal.600"
                                 border="1px solid"
                                 borderColor="teal.100"
                                 fontWeight="bold"
-                                fontSize="xs"
+                                fontSize={{ base: "10px", md: "xs" }}
                                 boxShadow="sm"
                                 mb={6}
                                 display="inline-flex"
@@ -103,14 +103,14 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
 
                             <Heading
                                 as="h1"
-                                fontSize={{ base: "2rem", md: "3.5rem", lg: "4.5rem", xl: "5rem" }} // Reduced base font size
+                                fontSize={{ base: "2.25rem", sm: "2.75rem", md: "3.5rem", lg: "4.5rem", xl: "5rem" }}
                                 fontWeight="800"
                                 lineHeight="1.1"
                                 letterSpacing="tight"
                                 color="teal.900"
                                 mb={6}
                             >
-                                <Text as="span" display="block" color="teal.500" fontSize={{ base: "1rem", md: "1.5rem", lg: "1.875rem" }} fontWeight="bold" mb={2} letterSpacing="normal">
+                                <Text as="span" display="block" color="teal.500" fontSize={{ base: "0.875rem", md: "1.25rem", lg: "1.5rem" }} fontWeight="bold" mb={2} letterSpacing="normal">
                                     {t.heroTitle}
                                 </Text>
                                 {/* Mint to Orange Gradient Text */}
@@ -135,19 +135,20 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                         </Box>
 
                         {/* NEW BUTTONS: REGISTER & LOGIN */}
-                        <Stack direction={{ base: "column", sm: "row" }} spacing={4} justify={{ base: 'center', lg: 'flex-start' }}>
+                        <Stack direction={{ base: "column", sm: "row" }} spacing={4} justify={{ base: 'center', lg: 'flex-start' }} w={{ base: "full", sm: "auto" }}>
                             <Button
                                 size="lg"
                                 rounded="full"
                                 bg="orange.400"
                                 color="white"
                                 px={10}
-                                h={16}
-                                fontSize="lg"
+                                h={{ base: 14, md: 16 }}
+                                fontSize={{ base: "md", md: "lg" }}
                                 fontWeight="bold"
                                 _hover={{ bg: "orange.500", transform: "translateY(-2px)", boxShadow: "xl" }}
                                 transition="all 0.2s"
                                 onClick={onRegisterClick}
+                                w={{ base: "full", sm: "auto" }}
                             >
                                 {t.heroRegister}
                             </Button>
@@ -157,12 +158,13 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                                 variant="ghost"
                                 color="teal.600"
                                 px={10}
-                                h={16}
-                                fontSize="lg"
+                                h={{ base: 14, md: 16 }}
+                                fontSize={{ base: "md", md: "lg" }}
                                 fontWeight="bold"
                                 _hover={{ bg: "teal.50", color: "teal.700" }}
                                 transition="all 0.2s"
                                 onClick={onLoginClick}
+                                w={{ base: "full", sm: "auto" }}
                             >
                                 {t.heroLogin}
                             </Button>

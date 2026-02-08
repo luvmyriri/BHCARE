@@ -91,7 +91,7 @@ const AIChatbot: React.FC = () => {
     };
 
     return (
-        <Box position="fixed" bottom="30px" right="30px" zIndex={1000}>
+        <Box position="fixed" bottom={{ base: "20px", md: "30px" }} right={{ base: "20px", md: "30px" }} zIndex={1000}>
             <AnimatePresence>
                 {isOpen && (
                     <MotionBox
@@ -100,7 +100,8 @@ const AIChatbot: React.FC = () => {
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
                         bg="white"
-                        w="350px"
+                        w={{ base: "calc(100vw - 40px)", sm: "350px" }}
+                        maxW="350px"
                         h="500px"
                         borderRadius="2xl"
                         boxShadow="2xl"

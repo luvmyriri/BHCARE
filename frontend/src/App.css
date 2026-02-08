@@ -1,7 +1,7 @@
 :root {
-  --primary: #FFB7A5;
+  --primary: #ffb7a5;
   --primary-dark: #f08b6f;
-  --secondary: #98FF98;
+  --secondary: #98ff98;
   --secondary-dark: #6ee76e;
   --text-main: #222222;
   --bg-page: #fff7f4;
@@ -19,7 +19,12 @@ html {
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   background: transparent;
   color: var(--text-main);
 }
@@ -101,7 +106,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
 
 .profile-button:hover {
@@ -211,7 +216,7 @@ body {
   padding: 12px;
   border-radius: 10px;
   border: none;
-  background: #2563eb; 
+  background: #2563eb;
   color: #fff;
   font-size: 1rem;
   font-weight: 600;
@@ -245,7 +250,6 @@ body {
 .signup-link:hover {
   text-decoration: underline;
 }
-
 
 /* Hero section */
 .hero {
@@ -344,12 +348,29 @@ body {
 }
 
 .auth-card {
-  max-width: 420px;
-  padding: 30px;
+  max-width: 900px;
+  width: 95%;
+  margin: 1rem auto;
   background: white;
-  border-radius: 20px;
-  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.2);
-  margin: 0 auto;
+  position: relative;
+  border-radius: 24px;
+  padding: 0;
+  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  min-height: 600px;
+  max-height: 90vh;
+}
+
+@media (max-width: 768px) {
+  .auth-card {
+    flex-direction: column;
+    max-height: none;
+    height: auto;
+    margin: 1rem auto;
+  }
 }
 
 .auth-title {
@@ -403,7 +424,7 @@ label {
 
 .auth-input.invalid {
   border-color: #e53935;
-  box-shadow: 0 0 0 1px rgba(229,57,53,0.15);
+  box-shadow: 0 0 0 1px rgba(229, 57, 53, 0.15);
 }
 
 .auth-input.invalid input,
@@ -445,7 +466,6 @@ label {
   font-weight: 600;
   cursor: pointer;
 }
-
 
 /* Certification card */
 .cert-card {
@@ -576,19 +596,32 @@ label {
   pointer-events: auto; /* Re-enable clicks for actual content */
 }
 
-
-/* Close button */
+/* Close button - Positioned within container */
 .modal-close {
   position: absolute;
-  top: 10px;
-  right: 15px;
-  font-size: 24px;
-  background: none;
+  top: 15px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  font-size: 28px;
+  line-height: 1;
+  background: #f1f5f9;
+  color: #64748b;
   border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   z-index: 1000;
+  transition: all 0.2s;
 }
 
+.modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  transform: rotate(90deg);
+}
 
 /* Scrollable form inside */
 .form-scroll {
@@ -596,12 +629,37 @@ label {
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow-y: auto;
+}
+
+.auth-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .auth-form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .form-scroll {
+    padding: 30px 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-scroll {
+    padding: 20px 10px;
+  }
 }
 
 /* Scrollbar style */
 /* Removed scrollbar styles as they are no longer needed */
-
-
 
 /* Responsive */
 @media (max-width: 960px) {
@@ -620,18 +678,17 @@ label {
   }
 
   .nav-links a {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1.1;
-}
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.1;
+  }
 
-.sub-label {
-  font-size: 0.7rem;
-  color: #6b7280;
-  font-weight: 400;
-}
-
+  .sub-label {
+    font-size: 0.7rem;
+    color: #6b7280;
+    font-weight: 400;
+  }
 
   .services {
     padding: 2.5rem 1.5rem 3.5rem;
@@ -644,5 +701,23 @@ label {
   .hero-image {
     width: 100%;
     height: 260px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 2.2rem;
+  }
+
+  .badge {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.8rem;
+  }
+
+  .primary-btn,
+  .secondary-btn {
+    padding: 0.7rem 1.2rem;
+    font-size: 0.9rem;
+    width: 100%;
   }
 }
