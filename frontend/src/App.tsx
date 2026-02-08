@@ -13,7 +13,7 @@ import Dashboard from './Dashboard';
 import DoctorDashboard from './DoctorDashboard';
 import AdminDashboard from './AdminDashboard';
 import SecurityDashboard from './SecurityDashboard';
-import InstallPWA from './components/InstallPWA';
+import FloatingActions from './components/FloatingActions';
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);
@@ -119,7 +119,7 @@ function App() {
       <Services />
       <ContactForm />
       <Footer onAppointmentClick={() => openLogin('login')} />
-      <InstallPWA />
+      <FloatingActions />
 
       {showLogin && (
         <div className="modal-overlay" onClick={closeLogin}>
@@ -127,7 +127,7 @@ function App() {
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
           >
-            <button className="modal-close" onClick={closeLogin}>
+            <button className="modal-close" onClick={closeLogin} aria-label="Close modal">
               ×
             </button>
             <div className="form-scroll">

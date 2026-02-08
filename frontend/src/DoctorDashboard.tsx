@@ -31,6 +31,7 @@ import {
     DrawerContent,
     DrawerCloseButton,
     IconButton,
+    SimpleGrid,
 } from '@chakra-ui/react';
 import {
     FiGrid,
@@ -123,8 +124,8 @@ const DoctorStatCard = ({ label, value, icon, color, onClick }: any) => (
 const PageHero = ({ title, description, badge }: any) => (
     <Box
         bg="linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)"
-        p={10}
-        borderRadius="3xl"
+        p={{ base: 6, md: 10 }}
+        borderRadius={{ base: "2xl", md: "3xl" }}
         color="white"
         boxShadow="xl"
         position="relative"
@@ -134,12 +135,12 @@ const PageHero = ({ title, description, badge }: any) => (
         <Box position="relative" zIndex={1}>
             <HStack spacing={4} mb={2}>
                 <Badge colorScheme="orange" variant="solid" px={3} borderRadius="full">{badge}</Badge>
-                <Text fontSize="sm" fontWeight="600" opacity={0.8}>Brgy. 174 Health Center</Text>
+                <Text fontSize="xs" fontWeight="600" opacity={0.8}>Brgy. 174 Health Center</Text>
             </HStack>
-            <Heading size="xl" mb={4}>
+            <Heading size={{ base: "lg", md: "xl" }} mb={4} lineHeight="1.2">
                 {title}
             </Heading>
-            <Text fontSize="lg" opacity={0.9} maxW="lg">
+            <Text fontSize={{ base: "md", lg: "lg" }} opacity={0.9} maxW="lg">
                 {description}
             </Text>
         </Box>
@@ -148,7 +149,7 @@ const PageHero = ({ title, description, badge }: any) => (
             position="absolute"
             right="-20px"
             bottom="-20px"
-            boxSize="200px"
+            boxSize={{ base: "150px", md: "200px" }}
             opacity={0.15}
             transform="rotate(-15deg)"
         />
@@ -311,12 +312,12 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                             description="You have 8 consultations scheduled for today. 2 patients are currently in the waiting area."
                         />
 
-                        <Flex gap={6} flexWrap="wrap">
+                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={6}>
                             <DoctorStatCard label="Patients Today" value={patientsQueue.length || "0"} icon={FiUsers} color="teal" onClick={() => handleCardClick('patients')} />
                             <DoctorStatCard label="Consultations Done" value="2" icon={FiClipboard} color="orange" onClick={() => handleCardClick('consultations')} />
                             <DoctorStatCard label="Critical Cases" value="0" icon={FiActivity} color="red" onClick={() => handleCardClick('critical')} />
                             <DoctorStatCard label="Pending Lab Results" value={labResults.length || "0"} icon={FiBox} color="orange" onClick={() => handleCardClick('labs')} />
-                        </Flex>
+                        </SimpleGrid>
 
                         <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" align="center" mb={6}>
