@@ -155,23 +155,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                     </Stack>
 
                     {/* Right Image Column - Highlighting Achievements */}
-                    <Box position="relative" h={{ base: "450px", md: "650px" }} w="full">
-                        {/* Mint Arch Background */}
-                        <Box
-                            position="absolute"
-                            top="5%"
-                            right="5%"
-                            bottom="5%"
-                            left="15%"
-                            bg="whiteAlpha.200"
-                            backdropFilter="blur(8px)"
-                            borderTopRadius="full"
-                            borderBottomRadius="full"
-                            border="1px solid"
-                            borderColor="whiteAlpha.300"
-                            boxShadow="2xl"
-                            zIndex={0}
-                        />
+                    <Box position="relative" h={{ base: "400px", md: "500px" }} w="full">
 
                         {/* Doctor Image */}
                         <Box
@@ -180,7 +164,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             w="100%"
                             display="flex"
                             justifyContent="center"
-                            alignItems="flex-end"
+                            alignItems="flex-start"
                             zIndex={1}
                             pl={{ lg: 10 }}
                         >
@@ -188,10 +172,10 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                                 src="/images/Logo.png"
                                 alt="Healthcare Logo"
                                 objectFit="contain"
-                                h={{ base: "90%", md: "105%" }}
+                                h={{ base: "85%", md: "95%" }}
                                 maxW="none"
                                 filter="drop-shadow(0px 20px 40px rgba(0,0,0,0.1))"
-                                transform="translateY(30px)"
+                                transform="translateY(0px)"
                             />
                         </Box>
 
