@@ -12,6 +12,7 @@ import Services from './services';
 import Dashboard from './Dashboard';
 import DoctorDashboard from './DoctorDashboard';
 import AdminDashboard from './AdminDashboard';
+import InstallPWA from './components/InstallPWA';
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);
@@ -101,6 +102,7 @@ function App() {
       <Services />
       <ContactForm />
       <Footer />
+      <InstallPWA />
 
       {showLogin && (
         <div className="modal-overlay" onClick={closeLogin}>

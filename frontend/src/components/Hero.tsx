@@ -11,6 +11,7 @@ import {
     SimpleGrid,
     Badge,
     HStack,
+    useBreakpointValue,
 } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -46,12 +47,20 @@ interface HeroProps {
     onLoginClick?: () => void;
 }
 
-
-
 const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
     const { t } = useLanguage();
     // Gradient for the text "KALUSUGAN ANG UNA" (Mint Green -> Light Orange)
     const textGradient = "linear(to-r, teal.400, orange.300)";
+
+    // Responsive values for floating elements with granular control and clamp() for smooth scaling
+    const topPerformingTop = useBreakpointValue({ base: '2%', md: '5%', lg: '10%', xl: '15%' });
+    const topPerformingRight = useBreakpointValue({ base: '2%', md: '-2%', lg: '-5%', xl: '0%' });
+
+    const readinessTop = useBreakpointValue({ base: '30%', md: '35%', lg: '40%', xl: '45%' });
+    const readinessLeft = useBreakpointValue({ base: '2%', md: '-10%', lg: '-15%', xl: '-5%' });
+
+    const digitizedBottom = useBreakpointValue({ base: '2%', md: '5%', lg: '10%', xl: '15%' });
+    const digitizedLeft = useBreakpointValue({ base: '2%', md: '-2%', lg: '0%', xl: '10%' });
 
     return (
         <Box
@@ -59,14 +68,14 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
             minH="100vh"
             overflow="hidden"
             position="relative"
-            pt={20}
+            pt={{ base: '4rem', md: '8rem' }} // Reduced base padding
         >
 
-            <Container maxW="7xl" position="relative" zIndex={1} pt={12}>
-                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={12} alignItems="center">
+            <Container maxW="7xl" position="relative" zIndex={1} pt={{ base: '2rem', md: '4rem' }}>
+                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={{ base: 8, lg: 12 }} alignItems="center">
 
                     {/* Left Content Column */}
-                    <Stack spacing={8} textAlign={{ base: 'center', lg: 'left' }}>
+                    <Stack spacing={{ base: 6, md: 8 }} textAlign={{ base: 'center', lg: 'left' }}>
                         <Box>
                             <Badge
                                 px={5}
@@ -92,14 +101,14 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
 
                             <Heading
                                 as="h1"
-                                fontSize={{ base: "4xl", md: "6xl", lg: "7xl" }}
+                                fontSize={{ base: "2rem", md: "3.5rem", lg: "4.5rem", xl: "5rem" }} // Reduced base font size
                                 fontWeight="800"
                                 lineHeight="1.1"
                                 letterSpacing="tight"
                                 color="teal.900"
                                 mb={6}
                             >
-                                <Text as="span" display="block" color="teal.500" fontSize={{ base: "2xl", md: "3xl" }} fontWeight="bold" mb={2} letterSpacing="normal">
+                                <Text as="span" display="block" color="teal.500" fontSize={{ base: "1rem", md: "1.5rem", lg: "1.875rem" }} fontWeight="bold" mb={2} letterSpacing="normal">
                                     {t.heroTitle}
                                 </Text>
                                 {/* Mint to Orange Gradient Text */}
@@ -108,13 +117,13 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                                     bgGradient={textGradient}
                                     bgClip="text"
                                     display="block"
-                                    pb={2} // Padding bottom to prevent clipping of descenders
+                                    pb={2}
                                 >
                                     KALUSUGAN ANG UNA
                                 </Text>
                             </Heading>
 
-                            <Text fontSize="xl" color="gray.600" maxW="lg" mx={{ base: 'auto', lg: 0 }} lineHeight="1.8">
+                            <Text fontSize={{ base: "1rem", lg: "1.25rem" }} color="gray.600" maxW="lg" mx={{ base: 'auto', lg: 0 }} lineHeight="1.8">
                                 {t.heroSubtitle}
                             </Text>
                         </Box>
@@ -155,7 +164,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                     </Stack>
 
                     {/* Right Image Column - Highlighting Achievements */}
-                    <Box position="relative" h={{ base: "400px", md: "500px" }} w="full">
+                    <Box position="relative" h={{ base: "350px", md: "550px", lg: "650px" }} w="full">
 
                         {/* Doctor Image */}
                         <Box
@@ -164,7 +173,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             w="100%"
                             display="flex"
                             justifyContent="center"
-                            alignItems="flex-start"
+                            alignItems="center"
                             zIndex={1}
                             pl={{ lg: 10 }}
                         >
@@ -172,8 +181,9 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                                 src="/images/Logo.png"
                                 alt="Healthcare Logo"
                                 objectFit="contain"
-                                h={{ base: "85%", md: "95%" }}
-                                maxW="none"
+                                h={{ base: "85%", md: "90%", lg: "95%" }}
+                                w="auto"
+                                maxW="full"
                                 filter="drop-shadow(0px 20px 40px rgba(0,0,0,0.1))"
                                 transform="translateY(0px)"
                             />
@@ -184,24 +194,24 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             initial={{ x: 50, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             transition={{ delay: 0.5, duration: 0.8 }}
-                            style={{ position: 'absolute', top: '15%', right: '0%', zIndex: 2 }}
+                            style={{ position: 'absolute', top: topPerformingTop, right: topPerformingRight, zIndex: 2 }}
                         >
                             <Box
-                                bg="rgba(255, 255, 255, 0.75)"
+                                bg="rgba(255, 255, 255, 0.85)"
                                 backdropFilter="blur(20px)"
                                 border="1px solid rgba(255, 255, 255, 0.6)"
                                 p={4}
                                 borderRadius="2xl"
                                 boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.1)"
-                                maxW="200px"
+                                maxW={{ base: "140px", md: "180px", lg: "200px" }}
                             >
                                 <HStack spacing={3} mb={1}>
                                     <Box bg="yellow.100" p={2} borderRadius="full" color="yellow.500">
-                                        <TrophyIcon boxSize={5} />
+                                        <TrophyIcon boxSize={4} />
                                     </Box>
-                                    <Text fontWeight="bold" fontSize="sm" color="gray.700">Top Performing</Text>
+                                    <Text fontWeight="bold" fontSize={{ base: "xs", md: "sm" }} color="gray.700">Top Performing</Text>
                                 </HStack>
-                                <Text fontSize="xs" color="gray.500" pl={1}>
+                                <Text fontSize={{ base: "10px", md: "xs" }} color="gray.500" pl={1}>
                                     Awarded Best Barangay Health Center 2025
                                 </Text>
                             </Box>
@@ -212,24 +222,24 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             initial={{ x: -50, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             transition={{ delay: 0.7, duration: 0.8 }}
-                            style={{ position: 'absolute', top: '40%', left: '-5%', zIndex: 2 }}
+                            style={{ position: 'absolute', top: readinessTop, left: readinessLeft, zIndex: 2 }}
                         >
                             <Box
-                                bg="rgba(255, 255, 255, 0.75)"
+                                bg="rgba(255, 255, 255, 0.85)"
                                 backdropFilter="blur(20px)"
                                 border="1px solid rgba(255, 255, 255, 0.6)"
                                 p={4}
                                 borderRadius="2xl"
                                 boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.1)"
-                                maxW="220px"
+                                maxW={{ base: "150px", md: "200px", lg: "220px" }}
                             >
                                 <HStack spacing={3} mb={1}>
                                     <Box bg="teal.100" p={2} borderRadius="full" color="teal.500">
-                                        <CheckCircleIcon boxSize={5} />
+                                        <CheckCircleIcon boxSize={4} />
                                     </Box>
-                                    <Text fontWeight="bold" fontSize="sm" color="gray.700">100% Readiness</Text>
+                                    <Text fontWeight="bold" fontSize={{ base: "xs", md: "sm" }} color="gray.700">100% Readiness</Text>
                                 </HStack>
-                                <Text fontSize="xs" color="gray.500" pl={1}>
+                                <Text fontSize={{ base: "10px", md: "xs" }} color="gray.500" pl={1}>
                                     Fully equipped for emergency response and maternity care.
                                 </Text>
                             </Box>
@@ -240,7 +250,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             initial={{ y: 50, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
                             transition={{ delay: 0.9, duration: 0.8 }}
-                            style={{ position: 'absolute', bottom: '15%', left: '10%', zIndex: 2 }}
+                            style={{ position: 'absolute', bottom: digitizedBottom, left: digitizedLeft, zIndex: 2 }}
                         >
                             <Box
                                 bg="rgba(255, 255, 255, 0.85)"
@@ -252,6 +262,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                                 display="flex"
                                 alignItems="center"
                                 gap={3}
+                                maxW={{ base: "160px", md: "auto" }}
                             >
                                 <Box bg="blue.50" p={2} borderRadius="lg" color="blue.500">
                                     <DocumentIcon boxSize={5} />
