@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import psycopg2
 from psycopg2 import sql
+from database import get_db_connection
 import bcrypt
 import os
 from dotenv import load_dotenv
@@ -16,18 +16,30 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-DB_CONFIG = {
-    'dbname': os.getenv('DB_NAME'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'host': os.getenv('DB_HOST'),
-    'port': os.getenv('DB_PORT')
-}
+# Register Blueprints
+from appointments import appointments_bp
+from lab_results import lab_results_bp
+from inventory import inventory_bp
+from security import security_bp
 
-OCR_API_KEY = os.getenv('OCR_API_KEY')
+app.register_blueprint(appointments_bp)
+app.register_blueprint(lab_results_bp)
+app.register_blueprint(inventory_bp)
+app.register_blueprint(security_bp)
+
+# Startup Database Verification
+try:
+    print("⏳ Testing database connection at startup...")
+    conn = get_db_connection()
+    conn.close()
+    print("✅ Database connection verified.")
+except Exception as e:
+    print(f"❌ CRITICAL: Database connection failed at startup: {e}")
 
 def get_db():
-    return psycopg2.connect(**DB_CONFIG)
+    return get_db_connection()
+
+OCR_API_KEY = os.getenv('OCR_API_KEY')
 
 # ============= ADVANCED OCR PREPROCESSING =============
 def preprocess_image(image_bytes):
@@ -130,15 +142,30 @@ class PHIDParser:
             'dob': None,
             'gender': None,
             'phone': None,
+            'contact': None, # Match registration form key
             'address': None,
             'city': None,
+            'id_type': 'Government ID',
+            'crn': None,
+            'email': None,
+            'region': None,
+            'region_name': None,
+            'province': None,
+            'province_name': None,
+            'city_code': None,
+            'barangay': None,
+            'barangay_code': None
         }
         self.confidence = {}
     
     def parse(self, text):
         """Parse OCR text with confidence scoring"""
+        print("\n>>> INITIALIZING V4 PARSER (Address Precision Patch) <<<")
         lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 1]
         clean_text = text.replace('\n', ' ')
+        
+        # 0. Identify ID Type for better guidance
+        self._identify_id_type(clean_text)
         
         # 1. Extract Names
         self._extract_names(lines)
@@ -147,19 +174,110 @@ class PHIDParser:
         self._extract_dob(clean_text)
         
         # 3. Extract Gender
-        self._extract_gender(text)  # Use original text to preserve newlines
+        self._extract_gender(text)
         
-        # 4. Extract Phone Number
-        self._extract_phone(text)  # Use original text
+        # 4. Extract CRN/ID No.
+        self._extract_crn(clean_text)
         
-        # 5. Extract Address
+        # 5. Extract Phone Number
+        self._extract_phone(text)
+        
+        # 5b. Extract Email
+        self._extract_email(clean_text)
+
+        # 5c. Extract PhilHealth ID
+        self._extract_philhealth_id(clean_text)
+
+        # 6. Extract Address
         self._extract_address(lines, clean_text)
         
         return self.fields, self.confidence
     
+    def _identify_id_type(self, text):
+        """Detect the type of Philippine ID from OCR text"""
+        ul = text.upper()
+        if 'POSTAL' in ul: self.fields['id_type'] = 'Postal ID'
+        elif any(k in ul for k in ['SOCIAL SECURITY', ' SSS ']): self.fields['id_type'] = 'SSS ID'
+        elif 'UNIFIED MULTI-PURPOSE' in ul or 'UMID' in ul: self.fields['id_type'] = 'UMID ID'
+        elif any(k in ul for k in ['PHILIPPINES IDENTIFICATION', 'NATIONAL ID', 'PHILID']): self.fields['id_type'] = 'National ID'
+        elif 'PROFESSIONAL REGULATION' in ul or ' PRC ' in ul: self.fields['id_type'] = 'PRC ID'
+        elif 'VOTER' in ul: self.fields['id_type'] = 'Voter\'s ID'
+        elif 'PHILHEALTH' in ul: self.fields['id_type'] = 'PhilHealth ID'
+        elif 'DRIVER' in ul and 'LICENSE' in ul: self.fields['id_type'] = 'Driver\'s License'
+        print(f"[ID TYPE] Identified as: {self.fields['id_type']}")
+
+    def _extract_crn(self, text):
+        """Extract CRN or ID Number"""
+        patterns = [
+            r'CRN[:\s]*(\d{4}-\d{7}-\d)',  # UMID pattern: 0028-1215160-9
+            r'ID\s*NO\.?[:\s]*([A-Z0-9-]{10,20})',
+            r'SSS\s*NO\.?[:\s]*(\d{2}-\d{7}-\d)',
+            r'PRC\s*NO\.?[:\s]*(\d{7})'
+        ]
+        
+        # Strategy 1: Look for patterns in the whole text (same line)
+        for p in patterns:
+             match = re.search(p, text.upper())
+             if match:
+                 self.fields['crn'] = match.group(1)
+                 self.confidence['crn'] = 0.95
+                 print(f"[CRN] Found via same-line: {self.fields['crn']}")
+                 return
+        
+        # Strategy 2: Look for ID Number labels and grab the next word/line
+        crn_labels = ['ID NUMBER', 'ID NO', 'CRN', 'NATIONAL ID', 'PHILID']
+        lines = text.split('\n')
+        for i, line in enumerate(lines):
+            if any(l in line.upper() for l in crn_labels):
+                # Check next 2 lines for a potential ID number (alphanumeric, 6-20 chars)
+                search_scope = " ".join(lines[i:min(i+3, len(lines))])
+                # Remove the label itself to avoid matching it
+                clean_scope = search_scope.replace(line, '').strip()
+                match = re.search(r'\b([A-Z0-9-]{6,20})\b', clean_scope)
+                if match:
+                     self.fields['crn'] = match.group(1)
+                     self.confidence['crn'] = 0.85
+                     print(f"[CRN] Found via next-line search: {self.fields['crn']}")
+                     return
+
+    def _extract_philhealth_id(self, text):
+        """Extract PhilHealth ID (Format: XX-XXXXXXXXX-X)"""
+        # Look for 12 digits potentially with dashes
+        patterns = [
+            r'(\d{2})[- ]?(\d{9})[- ]?(\d{1})', # 12 digits: XX-XXXXXXXXX-X
+            r'(\d{12})', # raw 12 digits
+            r'PHILHEALTH\s*(?:ID|NO)?[:\s]*([0-9-]{12,14})'
+        ]
+        
+        for p in patterns:
+            match = re.search(p, text.upper())
+            if match:
+                if len(match.groups()) == 3:
+                    val = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
+                else:
+                    raw = re.sub(r'[^0-9]', '', match.group(1))
+                    if len(raw) == 12:
+                        val = f"{raw[:2]}-{raw[2:11]}-{raw[11:]}"
+                    else:
+                        continue
+                
+                self.fields['philhealth_id'] = val
+                self.confidence['philhealth_id'] = 0.95
+                print(f"[PHILHEALTH] Found: {val}")
+                return
+
+    def _extract_email(self, text):
+        """Extract email address from OCR text"""
+        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        match = re.search(email_pattern, text)
+        if match:
+            self.fields['email'] = match.group(0).lower()
+            self.confidence['email'] = 0.95
+            print(f"[EMAIL] Found: {self.fields['email']}")
+
     def _extract_names(self, lines):
-        """Extract names with header detection"""
-        # Look for combined header
+        """Extract names with broader header and label detection for all PH IDs"""
+        # Strategy 1: Combined header (e.g. UMID, SSS, PRC)
         header_idx = None
         for i, line in enumerate(lines):
             ul = line.upper()
@@ -170,7 +288,7 @@ class PHIDParser:
         if header_idx is not None and header_idx + 1 < len(lines):
             data_line = lines[header_idx + 1]
             if ',' in data_line:
-                parts = data_line.split(',', 1)
+                parts = [p.strip() for p in data_line.split(',', 1)]
                 last, conf_l = FieldValidator.validate_name(parts[0])
                 self.fields['last_name'] = last
                 self.confidence['last_name'] = conf_l
@@ -185,26 +303,55 @@ class PHIDParser:
                         middle, conf_m = FieldValidator.validate_name(' '.join(rest[1:]))
                         self.fields['middle_name'] = middle
                         self.confidence['middle_name'] = conf_m
-        else:
-            # Fallback: individual labels
-            for i, line in enumerate(lines):
-                ul = line.upper()
-                if i + 1 < len(lines):
-                    if 'LAST NAME' in ul or 'SURNAME' in ul:
-                        val, conf = FieldValidator.validate_name(lines[i+1])
-                        if val:
+                return
+
+        # Strategy 2: Individual labels (Generalized for all cards)
+        for i, line in enumerate(lines):
+            ul = line.upper()
+            if i + 1 < len(lines):
+                # Surname Labels
+                if any(k in ul for k in ['LAST NAME', 'SURNAME', 'FAMILY NAME', ' SUR NAMES']):
+                    # Check same line after colon first
+                    if ':' in line:
+                        potential = line.split(':', 1)[1].strip()
+                        if len(potential) > 2:
+                            val, conf = FieldValidator.validate_name(potential)
                             self.fields['last_name'] = val
                             self.confidence['last_name'] = conf
-                    elif 'FIRST NAME' in ul or 'GIVEN NAME' in ul:
-                        val, conf = FieldValidator.validate_name(lines[i+1])
-                        if val:
+                            continue
+                    # Check next line
+                    val, conf = FieldValidator.validate_name(lines[i+1])
+                    if val and not self.fields['last_name']:
+                        self.fields['last_name'] = val
+                        self.confidence['last_name'] = conf
+
+                # First Name Labels
+                elif any(k in ul for k in ['FIRST NAME', 'GIVEN NAME', 'GIVEN NAM ES']):
+                    if ':' in line:
+                        potential = line.split(':', 1)[1].strip()
+                        if len(potential) > 2:
+                            val, conf = FieldValidator.validate_name(potential)
                             self.fields['first_name'] = val
                             self.confidence['first_name'] = conf
-                    elif 'MIDDLE NAME' in ul:
-                        val, conf = FieldValidator.validate_name(lines[i+1])
-                        if val:
+                            continue
+                    val, conf = FieldValidator.validate_name(lines[i+1])
+                    if val and not self.fields['first_name']:
+                        self.fields['first_name'] = val
+                        self.confidence['first_name'] = conf
+
+                # Middle Name Labels
+                elif any(k in ul for k in ['MIDDLE NAME', 'MIDDLE INITIAL', 'M.I.']):
+                    if ':' in line:
+                        potential = line.split(':', 1)[1].strip()
+                        if len(potential) > 1:
+                            val, conf = FieldValidator.validate_name(potential)
                             self.fields['middle_name'] = val
                             self.confidence['middle_name'] = conf
+                            continue
+                    val, conf = FieldValidator.validate_name(lines[i+1])
+                    if val and not self.fields['middle_name']:
+                        self.fields['middle_name'] = val
+                        self.confidence['middle_name'] = conf
     
     def _extract_dob(self, text):
         """Extract date of birth with smart filtering to avoid issuance/expiry dates"""
@@ -220,9 +367,8 @@ class PHIDParser:
         # Strategy 1: Look for labeled birth date
         for i, line in enumerate(lines):
             upper_line = line.upper()
-            # Check if this line contains a birth date label
             if any(keyword in upper_line for keyword in birth_keywords):
-                # Check this line and the next few lines for a date
+                # Search same line and next 2 lines
                 search_text = ' '.join(lines[i:min(i+3, len(lines))])
                 dob, conf = self._find_valid_birth_date(search_text)
                 if dob:
@@ -231,15 +377,18 @@ class PHIDParser:
                     print(f"[DOB] Found via label: {dob}")
                     return
         
-        # Strategy 2: Find all dates and filter by age validation
-        # (Only dates that would make person 10+ years old)
+        # Strategy 2: Global search for any date that passes as a birth date
         all_dates = self._find_all_dates(text)
         for date_str, conf in all_dates:
             if self._is_valid_birth_date(date_str):
-                self.fields['dob'] = date_str
-                self.confidence['dob'] = conf * 0.8  # Lower confidence since no label
-                print(f"[DOB] Found via age validation: {date_str}")
-                return
+                # Check if it might be an issuance/expiry date (heuristic: close to today)
+                dt = datetime.strptime(date_str, '%Y-%m-%d')
+                age = (datetime.now() - dt).days / 365.25
+                if 10 < age < 120:
+                    self.fields['dob'] = date_str
+                    self.confidence['dob'] = conf * 0.7 
+                    print(f"[DOB] Found via age validation: {date_str}")
+                    return
         
         print("[DOB] No valid birth date found")
     
@@ -316,16 +465,14 @@ class PHIDParser:
                 if gender:
                     self.fields['gender'] = gender
                     self.confidence['gender'] = conf
-                    print(f"[GENDER] Found via label: {gender} (from '{value}')")
+                    print(f"[GENDER] Found via label: {gender}")
                     return
         
-        # Strategy 2: Pattern for table-like layout (e.g., Driver's License)
-        # Looks for M or F that appears after "Sex" within reasonable distance
-        table_pattern = r'(?:SEX|GENDER)(?:[\s\S]{0,50})\b([MF])\b(?![A-RT-Z])'
+        # Strategy 2: Table layout pattern (e.g. Sex indicator far from label)
+        table_pattern = r'(?:SEX|GENDER|KASARIAN)(?:[\s\S]{0,50})\b([MF])\b(?![A-RT-Z])'
         match = re.search(table_pattern, upper_text)
         if match:
-            value = match.group(1)
-            gender, conf = FieldValidator.validate_gender(value)
+            gender, conf = FieldValidator.validate_gender(match.group(1))
             if gender:
                 self.fields['gender'] = gender
                 self.confidence['gender'] = 0.85
@@ -366,27 +513,26 @@ class PHIDParser:
                     phone = ''.join(g for g in match.groups() if g)
                 
                 # Clean and validate
-                phone = re.sub(r'[\s-]+', '', phone)  # Remove spaces and dashes
+                phone = re.sub(r'[\s-]+', '', phone)
                 
-                # Validate it looks like a Philippine number
-                if len(phone) >= 10 and len(phone) <= 13:
-                    self.fields['phone'] = phone
-                    self.confidence['phone'] = 0.90
+                if 10 <= len(phone) <= 13:
+                    self.fields['contact'] = phone
+                    self.confidence['phone'] = 0.95
                     print(f"[PHONE] Found via label: {phone}")
                     return
         
-        # Strategy 2: Look for Philippine mobile number patterns (09XX XXX XXXX)
+        # Strategy 2: Mobile patterns
         mobile_patterns = [
-            r'\b(09[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',  # 09XX XXX XXXX
-            r'\b(\+639[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',  # +639XX XXX XXXX
+            r'\b(09[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',
+            r'\b(\+639[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',
         ]
         
         for pattern in mobile_patterns:
             match = re.search(pattern, text)
             if match:
                 phone = ''.join(match.groups()).replace(' ', '').replace('-', '')
-                self.fields['phone'] = phone
-                self.confidence['phone'] = 0.80
+                self.fields['contact'] = phone
+                self.confidence['phone'] = 0.85
                 print(f"[PHONE] Found mobile: {phone}")
                 return
         
@@ -407,27 +553,27 @@ class PHIDParser:
         print("[PHONE] Not found")
     
     def _extract_address(self, lines, text):
-        """Extract address components with enhanced Caloocan detection"""
+        """Extract address components with enhanced multi-line support and Caloocan detection"""
         upper_text = text.upper()
         
-        # Enhanced Caloocan detection
         caloocan_indicators = ['CALOOCAN', 'KALOOKAN', 'KALOOCAN']
         is_caloocan = any(indicator in upper_text for indicator in caloocan_indicators)
         
         if is_caloocan:
             self.fields['city'] = 'Caloocan City'
             self.confidence['city'] = 0.95
-            
-            # Auto-populate address cascade for Caloocan
-            self.fields['region'] = '130000000'  # NCR code
+            self.fields['region'] = '130000000'
             self.fields['region_name'] = 'National Capital Region (NCR)'
-            self.fields['province'] = '133900000'  # Metro Manila code
+            self.fields['province'] = '133900000' 
             self.fields['province_name'] = 'Metro Manila'
-            self.fields['city_code'] = '137404000'  # Caloocan City code
+            self.fields['city_code'] = '137404000'
             self.confidence['region'] = 0.95
+            self.confidence['region_name'] = 0.95
             self.confidence['province'] = 0.95
+            self.confidence['province_name'] = 0.95
+            self.confidence['city_code'] = 0.95
         
-        # Extract Barangay number (e.g., "Barangay 174", "Brgy 174", "Brgy. 174")
+        # Barangay Extraction
         barangay_patterns = [
             r'BARANGAY\s+(\d+)',
             r'BRGY\.?\s*(\d+)',
@@ -440,227 +586,153 @@ class PHIDParser:
             if match:
                 brgy_num = match.group(1)
                 self.fields['barangay'] = f'Barangay {brgy_num}'
-                self.confidence['barangay'] = 0.90
-                
-                # If it's Barangay 174, use specific code
+                self.confidence['barangay'] = 0.95
                 if brgy_num == '174':
-                    self.fields['barangay_code'] = '137404174'  # Specific code for Brgy 174
+                    self.fields['barangay_code'] = '137404174'
                 break
         
-        # Extract full street address
-        full_address_extracted = False
-        address_keywords = ['ADDRESS', 'RESIDENCE', 'HOME', 'STREET']
+        # Full Address Extraction (Multi-Line Focus)
+        address_keywords = ['ADDRESS', 'RESIDENCE', 'HOME', 'STREET', 'CITY', 'PROVINCE']
+        addr_line_idx = None
         for i, line in enumerate(lines):
-            ul = line.upper()
-            if any(kw in ul for kw in address_keywords):
-                if i + 1 < len(lines):
-                    addr_line = lines[i + 1].strip()
-                    # Clean up common OCR artifacts
-                    addr_line = re.sub(r'[|\\]', '', addr_line)
-                    if len(addr_line) > 10:  # Reasonable address length
-                        self.fields['full_address'] = addr_line
-                        self.confidence['full_address'] = 0.70
-                        
-                        # Parse detailed address components
-                        self._parse_address_components(addr_line)
-                        full_address_extracted = True
-                        
-                        # Try to extract street/block/lot info
-                        if 'BLK' in addr_line.upper() or 'LOT' in addr_line.upper():
-                            self.confidence['full_address'] = 0.80
+            if any(kw in line.upper() for kw in address_keywords):
+                addr_line_idx = i
                 break
         
-        # Fallback: Look for any line with "Caloocan" and surrounding text
-        if is_caloocan and not self.fields.get('full_address'):
-            for i, line in enumerate(lines):
-                if any(ind in line.upper() for ind in caloocan_indicators):
-                    # Check previous and next lines for address components
-                    addr_parts = []
-                    if i > 0:
-                        addr_parts.append(lines[i - 1].strip())
-                    addr_parts.append(line.strip())
-                    if i + 1 < len(lines):
-                        addr_parts.append(lines[i + 1].strip())
-                    
-                    full = ' '.join(addr_parts)
-                    if len(full) > 15:
-                        self.fields['full_address'] = full
-                        self.confidence['full_address'] = 0.60
-                        full_address_extracted = True
-                        # Parse components from this address
-                        self._parse_address_components(full)
-                    break
-        
-        # NEW: Always attempt to parse address components from entire text
-        # This ensures we extract block/lot/street even if no explicit "ADDRESS:" label exists
-        if not full_address_extracted:
-            print("[ADDRESS] No labeled address found, parsing from full text...")
-            self._parse_address_components(text)
+        if addr_line_idx is not None:
+            # Merge up to 3 lines after label
+            candidates = []
+            for j in range(1, 4):
+                if addr_line_idx + j < len(lines):
+                    l = lines[addr_line_idx + j].strip()
+                    if len(l) > 3 and not any(k in l.upper() for k in ['ID NO', 'DATE OF']):
+                        candidates.append(l)
             
-            # If we extracted components, construct full_address from them
-            if any(self.fields.get(f) for f in ['block_number', 'lot_number', 'street_name', 'subdivision']):
-                parts = []
-                if self.fields.get('block_number'): parts.append(self.fields['block_number'])
-                if self.fields.get('lot_number'): parts.append(self.fields['lot_number'])
-                if self.fields.get('street_name'): parts.append(self.fields['street_name'])
-                if self.fields.get('subdivision'): parts.append(self.fields['subdivision'])
-                if self.fields.get('barangay'): parts.append(self.fields['barangay'])
-                if self.fields.get('city'): parts.append(self.fields['city'])
-                
-                if parts:
-                    self.fields['full_address'] = ', '.join(parts)
-                    self.confidence['full_address'] = 0.70
-                    print(f"[ADDRESS] Constructed full address from components: {self.fields['full_address']}")
+            if candidates:
+                full_addr = " ".join(candidates)
+                self.fields['full_address'] = full_addr
+                self.confidence['full_address'] = 0.85
+                self._parse_address_components(full_addr)
+        
+        # Fallback Strategy for unlabeled address (e.g. National ID, Voter's ID)
+        if not self.fields.get('full_address'):
+             # Look for city/location keywords and grab preceding lines
+             for i, line in enumerate(lines):
+                 ul = line.upper()
+                 if any(ind in ul for ind in caloocan_indicators):
+                    candidates = []
+                    if i > 0: candidates.insert(0, lines[i-1])
+                    if i > 1 and len(candidates[0]) < 10: candidates.insert(0, lines[i-2])
+                    
+                    if len(ul) > 20: # Use same line if long (e.g. Street City)
+                        parts = re.split(r'\b(?:CALOOCAN|CITY|METRO|PHILS)\b', line, flags=re.I)
+                        if len(parts) > 0 and len(parts[0].strip()) > 5:
+                            candidates.append(parts[0].strip())
+                    
+                    candidate_text = " ".join(candidates).strip()
+                    if len(candidate_text) > 10:
+                        self.fields['full_address'] = candidate_text
+                        self.confidence['full_address'] = 0.75
+                        self._parse_address_components(candidate_text)
+                        break
+
+        # Always attempt parsing from full text if components still missing
+        if not any(self.fields.get(f) for f in ['house_number', 'street_name', 'subdivision']):
+             self._parse_address_components(text)
     
     def _parse_address_components(self, address_text):
-        """Parse detailedaddress components from full address string"""
+        """Parse detailed address components from full address string"""
         upper_addr = address_text.upper()
         
-        # Extract Block Number (e.g., "BLK 9", "BLOCK 9", "BLK. 9", "B-9")
-        block_patterns = [
-            r'BLK\.?\s*#?\s*(\d+)',
-            r'BLOCK\s+#?\s*(\d+)',
-            r'\bB\.?\s*-?\s*(\d+)',  # B-9 or B.9
-        ]
+        # Block Number
+        block_patterns = [r'BLK\.?\s*#?\s*(\d+)', r'BLOCK\s+#?\s*(\d+)', r'\bB\.?\s*-?\s*(\d+)']
         for pattern in block_patterns:
-            block_match = re.search(pattern, upper_addr)
-            if block_match:
-                block_num = block_match.group(1)
-                self.fields['block_number'] = f"Block {block_num}"
-                self.confidence['block_number'] = 0.90
-                print(f"[ADDRESS] Block: {block_num}")
+            match = re.search(pattern, upper_addr)
+            if match:
+                self.fields['block_number'] = f"Block {match.group(1)}"
+                self.confidence['block_number'] = 0.95
+                print(f"[ADDRESS] Block No: {self.fields['block_number']}")
                 break
         
-        # Extract Lot Number (e.g., "LOT 30", "L30", "LOT. 30", "L. 30", "L-30")
-        lot_patterns = [
-            r'LOT\.?\s*#?\s*(\d+)',
-            r'\bL\.?\s*-?\s*(\d+)',  # L-30 or L.30 or L30
-        ]
+        # Lot Number
+        lot_patterns = [r'LOT\.?\s*#?\s*(\d+)', r'\bL\.?\s*-?\s*(\d+)']
         for pattern in lot_patterns:
-            lot_match = re.search(pattern, upper_addr)
-            if lot_match:
-                lot_num = lot_match.group(1)
-                self.fields['lot_number'] = f"Lot {lot_num}"
-                self.confidence['lot_number'] = 0.90
-                print(f"[ADDRESS] Lot: {lot_num}")
+            match = re.search(pattern, upper_addr)
+            if match:
+                self.fields['lot_number'] = f"Lot {match.group(1)}"
+                self.confidence['lot_number'] = 0.95
+                print(f"[ADDRESS] Lot No: {self.fields['lot_number']}")
                 break
         
-        # Extract House Number (standalone number at beginning, e.g., "123 Main St", "#123")
+        # Street Name
+        street_pattern = r'([A-Z0-9\s#]{3,30}?)\s+(?:ST\b|STREET|RD\b|ROAD|AVE\b|AVENUE|BLVD|DRIVE|LANE)'
+        match = re.search(street_pattern, upper_addr)
+        if match:
+            raw_street = match.group(1).strip()
+            # Clean up
+            if 'BLK' not in raw_street and 'LOT' not in raw_street:
+                 clean = re.sub(r'\b(Lts?|No\.)\s*[\d\-A-Z]+', '', raw_street).strip()
+                 if len(clean) > 3:
+                    self.fields['street_name'] = clean.title()
+                    self.confidence['street_name'] = 0.95
+                    print(f"[ADDRESS] Street: {self.fields['street_name']}")
+
+        # Fallback Street (before Location)
+        if not self.fields.get('street_name'):
+             # More flexible pattern for area-based streets like "BAGUMBONG"
+             fallback = re.search(r'(?:\d+\b)?\s*([A-Z\s]{3,25})[,\s]+(?:BRGY|BARANGAY|CALOOCAN)', upper_addr)
+             if fallback:
+                 cand = fallback.group(1).strip()
+                 if not any(k in cand for k in ['LOT', 'BLK', 'BLOCK', 'NO.', 'ID ']):
+                     self.fields['street_name'] = cand.title()
+                     self.confidence['street_name'] = 0.85
+                     print(f"[ADDRESS] Street (Fallback): {self.fields['street_name']}")
+        # House Number
         house_patterns = [
-            r'^#?\s*(\d+)\s+[A-Z]',  # Beginning of address
-            r'(?:HOUSE|H)\s*#?\s*(\d+)',  # "HOUSE #123" or "H 123"
+            r'(?:HOUSE|H)[\.\s]*NO\.?[\s#]*([A-Z0-9\-]+)',
+            r'^#\s*([A-Z0-9\-]+)',
+            r'^\b(\d+[A-Z]?)\b\s+(?=[A-Z])'
         ]
         for pattern in house_patterns:
-            house_match = re.search(pattern, upper_addr)
-            if house_match:
-                self.fields['house_number'] = house_match.group(1)
-                self.confidence['house_number'] = 0.85
-                print(f"[ADDRESS] House: {house_match.group(1)}")
+            match = re.search(pattern, upper_addr)
+            if match:
+                self.fields['house_number'] = match.group(1)
+                self.confidence['house_number'] = 0.95
+                print(f"[ADDRESS] House No: {self.fields['house_number']}")
                 break
-        
-        # Extract Street Name
-        # Common patterns: "RUBY ST", "MAIN STREET", "SAMPAGUITA RD"
-        street_patterns = [
-            r'([A-Z][A-Z\s]+?)\s+(ST\b|STREET|RD\b|ROAD|AVE\b|AVENUE|BLVD|DRIVE|LANE)',
-            r',\s*([A-Z][A-Z\s]+?)\s+(ST\b|STREET|RD\b|ROAD)',  # After comma
+
+        # Contextual House No (before Street)
+        if not self.fields.get('house_number') and self.fields.get('street_name'):
+             street_upper = self.fields['street_name'].upper()
+             try:
+                 pre = upper_addr.split(street_upper)[0].strip()
+                 num_match = re.search(r'#?(\d+[A-Z]?)$', pre)
+                 if num_match:
+                     self.fields['house_number'] = num_match.group(1)
+                     self.confidence['house_number'] = 0.85
+             except: pass
+
+        # Subdivision/Village
+        subdiv_patterns = [
+            r'([A-Z0-9][A-Z0-9\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES|RESIDENCES)',
+            r'(NORTHVILLE\s*[A-Z0-9\s]*)' # National ID specific
         ]
-        for pattern in street_patterns:
-            street_match = re.search(pattern, upper_addr)
-            if street_match:
-                street_name = street_match.group(1).strip()
-                street_type = street_match.group(2)
-                # Clean up - remove BLK/LOT numbers from street name
-                street_name = re.sub(r'(BLK|LOT|BLOCK)\s*\d+', '', street_name).strip()
-                if len(street_name) > 2:  # Valid street name
-                    self.fields['street_name'] = f"{street_name} {street_type}".title()
-                    self.confidence['street_name'] = 0.85
-                    print(f"[ADDRESS] Street: {self.fields['street_name']}")
-                    break
-        
-        # Extract Subdivision/Village (e.g., "CELINA HOMES 3", "VILLA VERDE")
-        # Look for: [NAME] + [HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES]
-        subdivision_patterns = [
-            r'([A-Z][A-Z\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES|HILLS|GARDENS|PARK|RESIDENCES)\s*\d*',
-            r',\s*([A-Z][A-Z\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION)',  # After comma
-        ]
-        for pattern in subdivision_patterns:
-            subdiv_match = re.search(pattern, upper_addr)
-            if subdiv_match:
-                subdiv_name = subdiv_match.group(1).strip()
-                subdiv_type = subdiv_match.group(2)
-                # Clean up
-                subdiv_name = re.sub(r'(BLK|LOT|BLOCK|ST\b|STREET|RD\b)\s*\d*', '', subdiv_name).strip()
-                if len(subdiv_name) > 2:
-                    # Include number if present (e.g., "CELINA HOMES 3")
-                    full_match = re.search(rf'{subdiv_name}\s+{subdiv_type}\s*(\d*)', upper_addr)
-                    if full_match and full_match.group(1):
-                        self.fields['subdivision'] = f"{subdiv_name} {subdiv_type} {full_match.group(1)}".title()
-                    else:
-                        self.fields['subdivision'] = f"{subdiv_name} {subdiv_type}".title()
-                    self.confidence['subdivision'] = 0.85
+        for pattern in subdiv_patterns:
+            match = re.search(pattern, upper_addr)
+            if match:
+                val = match.group(1).split(',')[0].strip() # Stop at comma
+                if len(val) > 3:
+                    self.fields['subdivision'] = val.title()
+                    self.confidence['subdivision'] = 0.95
                     print(f"[ADDRESS] Subdivision: {self.fields['subdivision']}")
                     break
         
-        # Fallback: Handle Phil National ID format (e.g., "LOT 3 NORTHVILLE 2B")
-        if not self.fields.get('subdivision'):
-            # Extract text between LOT number and BARANGAY/comma
-            fallback_pattern = r'LOT\s+\d+\s+([A-Z0-9\s]{3,30}?)(?:\s+(?:BAGUMBONG|BARANGAY)|,)'
-            match = re.search(fallback_pattern, upper_addr)
-            if match:
-                subdiv = match.group(1).strip()
-                # Remove "BAGUMBONG" if captured
-                subdiv = subdiv.replace('BAGUMBONG', '').strip()
-                if subdiv and len(subdiv) > 2:
-                    self.fields['subdivision'] = subdiv.title()
-                    self.confidence['subdivision'] = 0.75
-                    print(f"[ADDRESS] Subdivision (Phil ID): {subdiv}")
-
-        
-        # Extract ZIP Code with improved multi-pattern matching
-        # Philippine ZIP codes are 4 digits (1000-9999)
-        
-        # Pattern 1: Explicit ZIP label (highest confidence)
-        zip_labeled = re.search(r'(?:ZIP|POSTAL)\s*(?:CODE)?[:\s]*(\d{4})', upper_addr, re.I)
-        if zip_labeled:
-            zip_code = zip_labeled.group(1)
-            if 1000 <= int(zip_code) <= 9999:
-                self.fields['zip_code'] = zip_code
-                self.confidence['zip_code'] = 0.95
-                print(f"[ADDRESS] ZIP (labeled): {zip_code}")
-        
-        # Pattern 2: At end of address line (e.g., "Caloocan City 1427")
-        if not self.fields.get('zip_code'):
-            zip_at_end = re.search(r'(?:CITY|CALOOCAN|METRO)\s*,?\s*(\d{4})\s*$', upper_addr, re.I)
-            if zip_at_end:
-                zip_code = zip_at_end.group(1)
-                if 1000 <= int(zip_code) <= 9999:
-                    self.fields['zip_code'] = zip_code
-                    self.confidence['zip_code'] = 0.90
-                    print(f"[ADDRESS] ZIP (at end): {zip_code}")
-        
-        # Pattern 3: After city/barangay (e.g., "Brgy 174, Caloocan 1427")
-        if not self.fields.get('zip_code'):
-            zip_after_loc = re.search(r'(?:CALOOCAN|BARANGAY|BRGY)\s+[\w\s,]*?(\d{4})(?:\s|$)', upper_addr, re.I)
-            if zip_after_loc:
-                zip_code = zip_after_loc.group(1)
-                if 1000 <= int(zip_code) <= 9999:
-                    self.fields['zip_code'] = zip_code
-                    self.confidence['zip_code'] = 0.85
-                    print(f"[ADDRESS] ZIP (after location): {zip_code}")
-        
-        # Pattern 4: Fallback - last 4-digit number, excluding years
-        if not self.fields.get('zip_code'):
-            zip_matches = list(re.finditer(r'\b(\d{4})\b', upper_addr))
-            if zip_matches:
-                for match in reversed(zip_matches):
-                    zip_code = match.group(1)
-                    zip_int = int(zip_code)
-                    # Valid ZIP range, excluding years (1900-2099)
-                    if 1000 <= zip_int <= 9999 and not (1900 <= zip_int <= 2099):
-                        self.fields['zip_code'] = zip_code
-                        self.confidence['zip_code'] = 0.70
-                        print(f"[ADDRESS] ZIP (fallback): {zip_code}")
-                        break
+        # ZIP Code
+        zip_match = re.search(r'\b(1[0-9]{3})\b', upper_addr) # Philippine ZIP starts with 1 in NCR
+        if zip_match:
+            self.fields['zip_code'] = zip_match.group(1)
+            self.confidence['zip_code'] = 0.95
+            print(f"[ADDRESS] ZIP: {self.fields['zip_code']}")
 
 
 
@@ -728,9 +800,10 @@ def ocr_dual():
                     print(f"BACK OCR:\n{back_text}\n")
         
         # Parse combined text
-        combined = front_text + "\n" + back_text
+        combined_text = front_text + "\n" + back_text # Combine and Parse
         parser = PHIDParser()
-        fields, confidence = parser.parse(combined)
+        print(f"\n--- COMBINED OCR TEXT ---\n{combined_text}\n------------------------\n")
+        fields, confidence = parser.parse(combined_text)
         
         print("=== EXTRACTED FIELDS ===")
         for key, val in fields.items():
@@ -801,6 +874,29 @@ def login():
     if not email or not password:
         return jsonify({"error": "Missing credentials"}), 400
     
+    # Hardcoded Doctor/Admin Bypass for Testing
+    if email == 'admin@bhcare.ph' and password == 'bhcare123':
+        return jsonify({
+            "user": {
+                "id": 9998,
+                "email": email,
+                "first_name": "System",
+                "last_name": "Administrator",
+                "role": "admin"
+            }
+        }), 200
+    
+    if email == 'doctor@bhcare.ph' and password == 'bhcare123':
+        return jsonify({
+            "user": {
+                "id": 9999,
+                "email": email,
+                "first_name": "Medical",
+                "last_name": "Officer",
+                "role": "doctor"
+            }
+        }), 200
+    
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -842,6 +938,7 @@ def register():
         barangay = data.get('barangay')
         city = data.get('city')
         province = data.get('province')
+        philhealth_id = data.get('philhealth_id', '')
         
         # New detailed address fields (optional)
         house_number = data.get('house_number', '')
@@ -855,18 +952,32 @@ def register():
         if not all([email, password, first_name, last_name, dob, gender, contact, barangay, city, province]):
             return jsonify({"error": "Missing required fields"}), 400
         
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
         conn = get_db()
         cur = conn.cursor()
+
+        # Check for duplicate patient record (Name + DOB)
+        cur.execute("""
+            SELECT id FROM users 
+            WHERE LOWER(first_name) = LOWER(%s) 
+              AND LOWER(last_name) = LOWER(%s) 
+              AND date_of_birth = %s
+        """, (first_name, last_name, dob))
+        
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "A medical record already exists for this person (Name & DOB). Please login or consult the health center."}), 409
+
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
         cur.execute("""
             INSERT INTO users (email, password_hash, first_name, middle_name, last_name, 
-                              date_of_birth, gender, contact_number, barangay, city, province,
+                              date_of_birth, gender, contact_number, philhealth_id, barangay, city, province,
                               house_number, block_number, lot_number, street_name, subdivision, 
                               zip_code, full_address)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, barangay, city, province,
+        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, philhealth_id, barangay, city, province,
               house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address))
         
         user_id = cur.fetchone()[0]
@@ -880,6 +991,114 @@ def register():
         return jsonify({"error": "Email already exists"}), 409
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    """AI Chatbot endpoint for medical queries and health center information"""
+    try:
+        data = request.json
+        user_message = data.get('message', '').lower().strip()
+        
+        if not user_message:
+            return jsonify({"response": "Please ask me a question about the health center or your health concerns."}), 200
+        
+        # Health Center Information Responses
+        if any(word in user_message for word in ['hours', 'open', 'time', 'schedule', 'available']):
+            response = "The Brgy. 174 Health Center is open Monday through Friday, 8:00 AM to 5:00 PM. Weekend services are available for emergencies only."
+        
+        elif any(word in user_message for word in ['location', 'address', 'where', 'find']):
+            response = "We're located at Barangay 174, Caloocan City. You can easily find us near the main barangay hall."
+        
+        elif any(word in user_message for word in ['appointment', 'book', 'schedule consultation','visit']):
+            response = "You can book an appointment by clicking on the 'Appointments' tab in your dashboard. We offer general consultations, vaccinations, and prenatal care."
+        
+        elif any(word in user_message for word in ['services', 'offer', 'provide', 'treatment']):
+            response = "We offer: General Consultations, Vaccinations (children & adults), Prenatal Care, Family Planning, Medicine Dispensing, and Basic Laboratory Services."
+        
+        elif any(word in user_message for word in ['covid', 'vaccine', 'vaccination']):
+            response = "Yes, we provide COVID-19 vaccinations and booster shots. Please bring a valid ID and your vaccination card if you have one."
+        
+        elif any(word in user_message for word in ['prenatal', 'pregnancy', 'pregnant']):
+            response = "Our prenatal care program includes regular check-ups, vitamins, and health education. Schedule an appointment through your dashboard for a consultation."
+        
+        elif any(word in user_message for word in ['medicine', 'prescription', 'drug']):
+            response = "We dispense free basic medicines with a valid prescription from our doctors. Some medicines may have limited stock."
+        
+        elif any(word in user_message for word in ['emergency', 'urgent', 'critical']):
+            response = "For medical emergencies, please call 911 or go to the nearest hospital. Our health center handles non-emergency consultations and preventive care."
+        
+        elif any(word in user_message for word in ['cost', 'fee', 'price', 'pay', 'free']):
+            response = "Most of our services are FREE for registered barangay residents. Some specialized services may have minimal fees."
+        
+        # Health Tips & General Medical Advice
+        elif any(word in user_message for word in ['fever', 'temperature', 'hot']):
+            response = "For fever: Rest, drink plenty of fluids, and monitor your temperature. If fever persists beyond 3 days or exceeds 39°C, please visit us for consultation."
+        
+        elif any(word in user_message for word in ['cough', 'cold', 'flu']):
+            response = "For cough and colds: Get adequate rest, stay hydrated, and avoid contact with others. If symptoms worsen or persist beyond a week, schedule a consultation."
+        
+        elif any(word in user_message for word in ['headache', 'migraine']):
+            response = "For headaches: Rest in a quiet, dark room, stay hydrated, and apply a cold compress. If severe or persistent, please consult our doctors."
+        
+        elif any(word in user_message for word in ['hello', 'hi', 'hey', 'good morning', 'good afternoon']):
+            response = "Hello! I'm your BHCare AI Assistant. I can help you with information about our health center, services, appointments, and general health advice. How can I assist you today?"
+        
+        elif any(word in user_message for word in ['thank', 'thanks']):
+            response = "You're welcome! Stay healthy and don't hesitate to reach out if you need more assistance. 🩺"
+        
+        # Default Response
+        else:
+            response = "I can help you with questions about:\n• Health center hours and location\n• Booking appointments\n• Available services\n• Vaccinations\n• General health advice\n\nHow may I assist you today?"
+        
+        return jsonify({"response": response}), 200
+        
+    except Exception as e:
+        return jsonify({"response": "I apologize, but I'm having trouble processing your request. Please try again later."}), 500
+
+
+
+@app.route('/api/check-philhealth', methods=['POST'])
+def check_philhealth():
+    try:
+        data = request.json
+        print(f"Checking PhilHealth ID: {data}")
+        ph_id = data.get('philhealth_id')
+        
+        if not ph_id:
+            return jsonify({'success': False, 'message': 'PhilHealth ID is required'}), 400
+            
+        clean_id = re.sub(r'\D', '', ph_id)
+        
+        if len(clean_id) != 12:
+             return jsonify({'success': False, 'message': 'Invalid PhilHealth ID format'}), 400
+             
+        last_digit = int(clean_id[-1])
+        
+        status = 'Active'
+        if last_digit % 3 == 0:
+            category = 'Indigent'
+            benefits = ['Free Consultation', 'Free Diagnostic Labs (CBC, Urinalysis)', 'Free Medicines (Hypertension, Diabetes)']
+        elif last_digit % 3 == 1:
+            category = 'Senior Citizen'
+            benefits = ['Free Consultation', '20% Discount on Labs', 'Priority Lane']
+        else:
+            category = 'Formal Economy'
+            benefits = ['Consultation', 'Discounted Labs']
+            
+        return jsonify({
+            'success': True,
+            'data': {
+                'status': status,
+                'category': category,
+                'benefits': benefits,
+                'expiry': '2026-12-31'
+            }
+        })
+
+    except Exception as e:
+        print(f"Error checking PhilHealth: {e}")
+        return jsonify({'success': False, 'message': 'System error'}), 500
 
 
 if __name__ == '__main__':

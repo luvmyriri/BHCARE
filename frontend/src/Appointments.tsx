@@ -54,7 +54,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const fetchServices = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/services');
+            const response = await fetch('/api/services');
             const data = await response.json();
             setServices(data);
         } catch (error) {
@@ -64,7 +64,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const fetchAvailableSlots = async () => {
         try {
-            const response = await fetch(`http://localhost:5000/api/available-slots?date=${selectedDate}`);
+            const response = await fetch(`/api/available-slots?date=${selectedDate}`);
             const data = await response.json();
             setAvailableSlots(data);
         } catch (error) {
@@ -74,7 +74,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const fetchMyAppointments = async () => {
         try {
-            const response = await fetch(`http://localhost:5000/api/appointments/user/${user.id}`);
+            const response = await fetch(`/api/appointments/user/${user.id}`);
             const data = await response.json();
             setMyAppointments(data);
         } catch (error) {
@@ -90,7 +90,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:5000/api/appointments', {
+            const response = await fetch('/api/appointments', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -128,7 +128,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
         }
 
         try {
-            const response = await fetch(`http://localhost:5000/api/appointments/${appointmentId}/cancel`, {
+            const response = await fetch(`/api/appointments/${appointmentId}/cancel`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: 'Cancelled by patient' })
@@ -166,7 +166,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-6">
+        <div className="auth-card" style={{ maxWidth: '900px', width: '95%', padding: '30px', margin: '20px auto' }}>
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <button
@@ -184,8 +184,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
             <div className="flex gap-2 mb-8 bg-gray-100 p-1 rounded-lg">
                 <button
                     className={`flex-1 py-2 px-4 rounded-md font-medium transition ${view === 'book'
-                            ? 'bg-white text-primary shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
+                        ? 'bg-white text-primary shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
                         }`}
                     onClick={() => setView('book')}
                 >
@@ -193,8 +193,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
                 </button>
                 <button
                     className={`flex-1 py-2 px-4 rounded-md font-medium transition ${view === 'my-appointments'
-                            ? 'bg-white text-primary shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900'
+                        ? 'bg-white text-primary shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
                         }`}
                     onClick={() => setView('my-appointments')}
                 >
@@ -250,8 +250,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
                                         key={service.id}
                                         onClick={() => setSelectedService(service)}
                                         className={`p-6 rounded-xl border-2 cursor-pointer transition ${selectedService?.id === service.id
-                                                ? 'border-primary bg-green-50'
-                                                : 'border-gray-200 hover:border-primary hover:bg-gray-50'
+                                            ? 'border-primary bg-green-50'
+                                            : 'border-gray-200 hover:border-primary hover:bg-gray-50'
                                             }`}
                                     >
                                         <div className="flex items-start gap-4">
@@ -307,8 +307,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
                                                     key={index}
                                                     onClick={() => setSelectedTime(slot.time)}
                                                     className={`py-3 px-4 rounded-lg font-medium transition ${selectedTime === slot.time
-                                                            ? 'bg-primary text-white'
-                                                            : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-primary'
+                                                        ? 'bg-primary text-white'
+                                                        : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-primary'
                                                         }`}
                                                 >
                                                     {slot.display}

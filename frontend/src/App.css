@@ -346,6 +346,10 @@ body {
 .auth-card {
   max-width: 420px;
   padding: 30px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
 }
 
 .auth-title {
@@ -560,16 +564,16 @@ label {
 
 /* Modal content */
 .modal-content {
-  width: 70%;
-  max-width: 900px;
-  height: 80vh;
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
+  width: 95%;
+  max-width: 1000px;
   position: relative;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  pointer-events: none; /* Let clicks pass through to overlay */
+}
+
+.modal-content > * {
+  pointer-events: auto; /* Re-enable clicks for actual content */
 }
 
 
@@ -589,24 +593,13 @@ label {
 /* Scrollable form inside */
 .form-scroll {
   flex: 1;
-  overflow-y: auto;
-  padding-right: 8px;
-  padding-top: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Scrollbar style */
-.form-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.form-scroll::-webkit-scrollbar-thumb {
-  background: #ffb7a5;
-  border-radius: 999px;
-}
-
-.form-scroll::-webkit-scrollbar-track {
-  background: #f0f0f0;
-}
+/* Removed scrollbar styles as they are no longer needed */
 
 
 

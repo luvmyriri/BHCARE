@@ -1,9 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import './App.css';
 import LoginForm from './LoginForm';
-import Profile from './Profile';
-import Services from './services';
-import Appointments from './Appointments';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import LocationShowcase from './components/LocationShowcase';
@@ -11,64 +8,118 @@ import ContactForm from './components/ContactForm';
 import Footer from './components/Footer';
 import FloatingParticles from './components/FloatingParticles';
 import FloatingImages from './components/FloatingImages';
-
+import Services from './services';
+import Dashboard from './Dashboard';
+import DoctorDashboard from './DoctorDashboard';
+import AdminDashboard from './AdminDashboard';
+import SecurityDashboard from './SecurityDashboard';
+import InstallPWA from './components/InstallPWA';
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showAppointments, setShowAppointments] = useState(false);
+  const [loginMode, setLoginMode] = useState<'login' | 'register'>('login');
   const [user, setUser] = useState(() => {
     try {
       const u = localStorage.getItem('bh_user');
-      return u ? JSON.parse(u) : null;
+      if (!u) return null;
+      let userData = JSON.parse(u);
+
+      // Hardcoded Role Assignment
+      if (userData.email === 'admin@bhcare.ph') {
+        userData.role = 'admin';
+      } else if (userData.email === 'doctor@bhcare.ph') {
+        userData.role = 'doctor';
+      } else if (userData.email === 'security@bhcare.ph' || userData.email === 'security1741@bhcare.ph') {
+        userData.role = 'security';
+      } else {
+        userData.role = 'patient';
+      }
+      return userData;
     } catch {
       return null;
     }
   });
 
-  const openLogin = () => setShowLogin(true);
+  const openLogin = (mode: 'login' | 'register' = 'login') => {
+    setLoginMode(mode);
+    setShowLogin(true);
+  };
   const closeLogin = () => setShowLogin(false);
-  const closeProfile = () => setShowProfile(false);
-  const closeAppointments = () => setShowAppointments(false);
+
   const onLoginSuccess = (u: any) => {
+    // Apply hardcoded role on login too
+    if (u.email === 'admin@bhcare.ph') {
+      u.role = 'admin';
+    } else if (u.email === 'doctor@bhcare.ph') {
+      u.role = 'doctor';
+    } else if (u.email === 'security@bhcare.ph' || u.email === 'security1741@bhcare.ph') {
+      u.role = 'security';
+    } else {
+      u.role = 'patient';
+    }
     setUser(u);
     setShowLogin(false);
-    setShowProfile(true);
   };
-  const onProfileUpdated = (u: any) => setUser(u);
-  const onProfileIconClick = () => {
-    if (user) setShowProfile(true);
-    else setShowLogin(true);
-  };
-  const onAppointmentClick = () => {
-    if (user) setShowAppointments(true);
-    else setShowLogin(true);
-  };
+
   const onLogoutClick = () => {
     try {
       localStorage.removeItem('bh_user');
     } catch { }
     setUser(null);
-    setShowProfile(false);
-    setShowAppointments(false);
   };
 
+  // If logged in, show the appropriate Dashboard hub
+  if (user) {
+    if (user.role === 'admin') {
+      return (
+        <AdminDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
+    if (user.role === 'doctor') {
+      return (
+        <DoctorDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
+    if (user.role === 'security') {
+      return (
+        <SecurityDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
+    return (
+      <Dashboard
+        user={user}
+        onLogout={onLogoutClick}
+      />
+    );
+  }
+
+  // Otherwise show the landing page
   return (
     <div className="app">
       <FloatingImages />
       <FloatingParticles />
       <Navbar
-        onLoginClick={openLogin}
+        onLoginClick={() => openLogin('login')}
         onLogoutClick={onLogoutClick}
-        onProfileClick={onProfileIconClick}
-        onAppointmentClick={onAppointmentClick}
+        onProfileClick={() => { }}
+        onAppointmentClick={() => openLogin('login')}
         user={user}
       />
-      <Hero onRegisterClick={openLogin} onLoginClick={openLogin} />
+      <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
       <LocationShowcase />
       <Services />
       <ContactForm />
-      <Footer />
+      <Footer onAppointmentClick={() => openLogin('login')} />
+      <InstallPWA />
 
       {showLogin && (
         <div className="modal-overlay" onClick={closeLogin}>
@@ -80,31 +131,7 @@ function App() {
               ×
             </button>
             <div className="form-scroll">
-              <LoginForm onLoginSuccess={onLoginSuccess} />
-            </div>
-          </div>
-        </div>
-      )}
-      {showProfile && (
-        <div className="modal-overlay" onClick={closeProfile}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeProfile}>
-              ×
-            </button>
-            <div className="form-scroll">
-              <Profile user={user} onClose={closeProfile} onUpdated={onProfileUpdated} />
-            </div>
-          </div>
-        </div>
-      )}
-      {showAppointments && (
-        <div className="modal-overlay" onClick={closeAppointments}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeAppointments}>
-              ×
-            </button>
-            <div className="form-scroll">
-              <Appointments user={user} onClose={closeAppointments} />
+              <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
             </div>
           </div>
         </div>
