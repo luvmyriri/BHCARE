@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { FC } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
     Box,
@@ -14,11 +14,7 @@ import {
     MenuList,
     MenuItem,
     Avatar,
-    IconButton,
-    Spacer,
-    useColorModeValue,
 } from '@chakra-ui/react';
-import { motion } from 'framer-motion';
 
 interface NavbarProps {
     onLoginClick: () => void;
@@ -28,24 +24,14 @@ interface NavbarProps {
     user: any;
 }
 
-const Navbar: React.FC<NavbarProps> = ({
+const Navbar: FC<NavbarProps> = ({
     onLoginClick,
     onLogoutClick,
     onProfileClick,
     onAppointmentClick,
     user,
 }) => {
-    const [isScrolled, setIsScrolled] = useState(false);
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { language, setLanguage, t } = useLanguage();
-
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 20);
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
 
     const toggleLanguage = () => {
         setLanguage(language === 'en' ? 'tl' : 'en');

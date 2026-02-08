@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, FC, ReactNode, InputHTMLAttributes, SelectHTMLAttributes, FormEvent, ChangeEvent } from 'react';
 import { useLanguage } from './contexts/LanguageContext';
 
 type Option = { code: string; name: string };
 type ConfidenceMap = Record<string, number>;
 
-const Input: React.FC<
-  { label: string; icon: React.ReactNode; invalid?: boolean; confidence?: number } & React.InputHTMLAttributes<HTMLInputElement>
+const Input: FC<
+  { label: string; icon: ReactNode; invalid?: boolean; confidence?: number } & InputHTMLAttributes<HTMLInputElement>
 > = ({ label, icon, invalid, confidence, ...props }) => (
   <div style={{ marginBottom: '12px', position: 'relative' }}>
     <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'flex', alignItems: 'center', marginBottom: '4px', gap: '6px' }}>
@@ -53,8 +53,8 @@ const Input: React.FC<
   </div>
 );
 
-const Select: React.FC<
-  { label: string; icon: React.ReactNode; options: Option[]; invalid?: boolean; placeholder?: string; confidence?: number } & React.SelectHTMLAttributes<HTMLSelectElement>
+const Select: FC<
+  { label: string; icon: ReactNode; options: Option[]; invalid?: boolean; placeholder?: string; confidence?: number } & SelectHTMLAttributes<HTMLSelectElement>
 > = ({ label, icon, options, invalid, placeholder, confidence, ...props }) => {
   // Ensure options is always a valid array
   const safeOptions = Array.isArray(options) ? options : [];
@@ -143,11 +143,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [registerPwVisible, setRegisterPwVisible] = useState(false);
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
 
-  const [provinces, setProvinces] = useState<Option[]>([]);
 
-  const [regionCode, setRegionCode] = useState('');
-  const [provinceCode, setProvinceCode] = useState('');
-  const [cityCode, setCityCode] = useState('');
 
   const [idFront, setIdFront] = useState<File | null>(null);
   const [idBack, setIdBack] = useState<File | null>(null);
@@ -163,24 +159,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [ocrStatus, setOcrStatus] = useState('');
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
-  // Load regions data (OCR will populate address directly via text inputs)
-  useEffect(() => {
-    // No need to fetch regions since we use text inputs, not dropdowns
-  }, [mode]);
 
-  // Load provinces when region is set by OCR (for cascade validation)
-  useEffect(() => {
-    if (regionCode) {
-      fetch(`https://psgc.cloud/api/regions/${regionCode}/provinces`)
-        .then(res => res.json())
-        .then(data => {
-          setProvinces(data);
-          // If NCR (no provinces), province field shows Metro Manila directly
-        });
-    } else {
-      setProvinces([]);
-    }
-  }, [regionCode]);
 
   // Removed: City and barangay loading (using text inputs instead of dropdowns)
 
@@ -203,7 +182,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     return "Government ID";
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault(); setLoading(true); setError('');
     try {
       const res = await fetch('/login', {
@@ -220,13 +199,13 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
-  const handleFrontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFrontUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setIdFront(file); setFrontPreview(URL.createObjectURL(file));
   };
 
-  const handleBackUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setIdBack(file); setBackPreview(URL.createObjectURL(file));
@@ -313,35 +292,13 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
       if (fields.phone) setContact(fields.phone);
 
 
-      // Auto-populate address cascade
-      if (fields.region) {
-        console.log('[OCR] Setting region:', fields.region);
-        setRegionCode(fields.region);
-        // Province will auto-load via useEffect
-      }
-
-      // Queue province/city/barangay setting after region loads
-      if (fields.province) {
-        console.log('[OCR] Queueing province:', fields.province);
-        setTimeout(() => {
-          setProvinceCode(fields.province);
-          setProvince(fields.province_name || '');
-        }, 500);
-      }
-
-      if (fields.city_code) {
-        console.log('[OCR] Queueing city:', fields.city_code);
-        setTimeout(() => {
-          setCityCode(fields.city_code);
-          setCity(fields.city || '');
-        }, 1000);
-      }
+      // Auto-populate address fields directly
+      if (fields.province_name) setProvince(fields.province_name);
+      if (fields.city) setCity(fields.city);
 
       if (fields.barangay) {
         console.log('[OCR] Queueing barangay:', fields.barangay);
-        setTimeout(() => {
-          setBarangay(fields.barangay);
-        }, 1500);
+        setBarangay(fields.barangay);
       }
 
       // Auto-populate detailed street address fields
@@ -368,7 +325,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: FormEvent) => {
     e.preventDefault(); setError('');
 
     // Validation
@@ -788,7 +745,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                   icon="📍"
                   confidence={confidence.region}
                   value={province ? "National Capital Region (NCR)" : ""}
-                  onChange={(e) => { }}
+                  readOnly
                   required
                   disabled
                 />

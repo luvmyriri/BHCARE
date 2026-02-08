@@ -1,10 +1,8 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { useInView } from 'framer-motion';
+import { motion, useInView, Variants } from 'framer-motion';
 import { useRef } from 'react';
 import './services.css';
 
-const container = {
+const container: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
@@ -14,7 +12,7 @@ const container = {
   }
 };
 
-const item = {
+const item: Variants = {
   hidden: { opacity: 0, y: 30 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } }
 };
@@ -57,7 +55,7 @@ function Services() {
   ];
 
   const handleClick = (title: string) => {
-    // alert(`You clicked on: ${title}`);
+    console.log(`Clicked service: ${title}`);
   };
 
   return (
