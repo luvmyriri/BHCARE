@@ -33,7 +33,7 @@ const ContactForm = () => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        phone: '',
+        phone: '+63',
         subject: '',
         message: '',
     });
@@ -41,14 +41,81 @@ const ContactForm = () => {
     const toast = useToast();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+
+        if (name === 'phone') {
+            // Remove invalid characters
+            let cleaned = value.replace(/[^0-9+]/g, '');
+
+            // Handle paste cases or user typing 09/63
+            if (cleaned.startsWith('09')) {
+                cleaned = '+63' + cleaned.substring(1);
+            } else if (cleaned.startsWith('63') && !cleaned.startsWith('+63')) {
+                cleaned = '+' + cleaned;
+            } else if (cleaned.startsWith('9')) {
+                cleaned = '+63' + cleaned;
+            }
+
+            // Enforce +63 prefix
+            if (!cleaned.startsWith('+63')) {
+                // If the user cleared everything or typed something else, reset/prepend
+                // Remove all non-digits to be safe
+                const digits = cleaned.replace(/\D/g, '');
+                cleaned = '+63' + digits;
+            }
+
+            // Limit length: +63 (3 chars) + 10 digits = 13 chars
+            if (cleaned.length > 13) {
+                cleaned = cleaned.substring(0, 13);
+            }
+
+            setFormData({ ...formData, phone: cleaned });
+            return;
+        }
+
+        if (name === 'name') {
+            // Allow letters, spaces, hyphens, and apostrophes
+            const cleaned = value.replace(/[^a-zA-Z\s'-.]/g, '');
+            setFormData({ ...formData, name: cleaned });
+            return;
+        }
+
         setFormData({
             ...formData,
-            [e.target.name]: e.target.value,
+            [name]: value,
         });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // New Validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            toast({
+                title: 'Invalid Email',
+                description: 'Please enter a valid email address.',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+                position: 'top',
+            });
+            return;
+        }
+
+        // Allow empty check (just +63) for optional field, but if entered, must be valid
+        if (formData.phone && formData.phone !== '+63' && formData.phone.length < 13) {
+            toast({
+                title: 'Invalid Phone Number',
+                description: 'Please enter a valid contact number starting with +63.',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+                position: 'top',
+            });
+            return;
+        }
+
         setIsSubmitting(true);
 
         // Simulate API call
@@ -61,13 +128,13 @@ const ContactForm = () => {
                 isClosable: true,
                 position: 'top',
             });
-            setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+            setFormData({ name: '', email: '', phone: '+63', subject: '', message: '' });
             setIsSubmitting(false);
         }, 1000);
     };
 
     return (
-        <Box py={20} bg="transparent" position="relative" overflow="hidden">
+        <Box id="contact" py={20} bg="transparent" position="relative" overflow="hidden">
             {/* Background Decoration */}
             <Box
                 position="absolute"

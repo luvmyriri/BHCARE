@@ -10,6 +10,28 @@ import {
     HStack,
     Divider,
     Badge,
+    Table,
+    Thead,
+    Tbody,
+    Tr,
+    Th,
+    Td,
+    Button,
+    Modal,
+    ModalOverlay,
+    ModalContent,
+    ModalHeader,
+    ModalFooter,
+    ModalBody,
+    ModalCloseButton,
+    useDisclosure,
+    Progress,
+    Drawer,
+    DrawerBody,
+    DrawerOverlay,
+    DrawerContent,
+    DrawerCloseButton,
+    IconButton,
 } from '@chakra-ui/react';
 import {
     FiHome,
@@ -18,10 +40,12 @@ import {
     FiLogOut,
     FiActivity,
     FiFileText,
+    FiMenu,
 } from 'react-icons/fi';
 import Profile from './Profile';
 import Appointments from './Appointments';
 import AIChatbot from './AIChatbot';
+import HealthCalculators from './components/HealthCalculators';
 
 interface DashboardProps {
     user: any;
@@ -69,7 +93,7 @@ const NavItem = ({ icon, children, active, onClick }: any) => {
     );
 };
 
-const StatCard = ({ label, value, icon, color }: any) => (
+const StatCard = ({ label, value, icon, color, onClick }: any) => (
     <Box
         bg="white"
         p={6}
@@ -78,6 +102,10 @@ const StatCard = ({ label, value, icon, color }: any) => (
         border="1px solid"
         borderColor="gray.100"
         flex="1"
+        cursor={onClick ? "pointer" : "default"}
+        onClick={onClick}
+        transition="all 0.2s"
+        _hover={onClick ? { transform: "translateY(-2px)", boxShadow: "md" } : {}}
     >
         <Flex align="center" justify="space-between">
             <VStack align="start" spacing={1}>
@@ -132,6 +160,84 @@ const PageHero = ({ title, description, badge }: any) => (
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState('overview');
+    const { isOpen, onOpen, onClose } = useDisclosure();
+    const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
+    const [selectedCard, setSelectedCard] = useState('');
+
+    const handleCardClick = (card: string) => {
+        setSelectedCard(card);
+        onOpen();
+    };
+
+    const renderModalContent = () => {
+        switch (selectedCard) {
+            case 'appointments':
+                return (
+                    <>
+                        <ModalHeader>Upcoming Appointments</ModalHeader>
+                        <ModalBody>
+                            <Box p={4} bg="teal.50" borderRadius="lg" mb={4}>
+                                <Text fontWeight="bold" color="teal.800">Next Visit: Feb 24, 2026</Text>
+                                <Text fontSize="sm">Reason: Medical Check-up</Text>
+                                <Text fontSize="sm">Doctor: Dr. Maria Santos</Text>
+                            </Box>
+                            <Button size="sm" w="full" colorScheme="teal" onClick={() => setActiveTab('appointments')}>Book New Appointment</Button>
+                        </ModalBody>
+                    </>
+                );
+            case 'records':
+                return (
+                    <>
+                        <ModalHeader>Recent Health Records</ModalHeader>
+                        <ModalBody>
+                            <VStack align="stretch" spacing={2}>
+                                <HStack justify="space-between" p={2} borderBottom="1px solid" borderColor="gray.100">
+                                    <Text fontSize="sm" fontWeight="600">Blood Test Results</Text>
+                                    <Text fontSize="xs" color="gray.500">Feb 10, 2026</Text>
+                                </HStack>
+                                <HStack justify="space-between" p={2} borderBottom="1px solid" borderColor="gray.100">
+                                    <Text fontSize="sm" fontWeight="600">Urinalysis</Text>
+                                    <Text fontSize="xs" color="gray.500">Jan 15, 2026</Text>
+                                </HStack>
+                                <Button size="sm" variant="link" colorScheme="teal" onClick={() => setActiveTab('records')}>View All Records</Button>
+                            </VStack>
+                        </ModalBody>
+                    </>
+                );
+            case 'health_score':
+                return (
+                    <>
+                        <ModalHeader>Health Score Breakdown</ModalHeader>
+                        <ModalBody>
+                            <VStack align="stretch" spacing={4}>
+                                <Box>
+                                    <Text fontSize="sm" fontWeight="bold">Body Mass Index (BMI)</Text>
+                                    <Progress value={80} size="sm" colorScheme="green" />
+                                    <Text fontSize="xs" mt={1}>Normal Range (22.5)</Text>
+                                </Box>
+                                <Box>
+                                    <Text fontSize="sm" fontWeight="bold">Blood Pressure</Text>
+                                    <Progress value={90} size="sm" colorScheme="green" />
+                                    <Text fontSize="xs" mt={1}>120/80 mmHg (Good)</Text>
+                                </Box>
+                                <Box>
+                                    <Text fontSize="sm" fontWeight="bold">Physical Activity</Text>
+                                    <Progress value={60} size="sm" colorScheme="orange" />
+                                    <Text fontSize="xs" mt={1}>Moderate (Needs Improvement)</Text>
+                                </Box>
+                            </VStack>
+                        </ModalBody>
+                    </>
+                );
+            default:
+                return (
+                    <>
+                        <ModalHeader>Detail View</ModalHeader>
+                        <ModalBody><Text>No details available.</Text></ModalBody>
+                    </>
+                );
+        }
+    };
 
     const renderContent = () => {
         switch (activeTab) {
@@ -145,9 +251,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         />
 
                         <Flex gap={6} flexWrap="wrap">
-                            <StatCard label="Upcoming Appointments" value="1" icon={FiCalendar} color="teal" />
-                            <StatCard label="Health Records" value="12" icon={FiFileText} color="orange" />
-                            <StatCard label="Health Score" value="98%" icon={FiActivity} color="green" />
+                            <StatCard label="Upcoming Appointments" value="1" icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
+                            <StatCard label="Health Records" value="12" icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
+                            <StatCard label="Health Score" value="98%" icon={FiActivity} color="green" onClick={() => handleCardClick('health_score')} />
                         </Flex>
 
                         <Heading size="md" color="teal.800" mt={4}>
@@ -209,15 +315,78 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 );
             case 'records':
                 return (
-                    <VStack align="stretch">
+                    <VStack align="stretch" spacing={6}>
                         <PageHero
                             badge="HEALTH RECORDS"
                             title="Medical Logs & Results"
                             description="Access your past check-ups, diagnostic reports, and medical history in one secure place."
                         />
-                        <Flex h="300px" align="center" justify="center" bg="white" borderRadius="2xl" border="1px dashed" borderColor="gray.200">
-                            <Text color="gray.400">Records Archives Integration in Progress</Text>
+
+                        <Flex gap={4} direction={{ base: 'column', lg: 'row' }}>
+                            <Box flex="2" bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                                <Heading size="md" color="teal.800" mb={6}>My Medical History</Heading>
+                                <Box overflowX="auto">
+                                    <Table variant="simple">
+                                        <Thead>
+                                            <Tr>
+                                                <Th>Date</Th>
+                                                <Th>Diagnosis / Procedure</Th>
+                                                <Th>Doctor</Th>
+                                                <Th>Status</Th>
+                                                <Th>Action</Th>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            {[
+                                                { date: 'Feb 10, 2026', diag: 'Annual Physical Exam', doc: 'Dr. Santos', status: 'Completed' },
+                                                { date: 'Jan 15, 2026', diag: 'Flu Vaccination', doc: 'Dr. Gomez', status: 'Completed' },
+                                                { date: 'Dec 05, 2025', diag: 'Dental Cleaning', doc: 'Dr. Reyes', status: 'Completed' },
+                                            ].map((r, i) => (
+                                                <Tr key={i}>
+                                                    <Td>{r.date}</Td>
+                                                    <Td fontWeight="600">{r.diag}</Td>
+                                                    <Td>{r.doc}</Td>
+                                                    <Td><Badge colorScheme="green">{r.status}</Badge></Td>
+                                                    <Td>
+                                                        <Button size="xs" colorScheme="teal" variant="ghost">View Result</Button>
+                                                    </Td>
+                                                </Tr>
+                                            ))}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            </Box>
+
+                            <Box flex="1" bg="teal.50" p={6} borderRadius="2xl" border="1px solid" borderColor="teal.100">
+                                <VStack align="start" spacing={4}>
+                                    <Heading size="md" color="teal.800">Request Documents</Heading>
+                                    <Text fontSize="sm" color="teal.700">
+                                        Need a medical certificate or health clearance? Request it here and pick it up at the center.
+                                    </Text>
+                                    <Divider borderColor="teal.200" />
+                                    <Button w="full" colorScheme="teal" size="md">
+                                        Request Medical Certificate
+                                    </Button>
+                                    <Button w="full" colorScheme="orange" variant="outline" size="md">
+                                        Request Health Clearance
+                                    </Button>
+                                    <Text fontSize="xs" color="gray.500" mt={2}>
+                                        *Processing time: 1-2 working days. You will be notified when it's ready.
+                                    </Text>
+                                </VStack>
+                            </Box>
                         </Flex>
+                    </VStack>
+                );
+            case 'health-tools':
+                return (
+                    <VStack align="stretch" spacing={6}>
+                        <PageHero
+                            badge="HEALTH TOOLS"
+                            title="Interactive Health Calculators"
+                            description="Monitor your health metrics with our handy tools. Staying informed is the first step to a healthier life."
+                        />
+                        <HealthCalculators />
                     </VStack>
                 );
             default:
@@ -260,6 +429,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <NavItem icon={FiUser} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')}>
                         Profile Setting
                     </NavItem>
+                    <NavItem icon={FiActivity} active={activeTab === 'health-tools'} onClick={() => setActiveTab('health-tools')}>
+                        Health Tools
+                    </NavItem>
                 </VStack>
 
                 <Box pos="absolute" bottom="8" w="full" px={4}>
@@ -273,14 +445,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             {/* Main Content Area */}
             <Box ml={{ base: 0, md: '280px' }} p="8" position="relative">
                 <Flex justify="space-between" align="center" mb={10}>
-                    <VStack align="start" spacing={0}>
-                        <Heading size="md" color="teal.800" textTransform="capitalize">
-                            {activeTab.replace('-', ' ')}
-                        </Heading>
-                        <Text color="gray.400" fontSize="sm">
-                            Healthcare Dashboard v4.0
-                        </Text>
-                    </VStack>
+                    <HStack spacing={4}>
+                        <IconButton
+                            display={{ base: 'flex', md: 'none' }}
+                            onClick={onSidebarOpen}
+                            variant="outline"
+                            aria-label="open menu"
+                            icon={<FiMenu />}
+                        />
+                        <VStack align="start" spacing={0}>
+                            <Heading size="md" color="teal.800" textTransform="capitalize">
+                                {activeTab.replace('-', ' ')}
+                            </Heading>
+                            <Text color="gray.400" fontSize="sm">
+                                Healthcare Dashboard v4.0
+                            </Text>
+                        </VStack>
+                    </HStack>
                     <HStack spacing={4}>
                         <VStack align="end" spacing={0} mr={2}>
                             <Text fontWeight="700" color="teal.800" fontSize="sm">
@@ -301,6 +482,64 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
             {/* AI Chatbot */}
             <AIChatbot />
+
+            <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>{selectedCard && selectedCard.replace('_', ' ').charAt(0).toUpperCase() + selectedCard.replace('_', ' ').slice(1)} Details</ModalHeader>
+                    <ModalCloseButton />
+                    {renderModalContent()}
+                    <ModalFooter>
+                        <Button colorScheme="teal" mr={3} onClick={onClose}>
+                            Close
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            <Drawer isOpen={isSidebarOpen} placement="left" onClose={onSidebarClose}>
+                <DrawerOverlay />
+                <DrawerContent>
+                    <DrawerCloseButton />
+                    <DrawerBody p={0}>
+                        <Box h="full" bg="white">
+                            <Flex h="20" align="center" mx="8" mb={8}>
+                                <HStack spacing={3}>
+                                    <img src="/images/Logo.png" alt="Logo" style={{ height: '32px' }} />
+                                    <Text fontSize="xl" fontWeight="800" color="teal.800" letterSpacing="tight">
+                                        BHCare
+                                    </Text>
+                                </HStack>
+                            </Flex>
+
+                            <VStack spacing={2} align="stretch" px={4}>
+                                <NavItem icon={FiHome} active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); onSidebarClose(); }}>
+                                    Overview
+                                </NavItem>
+                                <NavItem icon={FiCalendar} active={activeTab === 'appointments'} onClick={() => { setActiveTab('appointments'); onSidebarClose(); }}>
+                                    Appointments
+                                </NavItem>
+                                <NavItem icon={FiFileText} active={activeTab === 'records'} onClick={() => { setActiveTab('records'); onSidebarClose(); }}>
+                                    Health Records
+                                </NavItem>
+                                <NavItem icon={FiUser} active={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); onSidebarClose(); }}>
+                                    Profile Setting
+                                </NavItem>
+                                <NavItem icon={FiActivity} active={activeTab === 'health-tools'} onClick={() => { setActiveTab('health-tools'); onSidebarClose(); }}>
+                                    Health Tools
+                                </NavItem>
+                            </VStack>
+
+                            <Box pos="absolute" bottom="8" w="full" px={4}>
+                                <Divider mb={4} />
+                                <NavItem icon={FiLogOut} onClick={onLogout}>
+                                    Logout
+                                </NavItem>
+                            </Box>
+                        </Box>
+                    </DrawerBody>
+                </DrawerContent>
+            </Drawer>
         </Box>
     );
 };

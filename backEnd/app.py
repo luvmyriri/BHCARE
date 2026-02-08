@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import psycopg2
 from psycopg2 import sql
+from database import get_db_connection
 import bcrypt
 import os
 from dotenv import load_dotenv
@@ -16,14 +16,28 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# Register Blueprints
+from appointments import appointments_bp
+from lab_results import lab_results_bp
+from inventory import inventory_bp
+from security import security_bp
+
+app.register_blueprint(appointments_bp)
+app.register_blueprint(lab_results_bp)
+app.register_blueprint(inventory_bp)
+app.register_blueprint(security_bp)
+
+# Startup Database Verification
+try:
+    print("⏳ Testing database connection at startup...")
+    conn = get_db_connection()
+    conn.close()
+    print("✅ Database connection verified.")
+except Exception as e:
+    print(f"❌ CRITICAL: Database connection failed at startup: {e}")
+
 def get_db():
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST', '127.0.0.1'),
-        port=os.getenv('DB_PORT', '5432'),
-        database=os.getenv('DB_NAME', 'bhcare'),
-        user=os.getenv('DB_USER', 'postgres'),
-        password=os.getenv('DB_PASSWORD')
-    )
+    return get_db_connection()
 
 OCR_API_KEY = os.getenv('OCR_API_KEY')
 
@@ -171,6 +185,9 @@ class PHIDParser:
         # 5b. Extract Email
         self._extract_email(clean_text)
 
+        # 5c. Extract PhilHealth ID
+        self._extract_philhealth_id(clean_text)
+
         # 6. Extract Address
         self._extract_address(lines, clean_text)
         
@@ -222,6 +239,32 @@ class PHIDParser:
                      self.confidence['crn'] = 0.85
                      print(f"[CRN] Found via next-line search: {self.fields['crn']}")
                      return
+
+    def _extract_philhealth_id(self, text):
+        """Extract PhilHealth ID (Format: XX-XXXXXXXXX-X)"""
+        # Look for 12 digits potentially with dashes
+        patterns = [
+            r'(\d{2})[- ]?(\d{9})[- ]?(\d{1})', # 12 digits: XX-XXXXXXXXX-X
+            r'(\d{12})', # raw 12 digits
+            r'PHILHEALTH\s*(?:ID|NO)?[:\s]*([0-9-]{12,14})'
+        ]
+        
+        for p in patterns:
+            match = re.search(p, text.upper())
+            if match:
+                if len(match.groups()) == 3:
+                    val = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
+                else:
+                    raw = re.sub(r'[^0-9]', '', match.group(1))
+                    if len(raw) == 12:
+                        val = f"{raw[:2]}-{raw[2:11]}-{raw[11:]}"
+                    else:
+                        continue
+                
+                self.fields['philhealth_id'] = val
+                self.confidence['philhealth_id'] = 0.95
+                print(f"[PHILHEALTH] Found: {val}")
+                return
 
     def _extract_email(self, text):
         """Extract email address from OCR text"""
@@ -895,6 +938,7 @@ def register():
         barangay = data.get('barangay')
         city = data.get('city')
         province = data.get('province')
+        philhealth_id = data.get('philhealth_id', '')
         
         # New detailed address fields (optional)
         house_number = data.get('house_number', '')
@@ -908,18 +952,32 @@ def register():
         if not all([email, password, first_name, last_name, dob, gender, contact, barangay, city, province]):
             return jsonify({"error": "Missing required fields"}), 400
         
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
         conn = get_db()
         cur = conn.cursor()
+
+        # Check for duplicate patient record (Name + DOB)
+        cur.execute("""
+            SELECT id FROM users 
+            WHERE LOWER(first_name) = LOWER(%s) 
+              AND LOWER(last_name) = LOWER(%s) 
+              AND date_of_birth = %s
+        """, (first_name, last_name, dob))
+        
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "A medical record already exists for this person (Name & DOB). Please login or consult the health center."}), 409
+
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
         cur.execute("""
             INSERT INTO users (email, password_hash, first_name, middle_name, last_name, 
-                              date_of_birth, gender, contact_number, barangay, city, province,
+                              date_of_birth, gender, contact_number, philhealth_id, barangay, city, province,
                               house_number, block_number, lot_number, street_name, subdivision, 
                               zip_code, full_address)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
-        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, barangay, city, province,
+        """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, philhealth_id, barangay, city, province,
               house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address))
         
         user_id = cur.fetchone()[0]
@@ -997,6 +1055,50 @@ def chat():
         
     except Exception as e:
         return jsonify({"response": "I apologize, but I'm having trouble processing your request. Please try again later."}), 500
+
+
+
+@app.route('/api/check-philhealth', methods=['POST'])
+def check_philhealth():
+    try:
+        data = request.json
+        print(f"Checking PhilHealth ID: {data}")
+        ph_id = data.get('philhealth_id')
+        
+        if not ph_id:
+            return jsonify({'success': False, 'message': 'PhilHealth ID is required'}), 400
+            
+        clean_id = re.sub(r'\D', '', ph_id)
+        
+        if len(clean_id) != 12:
+             return jsonify({'success': False, 'message': 'Invalid PhilHealth ID format'}), 400
+             
+        last_digit = int(clean_id[-1])
+        
+        status = 'Active'
+        if last_digit % 3 == 0:
+            category = 'Indigent'
+            benefits = ['Free Consultation', 'Free Diagnostic Labs (CBC, Urinalysis)', 'Free Medicines (Hypertension, Diabetes)']
+        elif last_digit % 3 == 1:
+            category = 'Senior Citizen'
+            benefits = ['Free Consultation', '20% Discount on Labs', 'Priority Lane']
+        else:
+            category = 'Formal Economy'
+            benefits = ['Consultation', 'Discounted Labs']
+            
+        return jsonify({
+            'success': True,
+            'data': {
+                'status': status,
+                'category': category,
+                'benefits': benefits,
+                'expiry': '2026-12-31'
+            }
+        })
+
+    except Exception as e:
+        print(f"Error checking PhilHealth: {e}")
+        return jsonify({'success': False, 'message': 'System error'}), 500
 
 
 if __name__ == '__main__':

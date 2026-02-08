@@ -12,10 +12,12 @@ import Services from './services';
 import Dashboard from './Dashboard';
 import DoctorDashboard from './DoctorDashboard';
 import AdminDashboard from './AdminDashboard';
+import SecurityDashboard from './SecurityDashboard';
 import InstallPWA from './components/InstallPWA';
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);
+  const [loginMode, setLoginMode] = useState<'login' | 'register'>('login');
   const [user, setUser] = useState(() => {
     try {
       const u = localStorage.getItem('bh_user');
@@ -27,6 +29,8 @@ function App() {
         userData.role = 'admin';
       } else if (userData.email === 'doctor@bhcare.ph') {
         userData.role = 'doctor';
+      } else if (userData.email === 'security@bhcare.ph' || userData.email === 'security1741@bhcare.ph') {
+        userData.role = 'security';
       } else {
         userData.role = 'patient';
       }
@@ -36,7 +40,10 @@ function App() {
     }
   });
 
-  const openLogin = () => setShowLogin(true);
+  const openLogin = (mode: 'login' | 'register' = 'login') => {
+    setLoginMode(mode);
+    setShowLogin(true);
+  };
   const closeLogin = () => setShowLogin(false);
 
   const onLoginSuccess = (u: any) => {
@@ -45,6 +52,8 @@ function App() {
       u.role = 'admin';
     } else if (u.email === 'doctor@bhcare.ph') {
       u.role = 'doctor';
+    } else if (u.email === 'security@bhcare.ph' || u.email === 'security1741@bhcare.ph') {
+      u.role = 'security';
     } else {
       u.role = 'patient';
     }
@@ -77,6 +86,14 @@ function App() {
         />
       );
     }
+    if (user.role === 'security') {
+      return (
+        <SecurityDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
     return (
       <Dashboard
         user={user}
@@ -91,17 +108,17 @@ function App() {
       <FloatingImages />
       <FloatingParticles />
       <Navbar
-        onLoginClick={openLogin}
+        onLoginClick={() => openLogin('login')}
         onLogoutClick={onLogoutClick}
         onProfileClick={() => { }}
-        onAppointmentClick={openLogin}
+        onAppointmentClick={() => openLogin('login')}
         user={user}
       />
-      <Hero onRegisterClick={openLogin} onLoginClick={openLogin} />
+      <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
       <LocationShowcase />
       <Services />
       <ContactForm />
-      <Footer />
+      <Footer onAppointmentClick={() => openLogin('login')} />
       <InstallPWA />
 
       {showLogin && (
@@ -114,7 +131,7 @@ function App() {
               ×
             </button>
             <div className="form-scroll">
-              <LoginForm onLoginSuccess={onLoginSuccess} />
+              <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
             </div>
           </div>
         </div>

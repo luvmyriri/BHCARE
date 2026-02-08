@@ -29,12 +29,14 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
     last_name: '',
     date_of_birth: '',
     gender: '',
-    contact_number: '',
+    contact_number: '+63',
+    philhealth_id: '',
     barangay: '',
     city: '',
     province: '',
     email: '',
   });
+  const [eligibilityResult, setEligibilityResult] = useState<any>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -48,7 +50,8 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
           last_name: data.last_name || '',
           date_of_birth: data.date_of_birth || '',
           gender: data.gender || '',
-          contact_number: data.contact_number || '',
+          contact_number: data.contact_number || '+63',
+          philhealth_id: data.philhealth_id || '',
           barangay: data.barangay || '',
           city: data.city || '',
           province: data.province || '',
@@ -59,11 +62,51 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
       .finally(() => setLoading(false));
   }, [user]);
 
-  const updateField = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const updateField = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    let value = e.target.value;
+    if (k === 'contact_number') {
+      let cleaned = value.replace(/[^0-9+]/g, '');
+      if (cleaned.startsWith('09')) cleaned = '+63' + cleaned.substring(1);
+      else if (cleaned.startsWith('63') && !cleaned.startsWith('+63')) cleaned = '+' + cleaned;
+      else if (cleaned.startsWith('9')) cleaned = '+63' + cleaned;
+
+      if (!cleaned.startsWith('+63')) {
+        const digits = cleaned.replace(/\D/g, '');
+        cleaned = '+63' + digits;
+      }
+      if (cleaned.length > 13) cleaned = cleaned.substring(0, 13);
+      value = cleaned;
+    } else if (k === 'philhealth_id') {
+      const cleaned = value.replace(/\D/g, '');
+      let formatted = cleaned;
+      if (cleaned.length > 2) formatted = cleaned.substring(0, 2) + '-' + cleaned.substring(2);
+      if (cleaned.length > 11) formatted = formatted.substring(0, 12) + '-' + cleaned.substring(11, 12);
+      if (formatted.length > 14) formatted = formatted.substring(0, 14);
+      value = formatted;
+    } else if (['first_name', 'middle_name', 'last_name'].includes(k)) {
+      value = value.replace(/[^a-zA-Z\s'-.]/g, '');
+    }
+    setForm((f) => ({ ...f, [k]: value }));
+  };
 
   const save = async () => {
     if (!user?.id) return;
+
+    // Validation
+    if (!form.first_name || !form.last_name) {
+      setError('First and Last names are required.');
+      return;
+    }
+    if (form.contact_number && form.contact_number.length < 13) {
+      setError('Contact number must be valid or empty (+63...)');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (form.email && !emailRegex.test(form.email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -77,9 +120,11 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
           date_of_birth: form.date_of_birth,
           gender: form.gender,
           contact_number: form.contact_number,
+          philhealth_id: form.philhealth_id,
           barangay: form.barangay,
           city: form.city,
           province: form.province,
+          email: form.email,
         }),
       });
       if (!res.ok) throw new Error('Update failed');
@@ -89,6 +134,32 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
       alert('Profile updated');
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkEligibility = async () => {
+    if (!form.philhealth_id || form.philhealth_id.length < 12) {
+      alert("Please enter a valid PhilHealth ID first.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/check-philhealth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ philhealth_id: form.philhealth_id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEligibilityResult(data.data);
+      } else {
+        alert(data.message || "Eligibility check failed");
+      }
+    } catch (e) {
+      alert("Connection error");
     } finally {
       setLoading(false);
     }
@@ -113,6 +184,49 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
         </select>
       </div>
       <Field label="Contact Number" icon="📞" value={form.contact_number} onChange={updateField('contact_number')} />
+      <label>PhilHealth ID (Konsulta Package)</label>
+      <div className="auth-input" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span>🆔</span>
+        <input
+          value={form.philhealth_id}
+          onChange={updateField('philhealth_id')}
+          placeholder="XX-XXXXXXXXX-X"
+          style={{ flex: 1 }}
+        />
+        <button
+          type="button"
+          onClick={checkEligibility}
+          className="secondary-btn"
+          style={{ fontSize: '0.8rem', padding: '8px 12px' }}
+        >
+          Check Status
+        </button>
+      </div>
+      {eligibilityResult && (
+        <div style={{
+          background: '#ecfdf5',
+          border: '1px solid #10b981',
+          borderRadius: '8px',
+          padding: '12px',
+          marginTop: '8px',
+          marginBottom: '16px',
+          fontSize: '0.9rem'
+        }}>
+          <div style={{ color: '#047857', fontWeight: 'bold', marginBottom: '4px' }}>
+            ✅ PhilHealth Member: {eligibilityResult.status}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', color: '#065f46' }}>
+            <div><strong>Category:</strong> {eligibilityResult.category}</div>
+            <div><strong>Expiry:</strong> {eligibilityResult.expiry}</div>
+          </div>
+          <div style={{ marginTop: '8px', color: '#065f46' }}>
+            <strong>Benefits:</strong>
+            <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+              {eligibilityResult.benefits.map((b: string, i: number) => <li key={i}>{b}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
       <Field label="Email" icon="📧" value={form.email} onChange={updateField('email')} />
       <Field label="Barangay" icon="🏘️" value={form.barangay} onChange={updateField('barangay')} />
       <Field label="City/Municipality" icon="🏙️" value={form.city} onChange={updateField('city')} />

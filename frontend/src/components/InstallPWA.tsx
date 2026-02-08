@@ -20,6 +20,7 @@ const InstallPWA = () => {
     const [showInstructions, setShowInstructions] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
     const [isStandalone, setIsStandalone] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
         // Check if already installed
@@ -30,6 +31,10 @@ const InstallPWA = () => {
         // Check if iOS
         const userAgent = window.navigator.userAgent.toLowerCase();
         setIsIOS(/iphone|ipad|ipod/.test(userAgent));
+
+        // Check if Mobile
+        const mobileCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        setIsMobile(mobileCheck);
 
         const handler = (e: any) => {
             e.preventDefault();
@@ -57,7 +62,7 @@ const InstallPWA = () => {
         }
     };
 
-    if (isStandalone) return null;
+    if (isStandalone || !isMobile) return null;
 
     return (
         <>

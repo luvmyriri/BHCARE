@@ -42,7 +42,7 @@ const MapPinIcon = (props: any) => (
     </Icon>
 );
 
-const Footer = () => {
+const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => {
     const currentYear = new Date().getFullYear();
 
     return (
@@ -82,21 +82,21 @@ const Footer = () => {
                     {/* Quick Links */}
                     <Stack spacing={4}>
                         <Heading size="sm" color="teal.300" mb={2}>Quick Links</Heading>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Home</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Services</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Appointments</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>About Us</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>FAQs</Link>
+                        <Link href="#home" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Home</Link>
+                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Services</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Appointments</Link>
+                        <Link href="#about" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>About Us</Link>
+                        <Link href="#contact" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>FAQs</Link>
                     </Stack>
 
                     {/* Services */}
                     <Stack spacing={4}>
                         <Heading size="sm" color="teal.300" mb={2}>Our Services</Heading>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>General Consultation</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Vaccination</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Prenatal Care</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Dental Services</Link>
-                        <Link href="#" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Laboratory</Link>
+                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>General Consultation</Link>
+                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Vaccination</Link>
+                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Prenatal Care</Link>
+                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Dental Services</Link>
+                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Laboratory</Link>
                     </Stack>
 
                     {/* Contact Info */}

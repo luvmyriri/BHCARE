@@ -28,13 +28,18 @@ python -m alembic current
 
 ### Current Migrations (in order)
 
-1. **f247b3e6830e** - Initial migration (empty placeholder)
-2. **8096898f8f3f** - Create appointments, services, and schedule_slots tables
-3. **a1b2c3d4e5f6** - Add detailed address fields to users table
-4. **c9dccf683a46** - Create users table with all registration fields
-5. **01b8bbf711cf** - Create admin_users table with default admin
-6. **3efcc136b7df** - Create health_records table for medical history
-7. **e05c655a5ea2** - Create audit_log table for activity tracking
+1.  **f247b3e6830e** - Initial migration (empty placeholder)
+2.  **8096898f8f3f** - Create `appointments`, `services`, and `schedule_slots` tables
+3.  **a1b2c3d4e5f6** - Add detailed address fields to `users` table
+4.  **c9dccf683a46** - Create `users` table with all registration fields
+5.  **01b8bbf711cf** - Create `admin_users` table with default admin
+6.  **3efcc136b7df** - Create `health_records` table for medical history
+7.  **e05c655a5ea2** - Create `audit_log` table for activity tracking
+8.  **c92b122eaa13** - Add `philhealth_id` to `users` table
+9.  **4f677f12ea5d** - Add `lab_results`, `inventory`, and `medical_records` tables
+10. **cdcd43429a91** - Create `visit_logs` table for security headspace
+11. **ff96e673d46b** - Make `user_id` nullable in `appointments` for walk-ins
+12. **5248104e4507** - Add `queue_number` to `appointments` for live tracking (HEAD)
 
 ### Table Schemas
 

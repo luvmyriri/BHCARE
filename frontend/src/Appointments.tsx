@@ -54,7 +54,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const fetchServices = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/services');
+            const response = await fetch('/api/services');
             const data = await response.json();
             setServices(data);
         } catch (error) {
@@ -64,7 +64,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const fetchAvailableSlots = async () => {
         try {
-            const response = await fetch(`http://localhost:5000/api/available-slots?date=${selectedDate}`);
+            const response = await fetch(`/api/available-slots?date=${selectedDate}`);
             const data = await response.json();
             setAvailableSlots(data);
         } catch (error) {
@@ -74,7 +74,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const fetchMyAppointments = async () => {
         try {
-            const response = await fetch(`http://localhost:5000/api/appointments/user/${user.id}`);
+            const response = await fetch(`/api/appointments/user/${user.id}`);
             const data = await response.json();
             setMyAppointments(data);
         } catch (error) {
@@ -90,7 +90,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:5000/api/appointments', {
+            const response = await fetch('/api/appointments', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -128,7 +128,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
         }
 
         try {
-            const response = await fetch(`http://localhost:5000/api/appointments/${appointmentId}/cancel`, {
+            const response = await fetch(`/api/appointments/${appointmentId}/cancel`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: 'Cancelled by patient' })

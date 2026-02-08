@@ -37,7 +37,7 @@ const LocationShowcase = () => {
     const [isMapOpen, setIsMapOpen] = useState(false);
 
     return (
-        <Box pt={10} pb={32} position="relative" bg="transparent" className="animate-fade-in-up">
+        <Box id="about" pt={10} pb={32} position="relative" bg="transparent" className="animate-fade-in-up">
             {/* Decorative Background Element */}
             <Box
                 position="absolute"

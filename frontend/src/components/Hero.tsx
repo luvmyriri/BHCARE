@@ -15,6 +15,7 @@ import {
 } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
+import HealthCenterStatus from './HealthCenterStatus';
 import './Hero.css';
 
 // Illustrations/Icons for Highlights
@@ -64,6 +65,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
 
     return (
         <Box
+            id="home"
             bg="transparent"
             minH="100vh"
             overflow="hidden"
@@ -123,9 +125,13 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                                 </Text>
                             </Heading>
 
-                            <Text fontSize={{ base: "1rem", lg: "1.25rem" }} color="gray.600" maxW="lg" mx={{ base: 'auto', lg: 0 }} lineHeight="1.8">
+                            <Text fontSize={{ base: "1rem", lg: "1.25rem" }} color="gray.600" maxW="lg" mx={{ base: 'auto', lg: 0 }} lineHeight="1.8" mb={8}>
                                 {t.heroSubtitle}
                             </Text>
+
+                            <Box maxW="sm" mx={{ base: 'auto', lg: 0 }} mb={10}>
+                                <HealthCenterStatus />
+                            </Box>
                         </Box>
 
                         {/* NEW BUTTONS: REGISTER & LOGIN */}
