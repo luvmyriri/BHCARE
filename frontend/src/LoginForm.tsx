@@ -1,40 +1,125 @@
-import React, { useState, useEffect } from 'react';
+import { useState, FC, ReactNode, InputHTMLAttributes, SelectHTMLAttributes, FormEvent, ChangeEvent, useEffect } from 'react';
+import { useLanguage } from './contexts/LanguageContext';
 
 type Option = { code: string; name: string };
+type ConfidenceMap = Record<string, number>;
 
-const Input: React.FC<
-  { label: string; icon: React.ReactNode; invalid?: boolean } & React.InputHTMLAttributes<HTMLInputElement>
-> = ({ label, icon, invalid, ...props }) => (
-  <>
-    <label>{label}</label>
-    <div className={`auth-input${invalid ? ' invalid' : ''}`}>
-      <span>{icon}</span>
-      <input {...props} />
+const Input: FC<
+  { label: string; icon: ReactNode; invalid?: boolean; confidence?: number } & InputHTMLAttributes<HTMLInputElement>
+> = ({ label, icon, invalid, confidence, ...props }) => (
+  <div style={{ marginBottom: '16px', position: 'relative' }}>
+    <label style={{ fontSize: '12px', fontWeight: 700, color: '#4a5568', display: 'flex', alignItems: 'center', marginBottom: '6px', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      {label}
+      {confidence !== undefined && confidence > 0 && (
+        <span style={{
+          fontSize: '10px',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          background: '#c6f6d5',
+          color: '#22543d',
+          fontWeight: 700,
+          textTransform: 'none',
+          letterSpacing: '0'
+        }}>
+          ✓ Auto
+        </span>
+      )}
+    </label>
+    <div
+      className={`auth-input${invalid ? ' invalid' : ''}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        background: confidence && confidence > 0 ? 'rgba(198,246,213,0.3)' : '#f7fafc',
+        border: invalid ? '2px solid #e53e3e' : confidence && confidence > 0 ? '2px solid #48bb78' : '1px solid #e2e8f0',
+        borderRadius: '8px',
+        padding: '10px 14px',
+        transition: 'all 0.2s ease',
+        boxShadow: 'none'
+      }}
+    >
+      <span style={{ fontSize: '16px', marginRight: '10px', opacity: 0.5 }}>{icon}</span>
+      <input
+        {...props}
+        style={{
+          border: 'none',
+          background: 'transparent',
+          outline: 'none',
+          width: '100%',
+          fontSize: '15px',
+          color: '#1a202c',
+          fontWeight: 500
+        }}
+      />
     </div>
-  </>
+  </div>
 );
 
-const Select: React.FC<
-  { label: string; icon: React.ReactNode; options: Option[]; invalid?: boolean } & React.SelectHTMLAttributes<HTMLSelectElement>
-> = ({ label, icon, options, invalid, ...props }) => (
-  <>
-    <label>{label}</label>
-    <div className={`auth-input${invalid ? ' invalid' : ''}`}>
-      <span>{icon}</span>
-      <select {...props}>
-        <option value="">Select {label}</option>
-        {options.map((opt) => (
-          <option key={opt.code} value={opt.code}>
-            {opt.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  </>
-);
+const Select: FC<
+  { label: string; icon: ReactNode; options: Option[]; invalid?: boolean; placeholder?: string; confidence?: number } & SelectHTMLAttributes<HTMLSelectElement>
+> = ({ label, icon, options, invalid, placeholder, confidence, ...props }) => {
+  // Ensure options is always a valid array
+  const safeOptions = Array.isArray(options) ? options : [];
 
-function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      <label style={{ fontSize: '12px', fontWeight: 700, color: '#4a5568', display: 'flex', alignItems: 'center', marginBottom: '6px', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        {label}
+        {confidence !== undefined && confidence > 0 && (
+          <span style={{
+            fontSize: '10px',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            background: '#c6f6d5',
+            color: '#22543d',
+            fontWeight: 700,
+            textTransform: 'none',
+            letterSpacing: '0'
+          }}>
+            ✓ Auto
+          </span>
+        )}
+      </label>
+      <div
+        className={`auth-input${invalid ? ' invalid' : ''}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          background: confidence && confidence > 0 ? 'rgba(198,246,213,0.3)' : '#f7fafc',
+          border: invalid ? '2px solid #e53e3e' : confidence && confidence > 0 ? '2px solid #48bb78' : '1px solid #e2e8f0',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          boxShadow: 'none'
+        }}
+      >
+        <span style={{ fontSize: '16px', marginRight: '10px', opacity: 0.5 }}>{icon}</span>
+        <select
+          {...props}
+          style={{
+            border: 'none',
+            background: 'transparent',
+            outline: 'none',
+            width: '100%',
+            fontSize: '14px',
+            color: '#1a202c',
+            fontWeight: 500
+          }}
+        >
+          <option value="">{placeholder || `Select ${label}`}</option>
+          {safeOptions.map((opt) => (
+            <option key={opt.code} value={opt.code}>
+              {opt.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+};
+
+function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register' }) {
+  const { t } = useLanguage();
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,650 +130,1265 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [lastName, setLastName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
-  const [contact, setContact] = useState('');
+  const [contact, setContact] = useState('+63');
+  const [philhealthId, setPhilhealthId] = useState('');
   const [barangay, setBarangay] = useState('');
   const [city, setCity] = useState('');
   const [province, setProvince] = useState('');
+
+  // Detailed street address fields
+  const [houseNumber, setHouseNumber] = useState('');
+  const [blockNumber, setBlockNumber] = useState('');
+  const [lotNumber, setLotNumber] = useState('');
+  const [streetName, setStreetName] = useState('');
+  const [subdivision, setSubdivision] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [fullAddress, setFullAddress] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [registerPwVisible, setRegisterPwVisible] = useState(false);
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
-  const [regions, setRegions] = useState<Option[]>([]);
-  const [provinces, setProvinces] = useState<Option[]>([]);
-  const [cities, setCities] = useState<Option[]>([]);
-  const [barangays, setBarangays] = useState<Option[]>([]);
 
-  const [regionCode, setRegionCode] = useState('');
-  const [provinceCode, setProvinceCode] = useState('');
-  const [cityCode, setCityCode] = useState('');
+  const [idFront, setIdFront] = useState<File | null>(null);
+  const [idBack, setIdBack] = useState<File | null>(null);
+  const [frontPreview, setFrontPreview] = useState<string | null>(null);
+  const [backPreview, setBackPreview] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('https://psgc.cloud/api/regions')
-      .then(res => res.json())
-      .then(data => setRegions(data))
-      .catch(err => console.error('Failed to fetch regions:', err));
-  }, []);
-
-  useEffect(() => {
-    if (regionCode) {
-      fetch(`https://psgc.cloud/api/regions/${regionCode}/provinces`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.length === 0) {
-            setProvinces([]);
-            fetch(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`)
-              .then(res => res.json())
-              .then(cityData => setCities(cityData))
-              .catch(err => console.error('Failed to fetch cities from region:', err));
-          } else {
-            setProvinces(data);
-            setCities([]);
-          }
-        })
-        .catch(err => console.error('Failed to fetch provinces:', err));
-    } else {
-      setProvinces([]);
-      setCities([]);
-    }
-    setProvinceCode('');
-    setProvince('');
-    setCityCode('');
-    setBarangays([]);
-  }, [regionCode]);
-
-  useEffect(() => {
-    if (provinceCode) {
-      fetch(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`)
-        .then(res => res.json())
-        .then(data => setCities(data))
-        .catch(err => console.error('Failed to fetch cities:', err));
-    } else if (provinces.length > 0) {
-      setCities([]);
-    }
-    setCityCode('');
-    setBarangays([]);
-  }, [provinceCode]);
-
-  useEffect(() => {
-    if (cityCode) {
-      fetch(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`)
-        .then(res => res.json())
-        .then(data => setBarangays(data))
-        .catch(err => console.error('Failed to fetch barangays:', err));
-    } else {
-      setBarangays([]);
-    }
-    setBarangay('');
-  }, [cityCode]);
-
-  const handleRegionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const code = e.target.value;
-    setRegionCode(code);
-  };
-
-  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const code = e.target.value;
-    setProvinceCode(code);
-    const name = provinces.find(p => p.code === code)?.name || '';
-    setProvince(name);
-    clearError('province');
-  };
-
-  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const code = e.target.value;
-    setCityCode(code);
-    const name = cities.find(c => c.code === code)?.name || '';
-    setCity(name);
-    clearError('city');
-  };
-
-  const handleBarangayChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const code = e.target.value;
-    const name = barangays.find(b => b.code === code)?.name || '';
-    setBarangay(name);
-    clearError('barangay');
-  };
-  const [idImage, setIdImage] = useState<File | null>(null);
-  const [idPreview, setIdPreview] = useState<string | null>(null);
-  const [ocrText, setOcrText] = useState('');
+  const [ocrProcessed, setOcrProcessed] = useState(false);
+  const [detectedIDType, setDetectedIDType] = useState('');
+  const [confidence, setConfidence] = useState<ConfidenceMap>({});
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState('');
   const [errors, setErrors] = useState<Record<string, boolean>>({});
-  const clearError = (field: string) => {
-    if (errors[field]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[field];
-        return next;
-      });
+  const [passwordCriteria, setPasswordCriteria] = useState({ length: false, upper: false, symbol: false });
+
+  useEffect(() => {
+    setPasswordCriteria({
+      length: password.length >= 8,
+      upper: /[A-Z]/.test(password),
+      symbol: /[^a-zA-Z0-9\s]/.test(password)
+    });
+  }, [password]);
+
+  const scrollToError = () => {
+    const errorEl = document.querySelector('.error-message-box');
+    if (errorEl) errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const formatPHPhone = (input: string) => {
+    // Remove all non-numeric characters except +
+    let cleaned = input.replace(/[^\d+]/g, '');
+
+    // Process common PH formats
+    if (cleaned.startsWith('09') && cleaned.length === 11) {
+      cleaned = '+63' + cleaned.substring(1);
+    } else if (cleaned.startsWith('9') && cleaned.length === 10) {
+      cleaned = '+63' + cleaned;
+    } else if (cleaned.startsWith('639') && cleaned.length === 12) {
+      cleaned = '+' + cleaned;
     }
+
+    return cleaned;
   };
 
-  const validateName = (name: string) => {
-    return !/\d/.test(name);
-  };
 
-  const validateEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
+  // Removed: City and barangay loading (using text inputs instead of dropdowns)
 
-  const checkPasswordStrength = (pass: string) => {
-    if (!pass) return { label: '', color: '' };
-    if (pass.length < 6) return { label: 'Weak', color: 'red' };
-    if (pass.length < 10 || !/\d/.test(pass) || !/[a-zA-Z]/.test(pass)) return { label: 'Medium', color: 'orange' };
-    return { label: 'Strong', color: 'green' };
-  };
 
-  const resetFields = () => {
-    setEmail('');
-    setPassword('');
+  // Removed clearError as it is replaced by dynamic validation in handleInputChange
+
+  const resetFormFields = () => {
     setFirstName('');
     setMiddleName('');
     setLastName('');
     setDob('');
     setGender('');
-    setContact('');
+    setContact('+63');
+    setPhilhealthId('');
     setBarangay('');
     setCity('');
     setProvince('');
-    setConfirmPassword('');
-    setIdImage(null);
-    setIdPreview(null);
-    setOcrText('');
+    setHouseNumber('');
+    setBlockNumber('');
+    setLotNumber('');
+    setStreetName('');
+    setSubdivision('');
+    setZipCode('');
+    setFullAddress('');
+    setConfidence({});
+    setDetectedIDType('');
     setError('');
-    setErrors({});
-    setRegionCode('');
-    setProvinceCode('');
-    setCityCode('');
+    setOcrStatus('');
+    // Note: ID images (idFront/idBack) and previews (frontPreview/backPreview)
+    // are intentionally preserved here to avoid re-uploading on rescan.
+    // Note: email and password are intentionally not reset here 
+    // to allow users to keep their credentials if they swap modes,
+    // but they can be added if the user specifically wants a total wipe.
+    setConfirmPassword('');
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  const identifyIDType = (text: string) => {
+    const clean = text.toUpperCase();
+    if (clean.includes("DRIVER") || clean.includes("DRIVE ONLY")) return "Driver's License";
+    if (clean.includes("POSTAL") || clean.includes("PHILPOST")) return "Postal ID";
+    if (clean.includes("UNIFIED") || clean.includes("CRN") || clean.includes("SSS") || clean.includes("GSIS")) return "UMID / SSS / GSIS ID";
+    if (clean.includes("PHILHEALTH")) return "PhilHealth ID";
+    if (clean.includes("PASSPORT") || clean.includes("REPUBLIKA") || clean.includes("NATIONAL ID")) return "Passport / National ID";
+    if (clean.includes("STUDENT")) return "Student ID";
+    if (clean.includes("PRC") || clean.includes("PROFESSIONAL REGULATION")) return "PRC ID";
+    if (clean.includes("VOTER") || clean.includes("KOMISYON SA HALALAN")) return "Voter's ID";
+    if (clean.includes("SENIOR") || clean.includes("CITIZEN")) return "Senior Citizen ID";
+    if (clean.includes("PWD") || clean.includes("PERSON WITH DISABILITY")) return "PWD ID";
+    if (clean.includes("SOLO PARENT")) return "Solo Parent ID";
+    if (clean.includes("TIN") || clean.includes("TAX IDENTIFICATION")) return "TIN ID";
+    return "Government ID";
+  };
 
+
+  const formatName = (val: string) => {
+    return val.replace(/[^a-zA-Z\s'-.]/g, '');
+  };
+
+  const formatPhilHealthId = (val: string) => {
+    // Remove non-digits
+    const cleaned = val.replace(/\D/g, '');
+
+    // Format: XX-XXXXXXXXX-X (12 digits)
+    let formatted = cleaned;
+    if (cleaned.length > 2) {
+      formatted = cleaned.substring(0, 2) + '-' + cleaned.substring(2);
+    }
+    if (cleaned.length > 11) {
+      formatted = formatted.substring(0, 12) + '-' + cleaned.substring(11, 12);
+    }
+
+    // Max 12 digits -> 14 chars with dashes
+    if (formatted.length > 14) formatted = formatted.substring(0, 14);
+
+    return formatted;
+  };
+
+  const validateField = (field: string, value: string) => {
+    let isValid = true;
+
+    // We update errors functionally to avoid closure staleness
+    setErrors(prevErrors => {
+      const newErrors = { ...prevErrors };
+
+      // Common required check
+      if (!value) {
+        newErrors[field] = true;
+        isValid = false;
+      } else {
+        delete newErrors[field];
+      }
+
+      // Specific checks
+      if (field === 'email' && value) {
+        const emailDomainRegex = /@((gmail\.com)|(yahoo\.com)|(hotmail\.com)|(.*\.gov(\.ph)?))$/i;
+        const emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailFormatRegex.test(value) || !emailDomainRegex.test(value)) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      if (field === 'contact' && value) {
+        if (value.length < 13) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      if (field === 'password' && value) {
+        // Require at least one non-alphanumeric character (excluding space), one uppercase, min 8 chars, no spaces.
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[^a-zA-Z0-9\s])(?!.*[\s]).{8,}$/;
+        if (!passwordRegex.test(value)) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      if (field === 'confirmPassword' && value) {
+        if (value !== password) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      return newErrors;
+    });
+
+    return isValid;
+  };
+
+  const handleInputChange = (field: string, value: string, setter: (v: string) => void) => {
+    let finalValue = value;
+    if (field === 'contact') {
+      finalValue = formatPHPhone(value);
+    }
+    setter(finalValue);
+    // If the field is already invalid, validate immediately on change to clear error if fixed
+    if (errors[field]) {
+      validateField(field, finalValue);
+    }
+  };
+
+
+
+  const handleLogin = async (e: FormEvent) => {
+    e.preventDefault(); setLoading(true); setError('');
     try {
       const res = await fetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-
       if (!res.ok) throw new Error('Invalid email or password');
       const data = await res.json();
-      const user = data.user;
-      if (user) {
-        localStorage.setItem('bh_user', JSON.stringify(user));
-        if (typeof onLoginSuccess === 'function') onLoginSuccess(user);
+      if (data.user) {
+        localStorage.setItem('bh_user', JSON.stringify(data.user));
+        if (typeof onLoginSuccess === 'function') onLoginSuccess(data.user);
       }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFrontUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    setIdImage(file);
-    setIdPreview(URL.createObjectURL(file));
+    setIdFront(file); setFrontPreview(URL.createObjectURL(file));
   };
 
-  const compressImage = (file: File) => {
-    return new Promise<File>((resolve) => {
-      try {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const img = new Image();
-          img.onload = () => {
-            const maxW = 1600;
-            const scale = Math.min(1, maxW / img.width);
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.floor(img.width * scale);
-            canvas.height = Math.floor(img.height * scale);
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve(file);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob(
-              (blob) => {
-                if (!blob) return resolve(file);
-                const newFile = new File([blob], (file.name || 'image').replace(/\.\w+$/, '.jpg'), {
-                  type: 'image/jpeg',
-                  lastModified: Date.now(),
-                });
-                resolve(newFile);
-              },
-              'image/jpeg',
-              0.8
-            );
-          };
-          img.src = reader.result as string;
+  const handleBackUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setIdBack(file); setBackPreview(URL.createObjectURL(file));
+  };
+
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Compression failed'));
+          }, 'image/jpeg', 0.85);
         };
-        reader.readAsDataURL(file);
-      } catch {
-        resolve(file);
-      }
+      };
+      reader.onerror = (e) => reject(e);
     });
   };
 
-  const parseOCRAndFill = (text: string) => {
-    if (!text) return;
+  const handleDualOCR = async () => {
+    if (!idFront) return;
 
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-    const clean = (s: string) => s.replace(/[^A-Za-z\s,.-]/g, '').replace(/\s+/g, ' ').trim();
-    const extractAfterLabel = (patterns: RegExp[]) => {
-      for (const p of patterns) {
-        const i = lines.findIndex(l => p.test(l));
-        if (i !== -1) {
-          const m = lines[i].match(p);
-          if (m && m[1]) {
-            const v = clean(m[1]);
-            if (v) return v;
-          }
-          const next = lines[i + 1] ? clean(lines[i + 1]) : '';
-          if (next) return next;
-        }
-      }
-      return '';
-    };
-    const splitName = (full: string) => {
-      if (!full) return { f: '', m: '', l: '' };
-      const s = clean(full);
-      if (!s) return { f: '', m: '', l: '' };
-      if (s.includes(',')) {
-        const parts = s.split(',').map(x => x.trim());
-        const l = parts[0] || '';
-        const rest = (parts[1] || '').split(/\s+/);
-        const m = rest.length > 1 ? rest[rest.length - 1] : '';
-        const f = rest.length > 1 ? rest.slice(0, -1).join(' ') : (parts[1] || '');
-        return { f, m, l };
-      }
-      const tokens = s.split(/\s+/);
-      if (tokens.length >= 3) {
-        const l = tokens[tokens.length - 1];
-        const f = tokens[0];
-        const m = tokens.slice(1, -1).join(' ');
-        return { f, m, l };
-      }
-      if (tokens.length === 2) {
-        return { f: tokens[0], m: '', l: tokens[1] };
-      }
-      return { f: s, m: '', l: '' };
-    };
-
-    const dlHeaderIndex = lines.findIndex(line => 
-      /Last Name[\.,\s]+First Name[\.,\s]+Middle Name/i.test(line)
-    );
-
-    if (dlHeaderIndex !== -1 && lines[dlHeaderIndex + 1]) {
-      const nameLine = lines[dlHeaderIndex + 1];
-      const parts = nameLine.split(',');
-      
-      if (parts.length >= 2) {
-        const lastName = parts[0].trim();
-        const rest = parts[1].trim();
-        
-        const nameParts = rest.split(/\s+/);
-        let middleName = '';
-        let firstName = rest;
-
-        if (nameParts.length > 1) {
-          middleName = nameParts[nameParts.length - 1];
-          firstName = nameParts.slice(0, -1).join(' ');
-        }
-
-        setLastName(lastName);
-        setFirstName(firstName);
-        setMiddleName(middleName);
-      }
-    } else {
-      const last = extractAfterLabel([
-        /(?:Surname|Last Name)\s*[:\-]?\s*([A-Za-z\s]+)/i
-      ]);
-      const first = extractAfterLabel([
-        /(?:Given Name|First Name)\s*[:\-]?\s*([A-Za-z\s]+)/i
-      ]);
-      const middle = extractAfterLabel([
-        /(?:Middle Name)\s*[:\-]?\s*([A-Za-z\s]+)/i
-      ]);
-      const full = extractAfterLabel([
-        /(?:Full Name|Student Name|Name)\s*[:\-]?\s*([A-Za-z\s,\.]+)/i
-      ]);
-      if (full && (!first || !last)) {
-        const n = splitName(full);
-        if (n.l) setLastName(n.l);
-        if (n.f) setFirstName(n.f);
-        if (n.m) setMiddleName(n.m);
-      } else {
-        if (last) setLastName(last);
-        if (first) setFirstName(first);
-        if (middle) setMiddleName(middle);
-      }
-    }
-
-    const dateRegex = /\b(\d{4})[\/\-\.](\d{2})[\/\-\.](\d{2})\b|\b(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})\b/;
-    const dateMatch = text.match(dateRegex);
-    
-    if (dateMatch) {
-      if (dateMatch[1]) {
-        setDob(`${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`);
-      } else if (dateMatch[4]) {
-        setDob(`${dateMatch[6]}-${dateMatch[4]}-${dateMatch[5]}`);
-      }
-    }
-    
-    const sexIndex = lines.findIndex(l => /Sex|Gender/i.test(l));
-    if (sexIndex !== -1) {
-      const sexContext = (lines[sexIndex] + " " + (lines[sexIndex+1] || "")).toUpperCase();
-      if (/\bM\b/.test(sexContext) || /MALE/.test(sexContext)) setGender('Male');
-      else if (/\bF\b/.test(sexContext) || /FEMALE/.test(sexContext)) setGender('Female');
-    }
-  };
-
-  const handleOCR = async () => {
-    if (!idImage) {
-      setError('Please upload an ID image first');
-      return;
-    }
-
-    const formData = new FormData();
-    const imgForUpload = await compressImage(idImage);
-    formData.append('image', imgForUpload);
-
+    console.log('[OCR] Starting scan process...');
+    resetFormFields(); // Clear previous data before new scan
     setLoading(true);
+    setError('');
+    setOcrStatus('Preprocessing images...');
+
     try {
-      const res = await fetch('/ocr', { method: 'POST', body: formData });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data && (data as any).error ? (data as any).error : 'OCR failed';
-        throw new Error(msg as string);
+      const formData = new FormData();
+
+      console.log('[OCR] Compressing front image...');
+      setOcrStatus('Compressing front image...');
+      const compressedFront = await compressImage(idFront);
+      formData.append('front', compressedFront, 'front.jpg');
+      console.log('[OCR] Front image compressed:', compressedFront.size, 'bytes');
+
+      if (idBack) {
+        console.log('[OCR] Compressing back image...');
+        setOcrStatus('Compressing back image...');
+        const compressedBack = await compressImage(idBack);
+        formData.append('back', compressedBack, 'back.jpg');
+        console.log('[OCR] Back image compressed:', compressedBack.size, 'bytes');
       }
-      setOcrText((data as any).text || '');
-      parseOCRAndFill((data as any).text);
+
+      console.log('[OCR] Sending to /ocr-dual endpoint...');
+      setOcrStatus('Scanning ID (this may take 10-20 seconds)...');
+
+      const res = await fetch('/ocr-dual', { method: 'POST', body: formData });
+      console.log('[OCR] Response received, status:', res.status);
+
+      let data;
+      const text = await res.text();
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        console.error('[OCR] Failed to parse JSON response:', text);
+        throw new Error(`Server returned invalid response: ${text.substring(0, 100)}...`);
+      }
+
+      console.log('[OCR] Response data:', data);
+
+      if (!res.ok) throw new Error(data.error || `OCR failed with status ${res.status}`);
+
+      setOcrStatus('Processing extracted data...');
+
+
+      // Auto-fill fields with confidence tracking
+      const { fields, confidence: conf } = data;
+      console.log('[OCR] Extracted fields:', fields);
+      console.log('[OCR] Confidence scores:', conf);
+
+      if (fields.first_name) setFirstName(fields.first_name);
+      if (fields.middle_name) setMiddleName(fields.middle_name);
+      if (fields.last_name) setLastName(fields.last_name);
+      if (fields.dob) setDob(fields.dob);
+      if (fields.gender) setGender(fields.gender);
+      if (fields.contact) setContact(formatPHPhone(fields.contact));
+      if (fields.phone) setContact(formatPHPhone(fields.phone));
+      if (fields.email) setEmail(fields.email);
+      if (fields.philhealth_id) setPhilhealthId(fields.philhealth_id);
+
+      // Auto-populate address details
+      if (fields.province_name) setProvince(fields.province_name);
+      else if (fields.province) setProvince(fields.province);
+
+      // Auto-populate address fields directly
+      if (fields.province_name) setProvince(fields.province_name);
+      if (fields.city) setCity(fields.city);
+
+      if (fields.barangay) {
+        console.log('[OCR] Queueing barangay:', fields.barangay);
+        setBarangay(fields.barangay);
+      }
+
+      // Auto-populate detailed street address fields
+      if (fields.house_number) setHouseNumber(fields.house_number);
+      if (fields.block_number) setBlockNumber(fields.block_number);
+      if (fields.lot_number) setLotNumber(fields.lot_number);
+      if (fields.street_name) setStreetName(fields.street_name);
+      if (fields.subdivision) setSubdivision(fields.subdivision);
+      if (fields.zip_code) setZipCode(fields.zip_code);
+      if (fields.full_address) setFullAddress(fields.full_address);
+
+      setConfidence(conf || {});
+      setDetectedIDType(identifyIDType(data.raw_front || ''));
+      setOcrProcessed(true);
+      setOcrStatus('');
+      console.log('[OCR] Scan complete!');
+
     } catch (err: any) {
-      setError(err.message);
+      console.error('[OCR] Error:', err);
+      setError(err.message || 'OCR failed. Please try again with a clearer photo.');
+      setOcrStatus('');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleRegister = async (e: FormEvent) => {
+    e.preventDefault(); setError('');
+    const newErrors: Record<string, boolean> = {};
 
-    const reqErrors: Record<string, boolean> = {};
-    if (!firstName) reqErrors.firstName = true;
-    if (!lastName) reqErrors.lastName = true;
-    if (!dob) reqErrors.dob = true;
-    if (!gender) reqErrors.gender = true;
-    if (!contact) reqErrors.contact = true;
-    if (!email) reqErrors.email = true;
-    if (provinces.length > 0 && !province) reqErrors.province = true;
-    if (!city) reqErrors.city = true;
-    if (!barangay) reqErrors.barangay = true;
-    if (!password) reqErrors.password = true;
-    if (!confirmPassword) reqErrors.confirmPassword = true;
-    if (Object.keys(reqErrors).length > 0) {
-      setErrors(reqErrors);
-      setError('Please complete the required fields');
-      return;
-    }
-    if (!validateName(firstName)) {
-      setError('First Name should not contain numbers');
-      return;
-    }
-    if (middleName && !validateName(middleName)) {
-      setError('Middle Name should not contain numbers');
-      return;
-    }
-    if (!validateName(lastName)) {
-      setError('Last Name should not contain numbers');
+    // Required Fields Check
+    if (!firstName) newErrors.firstName = true;
+    if (!lastName) newErrors.lastName = true;
+    if (!email) newErrors.email = true;
+    if (!password) newErrors.password = true;
+    if (!confirmPassword) newErrors.confirmPassword = true;
+    if (!dob) newErrors.dob = true;
+    if (!contact) newErrors.contact = true;
+    if (!barangay) newErrors.barangay = true;
+    if (!city) newErrors.city = true;
+    if (!province) newErrors.province = true;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setError('Please fill in all required fields.');
+      setTimeout(scrollToError, 100);
       return;
     }
 
-    if (!validateEmail(email)) {
-      setError('Invalid email address');
-      return;
-    }
-
+    // Validation
     if (password !== confirmPassword) {
-      setError("Passwords don't match");
+      setError('Passwords do not match');
+      setErrors({ ...newErrors, password: true, confirmPassword: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    // Password Complexity Check
+    // Require at least one non-alphanumeric character (excluding space), one uppercase, min 8 chars, no spaces.
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[^a-zA-Z0-9\s])(?!.*[\s]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setError('Password must be at least 8 characters long, contain at least one uppercase letter, and one special character (symbol). No spaces allowed.');
+      setErrors({ ...newErrors, password: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    // New Validations
+    // PH Phone Validation (+639XXXXXXXXX)
+    const phoneRegex = /^\+639\d{9}$/;
+    if (!phoneRegex.test(contact)) {
+      setError('Please enter a valid Philippine mobile number (+639XXXXXXXXX)');
+      setErrors({ ...newErrors, contact: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    // Strict Email Validation
+    // Allowed: gmail.com, yahoo.com, hotmail.com, *.gov.ph, *.gov
+    const emailDomainRegex = /@((gmail\.com)|(yahoo\.com)|(hotmail\.com)|(.*\.gov(\.ph)?))$/i;
+    const emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailFormatRegex.test(email)) {
+      setError('Please enter a valid email address format.');
+      setErrors({ ...newErrors, email: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    if (!emailDomainRegex.test(email)) {
+      setError('Only Gmail (@gmail.com), Yahoo, Hotmail, or Government email addresses are allowed.');
+      setErrors({ ...newErrors, email: true });
+      setTimeout(scrollToError, 100);
       return;
     }
 
     const formData = new FormData();
+    formData.append('email', email);
+    formData.append('password', password);
     formData.append('first_name', firstName);
     formData.append('middle_name', middleName);
     formData.append('last_name', lastName);
-    formData.append('date_of_birth', dob);
+    formData.append('dob', dob);
     formData.append('gender', gender);
-    formData.append('contact_number', contact);
-    formData.append('email', email);
+    formData.append('contact', contact);
+    formData.append('philhealth_id', philhealthId);
     formData.append('barangay', barangay);
     formData.append('city', city);
     formData.append('province', province);
-    formData.append('password', password);
-    if (idImage) formData.append('id_image', idImage);
-    formData.append('ocr_text', ocrText);
+
+    // Detailed street address fields
+    formData.append('house_number', houseNumber);
+    formData.append('block_number', blockNumber);
+    formData.append('lot_number', lotNumber);
+    formData.append('street_name', streetName);
+    formData.append('subdivision', subdivision);
+    formData.append('zip_code', zipCode);
+    formData.append('full_address', fullAddress);
+
 
     setLoading(true);
-
     try {
-      const res = await fetch('/register', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = (data as any) && (data as any).error ? (data as any).error : 'Registration failed';
-        throw new Error(msg as string);
-      }
+      const res = await fetch('/register', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
       alert('Registration successful!');
       setMode('login');
-      resetFields();
+      resetFormFields();
     } catch (err: any) {
       setError(err.message);
+      // Attempt to highlight field based on error message if possible, strictly mostly likely email
+      if (err.message.toLowerCase().includes('email')) {
+        setErrors({ email: true });
+      }
+      setTimeout(scrollToError, 100);
     } finally {
       setLoading(false);
     }
   };
 
+  // Unified Gradient Split-Screen Layout for All Modes
   return (
-    <div className="auth-card" style={{ maxWidth: mode === 'login' ? 420 : '100%', margin: '0 auto', boxShadow: 'none' }}>
-      {mode === 'login' ? (
-        <form onSubmit={handleLogin}>
-          <h2 className="auth-title">Welcome Back</h2>
-          <p className="auth-subtitle">Sign in to your account</p>
+    <>
+      <div className="auth-card">
+        {/* LEFT SIDE - BRANDING (Persistent) */}
+        <div style={{
+          flex: '0 0 50%',
+          background: 'linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)',
+          padding: '40px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          textAlign: 'center',
+          color: 'white',
+          position: 'relative',
+          overflow: 'hidden',
+          minHeight: '200px' // Added for mobile stack visibility
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(circle at top right, rgba(255,255,255,0.1) 0%, transparent 60%)',
+            pointerEvents: 'none'
+          }} />
 
-          <Input
-            label="Email Address"
-            icon="📧"
-            type="email"
-            placeholder="your.email@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-
-          <>
-            <label>Password</label>
-            <div className="auth-input">
-              <span>🔒</span>
-              <input
-                type={loginPwVisible ? 'text' : 'password'}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={{ flex: 1 }}
-              />
-              <button
-                type="button"
-                onClick={() => setLoginPwVisible((v) => !v)}
-                style={{ marginLeft: '8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                aria-label={loginPwVisible ? 'Hide password' : 'Show password'}
-              >
-                {loginPwVisible ? 'Hide' : 'Show'}
-              </button>
+          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+            <div style={{
+              width: '120px',
+              height: '120px',
+              background: 'white',
+              borderRadius: '50%',
+              margin: '0 auto 24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              border: '4px solid rgba(255,255,255,0.3)',
+              padding: '10px'
+            }}>
+              <img src="/images/Logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-          </>
-
-          {error && <div className="auth-error">{error}</div>}
-
-          <button className="auth-button" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-
-          <p className="auth-footer">
-            Don’t have an account{' '}
-            <span onClick={() => { setMode('register'); resetFields(); }}>
-              Sign up
-            </span>
-          </p>
-        </form>
-      ) : (
-        <form onSubmit={handleRegister} className="form-scroll">
-          <h2 className="auth-title">Create Account</h2>
-          <p className="auth-subtitle">Complete all required details</p>
-
-          <label>Upload Valid ID</label>
-          <input type="file" accept="image/*" onChange={handleImageUpload} required />
-          {idPreview && <img src={idPreview} alt="ID Preview" style={{ width: '100%', marginTop: 10 }} />}
-
-          <button type="button" className="auth-button" onClick={handleOCR}>
-            {loading ? 'Scanning...' : 'Scan ID'}
-          </button>
-
-          <Input label="First Name" icon="👤" invalid={!!errors.firstName} value={firstName} onChange={(e) => { setFirstName(e.target.value); clearError('firstName'); }} required />
-          <Input label="Middle Name" icon="👤" value={middleName} onChange={(e) => { setMiddleName(e.target.value); clearError('middleName'); }} />
-          <Input label="Last Name" icon="👤" invalid={!!errors.lastName} value={lastName} onChange={(e) => { setLastName(e.target.value); clearError('lastName'); }} required />
-          <Input label="Date of Birth" icon="📅" type="date" invalid={!!errors.dob} value={dob} onChange={(e) => { setDob(e.target.value); clearError('dob'); }} required />
-
-          <label>Gender</label>
-          <div className={`auth-input${errors.gender ? ' invalid' : ''}`}>
-            <span>⚧️</span>
-            <select
-              value={gender}
-              onChange={(e) => { setGender(e.target.value); clearError('gender'); }}
-              required
-            >
-              <option value="">Select Gender</option>
-              <option>Male</option>
-              <option>Female</option>
-              <option>Other</option>
-            </select>
+            <h1 style={{ fontSize: '32px', fontWeight: 800, marginBottom: '16px', lineHeight: 1.2, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              Brgy.174 Health<br />Center
+            </h1>
+            <p style={{ fontSize: '16px', opacity: 0.9, lineHeight: 1.6, maxWidth: '300px', margin: '0 auto' }}>
+              Access your medical records and book appointments securely.
+            </p>
           </div>
 
-          <Input label="Contact Number" icon="📞" invalid={!!errors.contact} value={contact} onChange={(e) => { setContact(e.target.value); clearError('contact'); }} required />
-          <Input label="Email Address" icon="📧" type="email" invalid={!!errors.email} value={email} onChange={(e) => { setEmail(e.target.value); clearError('email'); }} required />
-          
-          <Select 
-            label="Region" 
-            icon="🗺️" 
-            options={regions} 
-            value={regionCode} 
-            onChange={handleRegionChange} 
-            required 
-          />
-          
-          {provinces.length > 0 && (
-            <Select 
-              label="Province" 
-              icon="🗺️" 
-              options={provinces} 
-              value={provinceCode} 
-              onChange={handleProvinceChange} 
-              disabled={!regionCode}
-              invalid={!!errors.province}
-            />
-          )}
+          <div style={{
+            position: 'absolute',
+            bottom: '24px',
+            left: 0,
+            right: 0,
+            textAlign: 'center',
+            fontSize: '12px',
+            opacity: 0.7,
+            zIndex: 2
+          }}>
+            © 2026 BHCARE Portal
+          </div>
+        </div>
 
-          <Select 
-            label="City/Municipality" 
-            icon="🏙️" 
-            options={cities} 
-            value={cityCode} 
-            onChange={handleCityChange} 
-            disabled={!regionCode}
-            invalid={!!errors.city}
-            required 
-          />
-          
-          <Select 
-            label="Barangay" 
-            icon="🏘️" 
-            options={barangays} 
-            value={barangay} 
-            onChange={handleBarangayChange} 
-            disabled={!cityCode}
-            invalid={!!errors.barangay}
-            required 
-          />
-
-          <Input label="Province" icon="🗺️" value={province} onChange={(e) => setProvince(e.target.value)} disabled={provinces.length > 0} />
-
-          <div className="password-group">
-            <>
-              <label>Password</label>
-              <div className={`auth-input${errors.password ? ' invalid' : ''}`}>
-                <span>🔒</span>
-                <input
-                  type={registerPwVisible ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  style={{ flex: 1 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setRegisterPwVisible((v) => !v)}
-                  style={{ marginLeft: '8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                  aria-label={registerPwVisible ? 'Hide password' : 'Show password'}
-                >
-                  {registerPwVisible ? 'Hide' : 'Show'}
-                </button>
+        {/* RIGHT SIDE - DYNAMIC CONTENT */}
+        <div className="form-scroll" style={{
+          flex: '1',
+          padding: '40px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-start',
+          maxHeight: '100%'
+        }}>
+          {mode === 'login' ? (
+            // LOGIN FORM
+            <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: '360px', margin: 'auto' }}>
+              <h2 className="auth-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px', color: '#1a202c' }}>
+                Sign In
+              </h2>
+              <p className="auth-subtitle" style={{ fontSize: '14px', marginBottom: '32px', color: '#718096' }}>
+                Sign in to your account
+              </p>
+              {/* ... rest of login form ... */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#4a5568', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  EMAIL ADDRESS
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f7fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  transition: 'all 0.2s'
+                }}>
+                  <span style={{ fontSize: '16px', marginRight: '12px', opacity: 0.5 }}>✉️</span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="juan.delacruz@gmail.com"
+                    required
+                    style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
+                  />
+                </div>
               </div>
-            </>
-            <div className="password-strength">
-              {(() => {
-                const s = checkPasswordStrength(password);
-                return <span style={{ color: s.color }}>{s.label}</span>;
-              })()}
-            </div>
-          </div>
 
-          <>
-            <label>Confirm Password</label>
-            <div className={`auth-input${errors.confirmPassword ? ' invalid' : ''}`}>
-              <span>🔒</span>
-              <input
-                type={confirmPwVisible ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                style={{ flex: 1 }}
-              />
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#4a5568', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  PASSWORD
+                </label>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#f7fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  transition: 'all 0.2s'
+                }}>
+                  <span style={{ fontSize: '16px', marginRight: '12px', opacity: 0.5 }}>🔒</span>
+                  <input
+                    type={loginPwVisible ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
+                  />
+                  <button type="button" onClick={() => setLoginPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#38b2ac', fontWeight: 700, textTransform: 'uppercase' }}>
+                    {loginPwVisible ? 'HIDE' : 'SHOW'}
+                  </button>
+                </div>
+              </div>
+
+              {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '12px', borderRadius: '10px', fontSize: '13px', marginBottom: '24px', fontWeight: 600, border: '1px solid #fed7d7' }}>⚠️ {error}</div>}
+
+              <button className="auth-button" style={{
+                width: '100%',
+                padding: '14px',
+                background: '#38b2ac',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '15px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(56, 178, 172, 0.3)',
+                transition: 'all 0.2s'
+              }}>
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+
+              <p style={{
+                fontSize: '13px',
+                marginTop: '24px',
+                textAlign: 'center',
+                color: '#4a5568'
+              }}>
+                New Patient?{' '}
+                <span
+                  onClick={() => { setMode('register'); resetFormFields(); }}
+                  style={{
+                    color: '#ed8936',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textDecoration: 'none'
+                  }}
+                >
+                  Guide Registration
+                </span>
+              </p>
+            </form>
+          ) : (
+            // REGISTER FORM
+            <form onSubmit={handleRegister} style={{ width: '100%', maxWidth: '800px', margin: 'auto' }}>
               <button
                 type="button"
-                onClick={() => setConfirmPwVisible((v) => !v)}
-                style={{ marginLeft: '8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                aria-label={confirmPwVisible ? 'Hide password' : 'Show password'}
+                onClick={() => setMode('login')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#718096',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
               >
-                {confirmPwVisible ? 'Hide' : 'Show'}
+                ← Back to Login
+              </button>
+
+              <h2 className="auth-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px', color: '#1a202c' }}>
+              </h2>
+              {!ocrProcessed ? (
+                // OCR UPLOAD SCREEN
+                <div style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}>
+                  <p className="auth-subtitle" style={{ fontSize: '14px', marginBottom: '32px', color: '#718096', textAlign: 'center' }}>
+                    Upload your government ID to automatically fill all fields
+                  </p>
+
+                  <div style={{
+                    border: '2px dashed #4299e1',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    marginBottom: '20px',
+                    background: 'rgba(235, 248, 255, 0.5)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
+                      <span style={{ fontSize: '20px' }}>🪪</span>
+                      <h3 style={{ color: '#2d3748', fontSize: '15px', fontWeight: 700, margin: 0 }}>
+                        Automated Registration
+                      </h3>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                      <div>
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: '#4a5568', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Front Side</p>
+                        <input type="file" id="front-upload" accept="image/*" onChange={handleFrontUpload} style={{ display: 'none' }} />
+                        <div style={{
+                          aspectRatio: '16/10',
+                          width: '100%',
+                          background: '#f7fafc',
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          border: frontPreview ? '2px solid #48bb78' : '2px dashed #cbd5e0',
+                          position: 'relative'
+                        }}>
+                          {!frontPreview ? (
+                            <label htmlFor="front-upload" style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              width: '100%',
+                              height: '100%',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              color: '#718096',
+                              fontWeight: 600,
+                              textAlign: 'center',
+                              transition: 'all 0.2s'
+                            }}>
+                              <span style={{ fontSize: '20px', display: 'block', marginBottom: '2px' }}>📷</span>
+                              Upload
+                            </label>
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', position: 'relative', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setZoomedImage(frontPreview)}>
+                              <img
+                                src={frontPreview}
+                                alt="Front"
+                                style={{
+                                  maxWidth: '100%',
+                                  maxHeight: '100%',
+                                  objectFit: 'contain'
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setIdFront(null); setFrontPreview(null); }}
+                                style={{
+                                  position: 'absolute',
+                                  top: '4px',
+                                  right: '4px',
+                                  background: '#e53e3e',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  width: '20px',
+                                  height: '20px',
+                                  cursor: 'pointer',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  zIndex: 5,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>×</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p style={{ fontSize: '11px', fontWeight: 700, color: '#4a5568', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Back Side</p>
+                        <input type="file" id="back-upload" accept="image/*" onChange={handleBackUpload} style={{ display: 'none' }} />
+                        <div style={{
+                          aspectRatio: '16/10',
+                          width: '100%',
+                          background: '#f7fafc',
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          border: backPreview ? '2px solid #48bb78' : '2px dashed #cbd5e0',
+                          position: 'relative'
+                        }}>
+                          {!backPreview ? (
+                            <label htmlFor="back-upload" style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              width: '100%',
+                              height: '100%',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              color: '#a0aec0',
+                              fontWeight: 600,
+                              textAlign: 'center',
+                              transition: 'all 0.2s'
+                            }}>
+                              <span style={{ fontSize: '20px', display: 'block', marginBottom: '2px' }}>📷</span>
+                              Optional
+                            </label>
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', position: 'relative', cursor: 'zoom-in', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setZoomedImage(backPreview)}>
+                              <img
+                                src={backPreview}
+                                alt="Back"
+                                style={{
+                                  maxWidth: '100%',
+                                  maxHeight: '100%',
+                                  objectFit: 'contain'
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setIdBack(null); setBackPreview(null); }}
+                                style={{
+                                  position: 'absolute',
+                                  top: '4px',
+                                  right: '4px',
+                                  background: '#e53e3e',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  width: '20px',
+                                  height: '20px',
+                                  cursor: 'pointer',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  zIndex: 5,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>×</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+
+                    {ocrStatus && (
+                      <div style={{
+                        padding: '10px',
+                        background: 'rgba(66, 153, 225, 0.15)',
+                        borderRadius: '8px',
+                        marginBottom: '16px',
+                        fontSize: '12px',
+                        color: '#2c5282',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}>
+                        ⏳ {ocrStatus}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleDualOCR}
+                      disabled={!idFront || loading}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        background: idFront ? '#38b2ac' : '#cbd5e0',
+                        color: idFront ? 'white' : '#a0aec0',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        cursor: idFront ? 'pointer' : 'not-allowed',
+                        marginBottom: '16px',
+                        boxShadow: idFront ? '0 4px 12px rgba(56, 178, 172, 0.3)' : 'none',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {loading ? 'Scanning...' : 'Start Automatic Scan'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setOcrProcessed(true); }}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        background: 'transparent',
+                        color: '#ed8936',
+                        border: '1px solid #fed7d7',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Skip & Fill Manually →
+                    </button>
+                  </div >
+
+                  {detectedIDType && (
+                    <div style={{
+                      padding: '10px',
+                      background: '#f0fff4',
+                      color: '#2f855a',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      marginTop: '12px',
+                      border: '1px solid #c6f6d5'
+                    }}>
+                      ✓ Detected: {detectedIDType}
+                    </div>
+                  )
+                  }
+
+                  {
+                    error && (
+                      <div style={{
+                        padding: '10px',
+                        background: '#fff5f5',
+                        color: '#c53030',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        marginTop: '12px',
+                        border: '1px solid #fed7d7'
+                      }}>
+                        ✗ {error}
+                      </div>
+                    )
+                  }
+
+                  <p style={{
+                    fontSize: '12px',
+                    textAlign: 'center',
+                    color: '#4a5568',
+                    marginTop: '24px'
+                  }}>
+                    Already have an account?{' '}
+                    <span onClick={() => setMode('login')} style={{ color: '#3182ce', fontWeight: 700, cursor: 'pointer' }}>
+                      Login here
+                    </span>
+                  </p>
+                </div >
+              ) : (
+                // REGISTRATION FIELDS
+                <div style={{ width: '100%' }}>
+                  <h2 className="auth-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px', color: '#1a202c' }}>
+                    {t.createAccount}
+                  </h2>
+                  <p className="auth-subtitle" style={{ fontSize: '14px', marginBottom: '32px', color: '#718096' }}>
+                    Review your information below
+                  </p>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📝 Personal Details</h3>
+
+                    <div className="auth-form-row">
+                      <Input
+                        label="First Name"
+                        icon="👤"
+                        placeholder="Juan"
+                        value={firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value, setFirstName)}
+                        onBlur={() => validateField('firstName', firstName)}
+                        confidence={confidence.first_name}
+                        invalid={errors.firstName}
+                        required
+                      />
+                      <Input
+                        label="Last Name"
+                        icon="👤"
+                        placeholder="Dela Cruz"
+                        value={lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value, setLastName)}
+                        onBlur={() => validateField('lastName', lastName)}
+                        confidence={confidence.last_name}
+                        invalid={errors.lastName}
+                        required
+                      />
+                    </div>
+                    <div className="auth-form-row">
+                      <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value))} />
+                      <Input
+                        label={t.dob}
+                        icon="📅"
+                        type="date"
+                        confidence={confidence.dob}
+                        value={dob}
+                        onChange={(e) => handleInputChange('dob', e.target.value, setDob)}
+                        onBlur={() => validateField('dob', dob)}
+                        invalid={errors.dob}
+                        required
+                      />
+                    </div>
+
+                    <div className="auth-form-row">
+                      <Select
+                        label={t.gender}
+                        icon="⚧"
+                        confidence={confidence.gender}
+                        options={[
+                          { code: 'Male', name: t.male },
+                          { code: 'Female', name: t.female },
+                          { code: 'Other', name: t.other }
+                        ]}
+                        value={gender}
+                        onChange={(e) => setGender(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="PhilHealth ID (Optional)"
+                        icon="🆔"
+                        value={philhealthId}
+                        onChange={(e) => setPhilhealthId(formatPhilHealthId(e.target.value))}
+                        placeholder="XX-XXXXXXXXX-X"
+                      />
+                    </div>
+
+                    <div className="auth-form-row">
+                      <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => handleInputChange('contact', formatPHPhone(e.target.value), setContact)} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
+                      <Input
+                        label="Email Address"
+                        icon="✉️"
+                        type="email"
+                        placeholder="juan.delacruz@gmail.com"
+                        value={email}
+                        onChange={(e) => handleInputChange('email', e.target.value, setEmail)}
+                        onBlur={() => validateField('email', email)}
+                        confidence={confidence.email}
+                        invalid={errors.email}
+                        required
+                      />
+                    </div>
+
+                    <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', marginTop: '24px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Address Details</h3>
+                    <div className="auth-form-row">
+                      <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => handleInputChange('province', e.target.value, setProvince)} onBlur={() => validateField('province', province)} invalid={errors.province} required />
+                      <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => handleInputChange('city', e.target.value, setCity)} onBlur={() => validateField('city', city)} invalid={errors.city} required />
+                    </div>
+
+                    <div className="auth-form-row">
+                      <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => handleInputChange('barangay', e.target.value, setBarangay)} onBlur={() => validateField('barangay', barangay)} invalid={errors.barangay} required />
+                      <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
+                    </div>
+
+                    <div className="auth-form-row">
+                      <Input label="Block" icon="📍" confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
+                      <Input label="Lot" icon="📍" confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
+                    </div>
+
+                    <div className="auth-form-row">
+                      <Input label="Street" icon="🛣️" confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
+                      <Input label="Village / Subdivision" icon="🏘️" confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
+                    </div>
+
+                    <div className="auth-form-row">
+                      <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
+                    </div>
+
+                    <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>{t.createPw}</label>
+                      <div className={`auth-input${errors.password ? ' invalid' : ''}`} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: '#f7fafc',
+                        border: errors.password ? '2px solid #e53e3e' : '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '10px 12px',
+                        marginBottom: '12px',
+                        position: 'relative'
+                      }}>
+                        <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                        <input
+                          type={registerPwVisible ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => handleInputChange('password', e.target.value, setPassword)}
+                          onFocus={() => setPasswordFocused(true)}
+                          onBlur={() => { setPasswordFocused(false); validateField('password', password); }}
+                          required
+                          style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
+                        />
+                        <button type="button" onClick={() => setRegisterPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '10px', color: '#4299e1', fontWeight: 700 }}>{registerPwVisible ? 'HIDE' : 'SHOW'}</button>
+
+                        {passwordFocused && (
+                          <div style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: '100%',
+                            width: '100%',
+                            marginTop: '8px',
+                            background: '#2d3748',
+                            color: 'white',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                          }}>
+                            <div style={{ marginBottom: '4px', fontWeight: 'bold', borderBottom: '1px solid #4a5568', paddingBottom: '4px' }}>Password Requirements:</div>
+                            <ul style={{ paddingLeft: '16px', margin: 0, listStyleType: 'disc' }}>
+                              <li style={{ marginBottom: '2px', color: passwordCriteria.length ? '#68d391' : 'white' }}>At least 8 characters</li>
+                              <li style={{ marginBottom: '2px', color: passwordCriteria.upper ? '#68d391' : 'white' }}>At least one uppercase letter</li>
+                              <li style={{ color: passwordCriteria.symbol ? '#68d391' : 'white' }}>At least one special character</li>
+                            </ul>
+                            <div style={{
+                              position: 'absolute',
+                              top: '-4px',
+                              left: '20px',
+                              width: '8px',
+                              height: '8px',
+                              background: '#2d3748',
+                              transform: 'rotate(45deg)'
+                            }}></div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Password Criteria Checklist */}
+                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '-4px', marginBottom: '16px', paddingLeft: '4px' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <span style={{ color: passwordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                            {passwordCriteria.length ? '✓' : '○'} 8+ Chars
+                          </span>
+                          <span style={{ color: passwordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                            {passwordCriteria.upper ? '✓' : '○'} Upper (A-Z)
+                          </span>
+                          <span style={{ color: passwordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                            {passwordCriteria.symbol ? '✓' : '○'} Symbol (-_+ =)
+                          </span>
+                        </div>
+                      </div>
+
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>{t.confirmPw}</label>
+                      <div className={`auth-input${errors.confirmPassword ? ' invalid' : ''}`} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: '#f7fafc',
+                        border: errors.confirmPassword ? '2px solid #e53e3e' : '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '10px 12px'
+                      }}>
+                        <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                        <input
+                          type={confirmPwVisible ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => handleInputChange('confirmPassword', e.target.value, setConfirmPassword)}
+                          onBlur={() => validateField('confirmPassword', confirmPassword)}
+                          required
+                          style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
+                        />
+                        <span
+                          onClick={() => setConfirmPwVisible(!confirmPwVisible)}
+                          style={{ cursor: 'pointer', fontSize: '16px', marginLeft: '8px', userSelect: 'none' }}
+                        >
+                          {confirmPwVisible ? '👁️' : '🙈'}
+                        </span>
+                      </div>
+
+
+
+                      {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7' }}>{error}</div>}
+
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                        <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '12px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '13px' }}>
+                          ← Back
+                        </button>
+                        <button className="auth-button" style={{ margin: 0, flex: 2, height: '44px', fontSize: '14px', background: '#38b2ac', boxShadow: '0 4px 12px rgba(56, 178, 172, 0.3)' }} disabled={loading}>
+                          {loading ? 'Submitting...' : t.submit}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* Image Zoom Overlay */}
+      {
+        zoomedImage && (
+          <div
+            onClick={() => setZoomedImage(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(0,0,0,0.85)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              cursor: 'zoom-out',
+              animation: 'fadeIn 0.2s ease-out'
+            }}
+          >
+            <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}>
+              <img
+                src={zoomedImage}
+                alt="Zoomed ID"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '90vh',
+                  borderRadius: '12px',
+                  boxShadow: '0 0 40px rgba(0,0,0,0.5)',
+                  border: '4px solid white'
+                }}
+              />
+              <button
+                onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
+                style={{
+                  position: 'absolute',
+                  top: '-20px',
+                  right: '-20px',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'white',
+                  border: 'none',
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#2d3748'
+                }}
+              >
+                ×
               </button>
             </div>
-          </>
+          </div>
+        )
+      }
 
-          {error && <div className="auth-error">{error}</div>}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .form-scroll::-webkit-scrollbar {
+          width: 5px;
+        }
+        .form-scroll::-webkit-scrollbar-track {
+          background: #f7fafc;
+        }
+        .form-scroll::-webkit-scrollbar-thumb {
+          background: #cbd5e0;
+          border-radius: 10px;
+        }
+      `}</style>
 
-          <button className="auth-button" disabled={loading}>
-            {loading ? 'Creating account...' : 'Sign Up'}
-          </button>
-        </form>
-      )}
-    </div>
+    </>
   );
 }
 

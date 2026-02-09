@@ -1,138 +1,125 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import './App.css';
 import LoginForm from './LoginForm';
-import Profile from './Profile';
+import Navbar from './components/Navbar';
+import Hero from './components/Hero';
+import LocationShowcase from './components/LocationShowcase';
+import ContactForm from './components/ContactForm';
+import Footer from './components/Footer';
+import FloatingParticles from './components/FloatingParticles';
+import FloatingImages from './components/FloatingImages';
 import Services from './services';
-
-function Navbar({ onLoginClick, onLogoutClick, onProfileClick, user }: { onLoginClick: () => void; onLogoutClick: () => void; onProfileClick: () => void; user: any }) {
-  return (
-    <nav className="nav">
-      <div className="nav-left">
-        <img className="logo-icon" src="/images/Logo.png" alt="Logo" />
-        <span className="logo-text">Barangay 174 Health Center</span>
-      </div>
-
-      <ul className="nav-links">
-        <li>
-          <a href="#home">
-            Home
-          </a>
-        </li>
-        <li>
-          <a href="#services">
-            Services
-          </a>
-        </li>
-        <li>
-          <a href="#appointment">
-            Appointment
-          </a>
-        </li>
-        <li>
-          <a href="#contact">
-            Contact
-          </a>
-        </li>
-      </ul>
-
-      <div className="nav-right">
-        <button
-          className="profile-button"
-          title={user ? `${user.first_name} ${user.last_name}` : 'View Profile'}
-          onClick={onProfileClick}
-        >
-          <span className="profile-icon">👤</span>
-        </button>
-        {user ? (
-          <button className="logout-button" onClick={onLogoutClick}>
-            Log-out
-          </button>
-        ) : (
-          <button className="login-button" onClick={onLoginClick}>
-            Log-in
-          </button>
-        )}
-      </div>
-    </nav>
-  );
-}
-
-function Hero() {
-  return (
-    <section id="home" className="hero">
-      <div className="hero-left">
-        <div className="badge">Your Health, Our Priority</div>
-        <h1 className="hero-title">
-          Barangay
-          <br />
-          Health Center
-          <br />
-          Appointment
-        </h1>
-        <p className="hero-subtitle">
-          We’re dedicated to your health and well-being by eliminating long queues,
-          ensuring priority access, and giving you control over when you visit the
-          barangay health center. Providing compassionate care when you need it most
-          backed by smart analytics that help health centers serve you better, one
-          appointment at a time.
-        </p>
-        <div className="hero-actions">
-          <button className="primary-btn">Book Appointment </button>
-          <button className="secondary-btn">Learn More </button>
-        </div>
-      </div>
-
-      <div className="hero-right">
-        <div className="hero-image-card">
-          <img
-            src="/images/sample.jpg"
-            alt="Hospital building"
-            className="hero-image"
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
+import Dashboard from './Dashboard';
+import DoctorDashboard from './DoctorDashboard';
+import AdminDashboard from './AdminDashboard';
+import SecurityDashboard from './SecurityDashboard';
+import FloatingActions from './components/FloatingActions';
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [loginMode, setLoginMode] = useState<'login' | 'register'>('login');
   const [user, setUser] = useState(() => {
     try {
       const u = localStorage.getItem('bh_user');
-      return u ? JSON.parse(u) : null;
+      if (!u) return null;
+      let userData = JSON.parse(u);
+
+      // Hardcoded Role Assignment
+      if (userData.email === 'admin@bhcare.ph') {
+        userData.role = 'admin';
+      } else if (userData.email === 'doctor@bhcare.ph') {
+        userData.role = 'doctor';
+      } else if (userData.email === 'security@bhcare.ph' || userData.email === 'security1741@bhcare.ph') {
+        userData.role = 'security';
+      } else {
+        userData.role = 'patient';
+      }
+      return userData;
     } catch {
       return null;
     }
   });
 
-  const openLogin = () => setShowLogin(true);
+  const openLogin = (mode: 'login' | 'register' = 'login') => {
+    setLoginMode(mode);
+    setShowLogin(true);
+  };
   const closeLogin = () => setShowLogin(false);
-  const closeProfile = () => setShowProfile(false);
+
   const onLoginSuccess = (u: any) => {
+    // Apply hardcoded role on login too
+    if (u.email === 'admin@bhcare.ph') {
+      u.role = 'admin';
+    } else if (u.email === 'doctor@bhcare.ph') {
+      u.role = 'doctor';
+    } else if (u.email === 'security@bhcare.ph' || u.email === 'security1741@bhcare.ph') {
+      u.role = 'security';
+    } else {
+      u.role = 'patient';
+    }
     setUser(u);
     setShowLogin(false);
-    setShowProfile(true);
   };
-  const onProfileUpdated = (u: any) => setUser(u);
-  const onProfileIconClick = () => {
-    if (user) setShowProfile(true);
-    else setShowLogin(true);
-  };
+
   const onLogoutClick = () => {
     try {
       localStorage.removeItem('bh_user');
-    } catch {}
+    } catch { }
     setUser(null);
-    setShowProfile(false);
   };
 
+  // If logged in, show the appropriate Dashboard hub
+  if (user) {
+    if (user.role === 'admin') {
+      return (
+        <AdminDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
+    if (user.role === 'doctor') {
+      return (
+        <DoctorDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
+    if (user.role === 'security') {
+      return (
+        <SecurityDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
+    return (
+      <Dashboard
+        user={user}
+        onLogout={onLogoutClick}
+      />
+    );
+  }
+
+  // Otherwise show the landing page
   return (
     <div className="app">
-      <Navbar onLoginClick={openLogin} onLogoutClick={onLogoutClick} onProfileClick={onProfileIconClick} user={user} />
-      <Hero />
+      <FloatingImages />
+      <FloatingParticles />
+      <Navbar
+        onLoginClick={() => openLogin('login')}
+        onLogoutClick={onLogoutClick}
+        onProfileClick={() => { }}
+        onAppointmentClick={() => openLogin('login')}
+        user={user}
+      />
+      <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
+      <LocationShowcase />
       <Services />
+      <ContactForm />
+      <Footer onAppointmentClick={() => openLogin('login')} />
+      <FloatingActions />
 
       {showLogin && (
         <div className="modal-overlay" onClick={closeLogin}>
@@ -140,23 +127,11 @@ function App() {
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
           >
-            <button className="modal-close" onClick={closeLogin}>
+            <button className="modal-close" onClick={closeLogin} aria-label="Close modal">
               ×
             </button>
             <div className="form-scroll">
-              <LoginForm onLoginSuccess={onLoginSuccess} />
-            </div>
-          </div>
-        </div>
-      )}
-      {showProfile && (
-        <div className="modal-overlay" onClick={closeProfile}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={closeProfile}>
-              ×
-            </button>
-            <div className="form-scroll">
-              <Profile user={user} onClose={closeProfile} onUpdated={onProfileUpdated} />
+              <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
             </div>
           </div>
         </div>
