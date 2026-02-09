@@ -1,0 +1,61 @@
+/* Hero Animations */
+
+@keyframes gradientAnimation {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+@keyframes floatAnimation {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+    33% {
+        transform: translate(150px, -100px) rotate(10deg);
+    }
+    66% {
+        transform: translate(-100px, 120px) rotate(-5deg);
+    }
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+}
+
+@keyframes floatAnimationReverse {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+    33% {
+        transform: translate(-120px, 150px) rotate(-10deg);
+    }
+    66% {
+        transform: translate(150px, -80px) rotate(5deg);
+    }
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+}
+
+.hero-animated-bg {
+    background: linear-gradient(-45deg, #e6fffa, #fff5f5, #f0fff4, #ffedd5);
+    background-size: 300% 300%;
+    animation: gradientAnimation 20s ease infinite;
+}
+
+.hero-bubble-1 {
+    animation: floatAnimation 25s ease-in-out infinite;
+}
+
+.hero-bubble-2 {
+    animation: floatAnimationReverse 30s ease-in-out infinite;
+}
+
+.hero-bubble-3 {
+    animation: floatAnimation 22s ease-in-out infinite reverse;
+}
