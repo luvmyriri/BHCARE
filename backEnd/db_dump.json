@@ -1,0 +1,309 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "juan.delacruz@example.com",
+      "password_hash": "hashed_password",
+      "first_name": "Juan",
+      "middle_name": null,
+      "last_name": "Dela Cruz",
+      "date_of_birth": "1980-01-01",
+      "gender": "Male",
+      "contact_number": "09171234567",
+      "barangay": "174",
+      "city": "Caloocan",
+      "province": "Metro Manila",
+      "id_image_path": null,
+      "id_image": null,
+      "ocr_text": null,
+      "created_at": "2026-02-09T00:29:43.808513",
+      "house_number": null,
+      "block_number": null,
+      "lot_number": null,
+      "street_name": null,
+      "subdivision": null,
+      "zip_code": null,
+      "full_address": null,
+      "philhealth_id": null
+    },
+    {
+      "id": 2,
+      "email": "genetabios13@gmail.com",
+      "password_hash": "$2b$12$lvaUwbGKldJPJ1QLoOB44.AMHPYzxRDlzx49mrU5OF6kbR4r5fDZq",
+      "first_name": "Gene",
+      "middle_name": "Gange",
+      "last_name": "Tabios",
+      "date_of_birth": "2005-06-13",
+      "gender": "Male",
+      "contact_number": "+639614331761",
+      "barangay": "Barangay 171",
+      "city": "Caloocan City",
+      "province": "Metro Manila",
+      "id_image_path": null,
+      "id_image": null,
+      "ocr_text": null,
+      "created_at": "2026-02-09T01:48:12.703915",
+      "house_number": "",
+      "block_number": "Block 9",
+      "lot_number": "Lot 30",
+      "street_name": "Ruby",
+      "subdivision": "Ruby St Celina",
+      "zip_code": "1421",
+      "full_address": "BLK 9 LOT 30, RUBY ST CELINA HOMES 3 BAGUMBONG, BARANGAY 171, CALOOCAN CITY, NCR, THIRD DISTRICT, 1421 License No.",
+      "philhealth_id": ""
+    },
+    {
+      "id": 3,
+      "email": "security1741@bhcare.ph",
+      "password_hash": "$2b$12$eb1YN0bubS7TLjvPVithWO5IxKCyaE.BRRLVkX3HFW36PbhccPhv2",
+      "first_name": "Security",
+      "middle_name": null,
+      "last_name": "Department",
+      "date_of_birth": "1990-01-01",
+      "gender": "N/A",
+      "contact_number": "+639000000000",
+      "barangay": "174",
+      "city": "Caloocan",
+      "province": "Metro Manila",
+      "id_image_path": null,
+      "id_image": null,
+      "ocr_text": null,
+      "created_at": "2026-02-09T02:34:28.871694",
+      "house_number": null,
+      "block_number": null,
+      "lot_number": null,
+      "street_name": null,
+      "subdivision": null,
+      "zip_code": null,
+      "full_address": null,
+      "philhealth_id": null
+    }
+  ],
+  "admin_users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIxKTvQiOe",
+      "email": "admin@bhcare.local",
+      "role": "admin",
+      "is_active": true,
+      "created_at": "2026-02-09T00:01:34.216258",
+      "last_login": null
+    }
+  ],
+  "services": [
+    {
+      "id": 1,
+      "name": "General Consultation",
+      "description": "General health check-up and consultation",
+      "duration_minutes": 30,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    },
+    {
+      "id": 2,
+      "name": "Prenatal Care",
+      "description": "Prenatal check-up for pregnant women",
+      "duration_minutes": 45,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    },
+    {
+      "id": 3,
+      "name": "Immunization",
+      "description": "Vaccination and immunization services",
+      "duration_minutes": 20,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    },
+    {
+      "id": 4,
+      "name": "Family Planning",
+      "description": "Family planning consultation and services",
+      "duration_minutes": 30,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    },
+    {
+      "id": 5,
+      "name": "Dental Care",
+      "description": "Basic dental check-up and treatment",
+      "duration_minutes": 40,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    },
+    {
+      "id": 6,
+      "name": "Laboratory Services",
+      "description": "Blood tests and other laboratory services",
+      "duration_minutes": 30,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    },
+    {
+      "id": 7,
+      "name": "TB DOTS",
+      "description": "Tuberculosis treatment and monitoring",
+      "duration_minutes": 30,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    },
+    {
+      "id": 8,
+      "name": "Nutrition Counseling",
+      "description": "Nutritional assessment and counseling",
+      "duration_minutes": 30,
+      "is_active": true,
+      "created_at": "2026-02-04T00:27:03.463171"
+    }
+  ],
+  "schedule_slots": [
+    {
+      "id": 1,
+      "day_of_week": 0,
+      "start_time": "08:00:00",
+      "end_time": "12:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "day_of_week": 0,
+      "start_time": "13:00:00",
+      "end_time": "17:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 3,
+      "day_of_week": 1,
+      "start_time": "08:00:00",
+      "end_time": "12:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 4,
+      "day_of_week": 1,
+      "start_time": "13:00:00",
+      "end_time": "17:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 5,
+      "day_of_week": 2,
+      "start_time": "08:00:00",
+      "end_time": "12:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 6,
+      "day_of_week": 2,
+      "start_time": "13:00:00",
+      "end_time": "17:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 7,
+      "day_of_week": 3,
+      "start_time": "08:00:00",
+      "end_time": "12:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 8,
+      "day_of_week": 3,
+      "start_time": "13:00:00",
+      "end_time": "17:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 9,
+      "day_of_week": 4,
+      "start_time": "08:00:00",
+      "end_time": "12:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    },
+    {
+      "id": 10,
+      "day_of_week": 4,
+      "start_time": "13:00:00",
+      "end_time": "17:00:00",
+      "max_appointments": 5,
+      "is_active": true
+    }
+  ],
+  "inventory": [
+    {
+      "id": 1,
+      "item_name": "Paracetamol 500mg",
+      "category": "Medicine",
+      "stock_quantity": 500,
+      "unit": "boxes",
+      "status": "Good",
+      "expiry_date": "2026-12-31",
+      "updated_at": "2026-02-09T00:29:43.889913"
+    },
+    {
+      "id": 2,
+      "item_name": "Amoxicillin 500mg",
+      "category": "Medicine",
+      "stock_quantity": 50,
+      "unit": "pcs",
+      "status": "Low Stock",
+      "expiry_date": "2025-10-15",
+      "updated_at": "2026-02-09T00:29:43.889938"
+    },
+    {
+      "id": 3,
+      "item_name": "Medical Alcohol 70%",
+      "category": "Supplies",
+      "stock_quantity": 150,
+      "unit": "bottles",
+      "status": "Good",
+      "expiry_date": "2027-05-20",
+      "updated_at": "2026-02-09T00:29:43.889940"
+    }
+  ],
+  "lab_results": [
+    {
+      "id": 1,
+      "medical_record_id": null,
+      "patient_id": 1,
+      "test_type": "Complete Blood Count (CBC)",
+      "result_summary": null,
+      "status": "pending",
+      "is_urgent": false,
+      "requested_at": "2026-02-09T00:29:43.900049",
+      "completed_at": null
+    },
+    {
+      "id": 2,
+      "medical_record_id": null,
+      "patient_id": 1,
+      "test_type": "Urinalysis",
+      "result_summary": null,
+      "status": "processing",
+      "is_urgent": false,
+      "requested_at": "2026-02-09T00:29:43.900052",
+      "completed_at": null
+    },
+    {
+      "id": 3,
+      "medical_record_id": null,
+      "patient_id": 1,
+      "test_type": "X-Ray (Chest)",
+      "result_summary": null,
+      "status": "pending",
+      "is_urgent": true,
+      "requested_at": "2026-02-09T00:29:43.900052",
+      "completed_at": null
+    }
+  ]
+}
