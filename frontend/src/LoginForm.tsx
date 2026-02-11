@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState, FC, ReactNode, InputHTMLAttributes, SelectHTMLAttributes, FormEvent, ChangeEvent, useEffect } from 'react';
 import { useLanguage } from './contexts/LanguageContext';
 
 type Option = { code: string; name: string };
 type ConfidenceMap = Record<string, number>;
 
-const Input: React.FC<
-  { label: string; icon: React.ReactNode; invalid?: boolean; confidence?: number } & React.InputHTMLAttributes<HTMLInputElement>
+const Input: FC<
+  { label: string; icon: ReactNode; invalid?: boolean; confidence?: number } & InputHTMLAttributes<HTMLInputElement>
 > = ({ label, icon, invalid, confidence, ...props }) => (
   <div style={{ marginBottom: '16px', position: 'relative' }}>
     <label style={{ fontSize: '12px', fontWeight: 700, color: '#4a5568', display: 'flex', alignItems: 'center', marginBottom: '6px', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -55,8 +55,8 @@ const Input: React.FC<
   </div>
 );
 
-const Select: React.FC<
-  { label: string; icon: React.ReactNode; options: Option[]; invalid?: boolean; placeholder?: string; confidence?: number } & React.SelectHTMLAttributes<HTMLSelectElement>
+const Select: FC<
+  { label: string; icon: ReactNode; options: Option[]; invalid?: boolean; placeholder?: string; confidence?: number } & SelectHTMLAttributes<HTMLSelectElement>
 > = ({ label, icon, options, invalid, placeholder, confidence, ...props }) => {
   // Ensure options is always a valid array
   const safeOptions = Array.isArray(options) ? options : [];
@@ -117,9 +117,9 @@ const Select: React.FC<
   );
 };
 
-function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void }) {
+function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register' }) {
   const { t } = useLanguage();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -130,7 +130,8 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [lastName, setLastName] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
-  const [contact, setContact] = useState('');
+  const [contact, setContact] = useState('+63');
+  const [philhealthId, setPhilhealthId] = useState('');
   const [barangay, setBarangay] = useState('');
   const [city, setCity] = useState('');
   const [province, setProvince] = useState('');
@@ -146,6 +147,8 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [confirmPassword, setConfirmPassword] = useState('');
   const [registerPwVisible, setRegisterPwVisible] = useState(false);
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+
 
   const [idFront, setIdFront] = useState<File | null>(null);
   const [idBack, setIdBack] = useState<File | null>(null);
@@ -161,17 +164,42 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   const [loading, setLoading] = useState(false);
   const [ocrStatus, setOcrStatus] = useState('');
   const [errors, setErrors] = useState<Record<string, boolean>>({});
+  const [passwordCriteria, setPasswordCriteria] = useState({ length: false, upper: false, symbol: false });
 
-  // Removed: PSGC cascade (using text inputs for direct address population)
+  useEffect(() => {
+    setPasswordCriteria({
+      length: password.length >= 8,
+      upper: /[A-Z]/.test(password),
+      symbol: /[^a-zA-Z0-9\s]/.test(password)
+    });
+  }, [password]);
+
+  const scrollToError = () => {
+    const errorEl = document.querySelector('.error-message-box');
+    if (errorEl) errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const formatPHPhone = (input: string) => {
+    // Remove all non-numeric characters except +
+    let cleaned = input.replace(/[^\d+]/g, '');
+
+    // Process common PH formats
+    if (cleaned.startsWith('09') && cleaned.length === 11) {
+      cleaned = '+63' + cleaned.substring(1);
+    } else if (cleaned.startsWith('9') && cleaned.length === 10) {
+      cleaned = '+63' + cleaned;
+    } else if (cleaned.startsWith('639') && cleaned.length === 12) {
+      cleaned = '+' + cleaned;
+    }
+
+    return cleaned;
+  };
+
 
   // Removed: City and barangay loading (using text inputs instead of dropdowns)
 
 
-  const clearError = (field: string) => {
-    if (errors[field]) {
-      setErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
-    }
-  };
+  // Removed clearError as it is replaced by dynamic validation in handleInputChange
 
   const resetFormFields = () => {
     setFirstName('');
@@ -179,7 +207,8 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     setLastName('');
     setDob('');
     setGender('');
-    setContact('');
+    setContact('+63');
+    setPhilhealthId('');
     setBarangay('');
     setCity('');
     setProvince('');
@@ -219,7 +248,99 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     return "Government ID";
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+
+  const formatName = (val: string) => {
+    return val.replace(/[^a-zA-Z\s'-.]/g, '');
+  };
+
+  const formatPhilHealthId = (val: string) => {
+    // Remove non-digits
+    const cleaned = val.replace(/\D/g, '');
+
+    // Format: XX-XXXXXXXXX-X (12 digits)
+    let formatted = cleaned;
+    if (cleaned.length > 2) {
+      formatted = cleaned.substring(0, 2) + '-' + cleaned.substring(2);
+    }
+    if (cleaned.length > 11) {
+      formatted = formatted.substring(0, 12) + '-' + cleaned.substring(11, 12);
+    }
+
+    // Max 12 digits -> 14 chars with dashes
+    if (formatted.length > 14) formatted = formatted.substring(0, 14);
+
+    return formatted;
+  };
+
+  const validateField = (field: string, value: string) => {
+    let isValid = true;
+
+    // We update errors functionally to avoid closure staleness
+    setErrors(prevErrors => {
+      const newErrors = { ...prevErrors };
+
+      // Common required check
+      if (!value) {
+        newErrors[field] = true;
+        isValid = false;
+      } else {
+        delete newErrors[field];
+      }
+
+      // Specific checks
+      if (field === 'email' && value) {
+        const emailDomainRegex = /@((gmail\.com)|(yahoo\.com)|(hotmail\.com)|(.*\.gov(\.ph)?))$/i;
+        const emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailFormatRegex.test(value) || !emailDomainRegex.test(value)) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      if (field === 'contact' && value) {
+        if (value.length < 13) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      if (field === 'password' && value) {
+        // Require at least one non-alphanumeric character (excluding space), one uppercase, min 8 chars, no spaces.
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[^a-zA-Z0-9\s])(?!.*[\s]).{8,}$/;
+        if (!passwordRegex.test(value)) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      if (field === 'confirmPassword' && value) {
+        if (value !== password) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
+      return newErrors;
+    });
+
+    return isValid;
+  };
+
+  const handleInputChange = (field: string, value: string, setter: (v: string) => void) => {
+    let finalValue = value;
+    if (field === 'contact') {
+      finalValue = formatPHPhone(value);
+    }
+    setter(finalValue);
+    // If the field is already invalid, validate immediately on change to clear error if fixed
+    if (errors[field]) {
+      validateField(field, finalValue);
+    }
+  };
+
+
+
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault(); setLoading(true); setError('');
     try {
       const res = await fetch('/login', {
@@ -236,13 +357,13 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
-  const handleFrontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFrontUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setIdFront(file); setFrontPreview(URL.createObjectURL(file));
   };
 
-  const handleBackUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setIdBack(file); setBackPreview(URL.createObjectURL(file));
@@ -337,16 +458,23 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
       if (fields.last_name) setLastName(fields.last_name);
       if (fields.dob) setDob(fields.dob);
       if (fields.gender) setGender(fields.gender);
-      if (fields.contact) setContact(fields.contact);
-      if (fields.phone) setContact(fields.phone);
+      if (fields.contact) setContact(formatPHPhone(fields.contact));
+      if (fields.phone) setContact(formatPHPhone(fields.phone));
       if (fields.email) setEmail(fields.email);
+      if (fields.philhealth_id) setPhilhealthId(fields.philhealth_id);
 
       // Auto-populate address details
       if (fields.province_name) setProvince(fields.province_name);
       else if (fields.province) setProvince(fields.province);
 
+      // Auto-populate address fields directly
+      if (fields.province_name) setProvince(fields.province_name);
       if (fields.city) setCity(fields.city);
-      if (fields.barangay) setBarangay(fields.barangay);
+
+      if (fields.barangay) {
+        console.log('[OCR] Queueing barangay:', fields.barangay);
+        setBarangay(fields.barangay);
+      }
 
       // Auto-populate detailed street address fields
       if (fields.house_number) setHouseNumber(fields.house_number);
@@ -372,12 +500,73 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: FormEvent) => {
     e.preventDefault(); setError('');
+    const newErrors: Record<string, boolean> = {};
+
+    // Required Fields Check
+    if (!firstName) newErrors.firstName = true;
+    if (!lastName) newErrors.lastName = true;
+    if (!email) newErrors.email = true;
+    if (!password) newErrors.password = true;
+    if (!confirmPassword) newErrors.confirmPassword = true;
+    if (!dob) newErrors.dob = true;
+    if (!contact) newErrors.contact = true;
+    if (!barangay) newErrors.barangay = true;
+    if (!city) newErrors.city = true;
+    if (!province) newErrors.province = true;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setError('Please fill in all required fields.');
+      setTimeout(scrollToError, 100);
+      return;
+    }
 
     // Validation
     if (password !== confirmPassword) {
       setError('Passwords do not match');
+      setErrors({ ...newErrors, password: true, confirmPassword: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    // Password Complexity Check
+    // Require at least one non-alphanumeric character (excluding space), one uppercase, min 8 chars, no spaces.
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[^a-zA-Z0-9\s])(?!.*[\s]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setError('Password must be at least 8 characters long, contain at least one uppercase letter, and one special character (symbol). No spaces allowed.');
+      setErrors({ ...newErrors, password: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    // New Validations
+    // PH Phone Validation (+639XXXXXXXXX)
+    const phoneRegex = /^\+639\d{9}$/;
+    if (!phoneRegex.test(contact)) {
+      setError('Please enter a valid Philippine mobile number (+639XXXXXXXXX)');
+      setErrors({ ...newErrors, contact: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    // Strict Email Validation
+    // Allowed: gmail.com, yahoo.com, hotmail.com, *.gov.ph, *.gov
+    const emailDomainRegex = /@((gmail\.com)|(yahoo\.com)|(hotmail\.com)|(.*\.gov(\.ph)?))$/i;
+    const emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailFormatRegex.test(email)) {
+      setError('Please enter a valid email address format.');
+      setErrors({ ...newErrors, email: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
+
+    if (!emailDomainRegex.test(email)) {
+      setError('Only Gmail (@gmail.com), Yahoo, Hotmail, or Government email addresses are allowed.');
+      setErrors({ ...newErrors, email: true });
+      setTimeout(scrollToError, 100);
       return;
     }
 
@@ -390,6 +579,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
     formData.append('dob', dob);
     formData.append('gender', gender);
     formData.append('contact', contact);
+    formData.append('philhealth_id', philhealthId);
     formData.append('barangay', barangay);
     formData.append('city', city);
     formData.append('province', province);
@@ -411,8 +601,14 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
       if (!res.ok) throw new Error(data.error || 'Registration failed');
       alert('Registration successful!');
       setMode('login');
+      resetFormFields();
     } catch (err: any) {
       setError(err.message);
+      // Attempt to highlight field based on error message if possible, strictly mostly likely email
+      if (err.message.toLowerCase().includes('email')) {
+        setErrors({ email: true });
+      }
+      setTimeout(scrollToError, 100);
     } finally {
       setLoading(false);
     }
@@ -421,22 +617,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
   // Unified Gradient Split-Screen Layout for All Modes
   return (
     <>
-      <div className="auth-card" style={{
-        maxWidth: '900px',
-        width: '100%',
-        margin: '0 auto',
-        background: 'white',
-        position: 'relative',
-        borderRadius: '24px',
-        padding: '0',
-        boxShadow: '0 20px 60px -15px rgba(0, 0, 0, 0.25)',
-        zIndex: 10,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'row',
-        minHeight: '600px',
-        maxHeight: '90vh'
-      }}>
+      <div className="auth-card">
         {/* LEFT SIDE - BRANDING (Persistent) */}
         <div style={{
           flex: '0 0 50%',
@@ -449,7 +630,8 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
           textAlign: 'center',
           color: 'white',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          minHeight: '200px' // Added for mobile stack visibility
         }}>
           <div style={{
             position: 'absolute',
@@ -501,12 +683,11 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
 
         {/* RIGHT SIDE - DYNAMIC CONTENT */}
         <div className="form-scroll" style={{
-          flex: '0 0 50%',
+          flex: '1',
           padding: '40px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'flex-start', // Changed from center to prevent top clipping
-          overflowY: 'auto',
+          justifyContent: 'flex-start',
           maxHeight: '100%'
         }}>
           {mode === 'login' ? (
@@ -612,7 +793,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
             </form>
           ) : (
             // REGISTER FORM
-            <form onSubmit={handleRegister} style={{ width: '100%', maxWidth: '500px', margin: 'auto' }}>
+            <form onSubmit={handleRegister} style={{ width: '100%', maxWidth: '800px', margin: 'auto' }}>
               <button
                 type="button"
                 onClick={() => setMode('login')}
@@ -790,6 +971,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                       </div>
                     </div>
 
+
                     {ocrStatus && (
                       <div style={{
                         padding: '10px',
@@ -844,7 +1026,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                     >
                       Skip & Fill Manually →
                     </button>
-                  </div>
+                  </div >
 
                   {detectedIDType && (
                     <div style={{
@@ -860,23 +1042,26 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                     }}>
                       ✓ Detected: {detectedIDType}
                     </div>
-                  )}
+                  )
+                  }
 
-                  {error && (
-                    <div style={{
-                      padding: '10px',
-                      background: '#fff5f5',
-                      color: '#c53030',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      textAlign: 'center',
-                      marginTop: '12px',
-                      border: '1px solid #fed7d7'
-                    }}>
-                      ✗ {error}
-                    </div>
-                  )}
+                  {
+                    error && (
+                      <div style={{
+                        padding: '10px',
+                        background: '#fff5f5',
+                        color: '#c53030',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        marginTop: '12px',
+                        border: '1px solid #fed7d7'
+                      }}>
+                        ✗ {error}
+                      </div>
+                    )
+                  }
 
                   <p style={{
                     fontSize: '12px',
@@ -889,7 +1074,7 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                       Login here
                     </span>
                   </p>
-                </div>
+                </div >
               ) : (
                 // REGISTRATION FIELDS
                 <div style={{ width: '100%' }}>
@@ -903,15 +1088,46 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                   <div style={{ marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📝 Personal Details</h3>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <Input label={t.firstName} icon="👤" confidence={confidence.first_name} value={firstName} onChange={(e) => { setFirstName(e.target.value); clearError('firstName'); }} required />
-                      <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
+                    <div className="auth-form-row">
+                      <Input
+                        label="First Name"
+                        icon="👤"
+                        placeholder="Juan"
+                        value={firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value, setFirstName)}
+                        onBlur={() => validateField('firstName', firstName)}
+                        confidence={confidence.first_name}
+                        invalid={errors.firstName}
+                        required
+                      />
+                      <Input
+                        label="Last Name"
+                        icon="👤"
+                        placeholder="Dela Cruz"
+                        value={lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value, setLastName)}
+                        onBlur={() => validateField('lastName', lastName)}
+                        confidence={confidence.last_name}
+                        invalid={errors.lastName}
+                        required
+                      />
+                    </div>
+                    <div className="auth-form-row">
+                      <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value))} />
+                      <Input
+                        label={t.dob}
+                        icon="📅"
+                        type="date"
+                        confidence={confidence.dob}
+                        value={dob}
+                        onChange={(e) => handleInputChange('dob', e.target.value, setDob)}
+                        onBlur={() => validateField('dob', dob)}
+                        invalid={errors.dob}
+                        required
+                      />
                     </div>
 
-                    <Input label={t.lastName} icon="👤" confidence={confidence.last_name} value={lastName} onChange={(e) => { setLastName(e.target.value); clearError('lastName'); }} required />
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
-                      <Input label={t.dob} icon="📅" type="date" confidence={confidence.dob} value={dob} onChange={(e) => setDob(e.target.value)} required />
+                    <div className="auth-form-row">
                       <Select
                         label={t.gender}
                         icon="⚧"
@@ -925,76 +1141,167 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
                         onChange={(e) => setGender(e.target.value)}
                         required
                       />
+                      <Input
+                        label="PhilHealth ID (Optional)"
+                        icon="🆔"
+                        value={philhealthId}
+                        onChange={(e) => setPhilhealthId(formatPhilHealthId(e.target.value))}
+                        placeholder="XX-XXXXXXXXX-X"
+                      />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => setContact(e.target.value)} confidence={confidence.phone} required />
-                      <Input label={t.email} icon="📧" type="email" value={email} onChange={(e) => setEmail(e.target.value)} confidence={confidence.email} required />
+                    <div className="auth-form-row">
+                      <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => handleInputChange('contact', formatPHPhone(e.target.value), setContact)} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
+                      <Input
+                        label="Email Address"
+                        icon="✉️"
+                        type="email"
+                        placeholder="juan.delacruz@gmail.com"
+                        value={email}
+                        onChange={(e) => handleInputChange('email', e.target.value, setEmail)}
+                        onBlur={() => validateField('email', email)}
+                        confidence={confidence.email}
+                        invalid={errors.email}
+                        required
+                      />
                     </div>
 
                     <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', marginTop: '24px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Address Details</h3>
-                    <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => setProvince(e.target.value)} required />
-                    <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => setCity(e.target.value)} required />
-                    <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => setBarangay(e.target.value)} required />
+                    <div className="auth-form-row">
+                      <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => handleInputChange('province', e.target.value, setProvince)} onBlur={() => validateField('province', province)} invalid={errors.province} required />
+                      <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => handleInputChange('city', e.target.value, setCity)} onBlur={() => validateField('city', city)} invalid={errors.city} required />
+                    </div>
 
-                    <div style={{ marginTop: '12px' }}>
+                    <div className="auth-form-row">
+                      <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => handleInputChange('barangay', e.target.value, setBarangay)} onBlur={() => validateField('barangay', barangay)} invalid={errors.barangay} required />
                       <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                    <div className="auth-form-row">
                       <Input label="Block" icon="📍" confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
                       <Input label="Lot" icon="📍" confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
                     </div>
 
-                    <div style={{ marginTop: '12px' }}>
+                    <div className="auth-form-row">
                       <Input label="Street" icon="🛣️" confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
-                    </div>
-
-                    <div style={{ marginTop: '12px' }}>
                       <Input label="Village / Subdivision" icon="🏘️" confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
                     </div>
 
-                    <div style={{ marginTop: '12px' }}>
+                    <div className="auth-form-row">
                       <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
                     </div>
 
                     <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
                       <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>{t.createPw}</label>
-                      <div className="auth-input" style={{ display: 'flex', alignItems: 'center', background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
+                      <div className={`auth-input${errors.password ? ' invalid' : ''}`} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: '#f7fafc',
+                        border: errors.password ? '2px solid #e53e3e' : '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '10px 12px',
+                        marginBottom: '12px',
+                        position: 'relative'
+                      }}>
                         <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
                         <input
                           type={registerPwVisible ? 'text' : 'password'}
                           value={password}
-                          onChange={(e) => setPassword(e.target.value)}
+                          onChange={(e) => handleInputChange('password', e.target.value, setPassword)}
+                          onFocus={() => setPasswordFocused(true)}
+                          onBlur={() => { setPasswordFocused(false); validateField('password', password); }}
                           required
                           style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
                         />
                         <button type="button" onClick={() => setRegisterPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '10px', color: '#4299e1', fontWeight: 700 }}>{registerPwVisible ? 'HIDE' : 'SHOW'}</button>
+
+                        {passwordFocused && (
+                          <div style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: '100%',
+                            width: '100%',
+                            marginTop: '8px',
+                            background: '#2d3748',
+                            color: 'white',
+                            padding: '10px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                          }}>
+                            <div style={{ marginBottom: '4px', fontWeight: 'bold', borderBottom: '1px solid #4a5568', paddingBottom: '4px' }}>Password Requirements:</div>
+                            <ul style={{ paddingLeft: '16px', margin: 0, listStyleType: 'disc' }}>
+                              <li style={{ marginBottom: '2px', color: passwordCriteria.length ? '#68d391' : 'white' }}>At least 8 characters</li>
+                              <li style={{ marginBottom: '2px', color: passwordCriteria.upper ? '#68d391' : 'white' }}>At least one uppercase letter</li>
+                              <li style={{ color: passwordCriteria.symbol ? '#68d391' : 'white' }}>At least one special character</li>
+                            </ul>
+                            <div style={{
+                              position: 'absolute',
+                              top: '-4px',
+                              left: '20px',
+                              width: '8px',
+                              height: '8px',
+                              background: '#2d3748',
+                              transform: 'rotate(45deg)'
+                            }}></div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Password Criteria Checklist */}
+                      <div style={{ fontSize: '11px', color: '#718096', marginTop: '-4px', marginBottom: '16px', paddingLeft: '4px' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <span style={{ color: passwordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                            {passwordCriteria.length ? '✓' : '○'} 8+ Chars
+                          </span>
+                          <span style={{ color: passwordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                            {passwordCriteria.upper ? '✓' : '○'} Upper (A-Z)
+                          </span>
+                          <span style={{ color: passwordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                            {passwordCriteria.symbol ? '✓' : '○'} Symbol (-_+ =)
+                          </span>
+                        </div>
                       </div>
 
                       <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>{t.confirmPw}</label>
-                      <div className="auth-input" style={{ display: 'flex', alignItems: 'center', background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
+                      <div className={`auth-input${errors.confirmPassword ? ' invalid' : ''}`} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: '#f7fafc',
+                        border: errors.confirmPassword ? '2px solid #e53e3e' : '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '10px 12px'
+                      }}>
                         <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
                         <input
                           type={confirmPwVisible ? 'text' : 'password'}
                           value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          onChange={(e) => handleInputChange('confirmPassword', e.target.value, setConfirmPassword)}
+                          onBlur={() => validateField('confirmPassword', confirmPassword)}
                           required
                           style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
                         />
-                        <button type="button" onClick={() => setConfirmPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '10px', color: '#4299e1', fontWeight: 700 }}>{confirmPwVisible ? 'HIDE' : 'SHOW'}</button>
+                        <span
+                          onClick={() => setConfirmPwVisible(!confirmPwVisible)}
+                          style={{ cursor: 'pointer', fontSize: '16px', marginLeft: '8px', userSelect: 'none' }}
+                        >
+                          {confirmPwVisible ? '👁️' : '🙈'}
+                        </span>
                       </div>
-                    </div>
 
-                    {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7' }}>{error}</div>}
 
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                      <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '12px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '13px' }}>
-                        ← Back
-                      </button>
-                      <button className="auth-button" style={{ margin: 0, flex: 2, height: '44px', fontSize: '14px', background: '#38b2ac', boxShadow: '0 4px 12px rgba(56, 178, 172, 0.3)' }} disabled={loading}>
-                        {loading ? 'Submitting...' : t.submit}
-                      </button>
+
+                      {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7' }}>{error}</div>}
+
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                        <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '12px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '13px' }}>
+                          ← Back
+                        </button>
+                        <button className="auth-button" style={{ margin: 0, flex: 2, height: '44px', fontSize: '14px', background: '#38b2ac', boxShadow: '0 4px 12px rgba(56, 178, 172, 0.3)' }} disabled={loading}>
+                          {loading ? 'Submitting...' : t.submit}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1005,62 +1312,64 @@ function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: any) => void })
       </div>
 
       {/* Image Zoom Overlay */}
-      {zoomedImage && (
-        <div
-          onClick={() => setZoomedImage(null)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            background: 'rgba(0,0,0,0.85)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            cursor: 'zoom-out',
-            animation: 'fadeIn 0.2s ease-out'
-          }}
-        >
-          <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}>
-            <img
-              src={zoomedImage}
-              alt="Zoomed ID"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '90vh',
-                borderRadius: '12px',
-                boxShadow: '0 0 40px rgba(0,0,0,0.5)',
-                border: '4px solid white'
-              }}
-            />
-            <button
-              onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
-              style={{
-                position: 'absolute',
-                top: '-20px',
-                right: '-20px',
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: 'white',
-                border: 'none',
-                fontSize: '24px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#2d3748'
-              }}
-            >
-              ×
-            </button>
+      {
+        zoomedImage && (
+          <div
+            onClick={() => setZoomedImage(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(0,0,0,0.85)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              cursor: 'zoom-out',
+              animation: 'fadeIn 0.2s ease-out'
+            }}
+          >
+            <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}>
+              <img
+                src={zoomedImage}
+                alt="Zoomed ID"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '90vh',
+                  borderRadius: '12px',
+                  boxShadow: '0 0 40px rgba(0,0,0,0.5)',
+                  border: '4px solid white'
+                }}
+              />
+              <button
+                onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
+                style={{
+                  position: 'absolute',
+                  top: '-20px',
+                  right: '-20px',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'white',
+                  border: 'none',
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#2d3748'
+                }}
+              >
+                ×
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       <style>{`
         @keyframes fadeIn {
