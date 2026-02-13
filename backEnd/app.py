@@ -1,8 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 from psycopg2 import sql
+import psycopg2.extras
+from psycopg2.extras import RealDictCursor
 from database import get_db_connection
-import bcrypt
+from flask_bcrypt import Bcrypt
 import os
 from dotenv import load_dotenv
 import requests
@@ -10,11 +13,32 @@ from PIL import Image, ImageEnhance, ImageFilter
 import io
 import re
 from datetime import datetime
+from email_config import (
+    init_mail,
+    generate_reset_token,
+    store_reset_token,
+    validate_reset_token,
+    invalidate_reset_token,
+    send_password_reset_email
+)
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
+bcrypt = Bcrypt(app)
+mail = init_mail(app)  # Initialize Flask-Mail
+
+# Configuration
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Ensure upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Register Blueprints
 from appointments import appointments_bp
@@ -26,6 +50,11 @@ app.register_blueprint(appointments_bp)
 app.register_blueprint(lab_results_bp)
 app.register_blueprint(inventory_bp)
 app.register_blueprint(security_bp)
+
+from soap_notes import soap_notes_bp
+from notifications import notifications_bp
+app.register_blueprint(soap_notes_bp)
+app.register_blueprint(notifications_bp)
 
 # Startup Database Verification
 try:
@@ -900,7 +929,7 @@ def login():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, email, password_hash, first_name, last_name FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, profile_picture FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
@@ -908,17 +937,37 @@ def login():
         if not user:
             return jsonify({"error": "Invalid credentials"}), 401
         
-        if not bcrypt.checkpw(password.encode('utf-8'), user[2].encode('utf-8')):
+        if not bcrypt.check_password_hash(user[2], password):
             return jsonify({"error": "Invalid credentials"}), 401
         
-        return jsonify({
-            "user": {
-                "id": user[0],
-                "email": user[1],
-                "first_name": user[3],
-                "last_name": user[4]
-            }
-        }), 200
+        # Build complete user object
+        user_data = {
+            "id": user[0],
+            "email": user[1],
+            "first_name": user[3],
+            "last_name": user[4],
+            "middle_name": user[5],
+            "date_of_birth": user[6].strftime('%Y-%m-%d') if user[6] else None,
+            "gender": user[7],
+            "contact_number": user[8],
+            "philhealth_id": user[9],
+            "barangay": user[10],
+            "city": user[11],
+            "province": user[12],
+            "house_number": user[13],
+            "block_number": user[14],
+            "lot_number": user[15],
+            "street_name": user[16],
+            "subdivision": user[17],
+            "zip_code": user[18],
+            "full_address": user[19]
+        }
+        
+        # Add profile picture URL if exists
+        if user[20]:
+            user_data["profile_picture"] = f"http://127.0.0.1:5000/static/uploads/{user[20]}"
+        
+        return jsonify({"user": user_data}), 200
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -968,7 +1017,7 @@ def register():
             conn.close()
             return jsonify({"error": "A medical record already exists for this person (Name & DOB). Please login or consult the health center."}), 409
 
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        hashed = bcrypt.generate_password_hash(password).decode('utf-8')
         
         cur.execute("""
             INSERT INTO users (email, password_hash, first_name, middle_name, last_name, 
@@ -990,6 +1039,122 @@ def register():
     except psycopg2.IntegrityError:
         return jsonify({"error": "Email already exists"}), 409
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/user/<int:user_id>/upload-photo', methods=['POST'])
+def upload_photo(user_id):
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+        
+    if file and allowed_file(file.filename):
+        try:
+            filename = secure_filename(f"user_{user_id}_{file.filename}")
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Update DB
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("UPDATE users SET profile_picture = %s WHERE id = %s", (filename, user_id))
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            # Return full URL
+            photo_url = f"http://127.0.0.1:5000/static/uploads/{filename}"
+            return jsonify({"message": "Photo uploaded successfully", "profile_picture": photo_url}), 200
+        except Exception as e:
+            print(e)
+            return jsonify({"error": str(e)}), 500
+    
+    return jsonify({"error": "Invalid file type. Only PNG and JPEG are allowed."}), 400
+
+@app.route("/user/<int:user_id>", methods=["GET"])
+def get_user(user_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        cur = conn.cursor(cursor_factory=RealDictCursor) # Use RealDictCursor
+        cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        user_row = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if user_row:
+             # Convert RealDictRow to dict
+            user = dict(user_row)
+            
+            # Handle date serialization
+            if user.get('date_of_birth'):
+                user['date_of_birth'] = user['date_of_birth'].strftime('%Y-%m-%d')
+            
+            # Add profile picture URL if exists
+            if user.get('profile_picture'):
+                user['profile_picture'] = f"http://127.0.0.1:5000/static/uploads/{user['profile_picture']}"
+            
+            return jsonify(user)
+        return jsonify({"error": "User not found"}), 404
+    except Exception as e:
+        print(f"Error fetching user: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/user/<int:user_id>", methods=["PUT"])
+def update_user(user_id):
+    try:
+        data = request.json
+        conn = get_db()
+        cur = conn.cursor()
+        
+        # Build dynamic update query
+        fields = []
+        values = []
+        allowed_fields = [
+            'first_name', 'middle_name', 'last_name', 'date_of_birth', 
+            'gender', 'contact_number', 'philhealth_id', 
+            'barangay', 'city', 'province', 'email',
+            'house_number', 'block_number', 'lot_number', 'street_name', 'subdivision', 'zip_code'
+        ]
+        
+        for key in allowed_fields:
+            if key in data:
+                fields.append(f"{key} = %s")
+                values.append(data[key])
+        
+        # Handle Password Change separately
+        if 'password' in data and data['password']:
+            hashed = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+            fields.append("password_hash = %s")
+            values.append(hashed)
+        
+        if not fields:
+            return jsonify({"error": "No valid fields to update"}), 400
+            
+        values.append(user_id)
+        
+        # Simplistic approach for now to avoid robust SQL composition issues in one-shot
+        # Reverting to string formatting for simplicity in this specific verified env
+        set_clause = ", ".join(fields)
+        query = f"UPDATE users SET {set_clause} WHERE id = %s RETURNING id"
+        
+        cur.execute(query, tuple(values))
+        updated_id = cur.fetchone()
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        if not updated_id:
+            return jsonify({"error": "User not found"}), 404
+            
+        return jsonify({"message": "User updated successfully"}), 200
+    except Exception as e:
+        print(f"Error updating user: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1099,6 +1264,112 @@ def check_philhealth():
     except Exception as e:
         print(f"Error checking PhilHealth: {e}")
         return jsonify({'success': False, 'message': 'System error'}), 500
+
+
+
+
+
+
+@app.route("/api/forgot-password", methods=["POST"])
+def forgot_password():
+    """Send 6-digit verification code to email"""
+    try:
+        data = request.json
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+            
+        # Check if email exists in DB
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        user_exists = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if not user_exists:
+            # Security: Don't reveal if email exists, just pretend it worked
+            # Delay slightly to prevent timing attacks
+            import time
+            time.sleep(1)
+            return jsonify({"message": "If this email is registered, a code has been sent."}), 200
+            
+        # Generate and store code
+        code = generate_reset_token()
+        store_reset_token(email, code)
+        
+        # Send email
+        send_password_reset_email(mail, email, code)
+        
+        return jsonify({"message": "Verification code sent"}), 200
+        
+    except Exception as e:
+        print(f"[FORGOT ERROR] {str(e)}")
+        return jsonify({"error": "An error occurred"}), 500
+
+@app.route("/api/verify-reset-code", methods=["POST"])
+def verify_reset_code():
+    """Verify the 6-digit reset code"""
+    try:
+        data = request.json
+        email = data.get('email')
+        code = data.get('code')
+        
+        if not email or not code:
+            return jsonify({"error": "Email and code are required"}), 400
+            
+        valid_email = validate_reset_token(code, email)
+        
+        if valid_email:
+            return jsonify({"valid": True, "message": "Code verified"}), 200
+        else:
+            return jsonify({"valid": False, "error": "Invalid or expired code"}), 400
+            
+    except Exception as e:
+        print(f"[VERIFY ERROR] {str(e)}")
+        return jsonify({"valid": False, "error": "An error occurred"}), 500
+
+@app.route("/api/reset-password", methods=["POST"])
+def reset_password():
+    """Reset password using verified email and code"""
+    try:
+        data = request.json
+        email = data.get('email')
+        code = data.get('code')
+        new_password = data.get('password')
+        
+        if not email or not code or not new_password:
+            return jsonify({"error": "Missing required fields"}), 400
+            
+        # Verify code again before resetting
+        valid_email = validate_reset_token(code, email)
+        
+        if not valid_email:
+             return jsonify({"error": "Invalid or expired code"}), 400
+             
+        if len(new_password) < 8:
+            return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+        # Hash new password
+        hashed = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        
+        # Update database
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET password_hash = %s WHERE email = %s", (hashed, email))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # Invalidate code
+        invalidate_reset_token(code, email)
+        
+        return jsonify({"message": "Password reset successfully"}), 200
+        
+    except Exception as e:
+        print(f"[RESET ERROR] {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':

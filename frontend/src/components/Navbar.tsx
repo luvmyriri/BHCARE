@@ -138,7 +138,7 @@ const Navbar: FC<NavbarProps> = ({
                                     minW={0}
                                     padding={0}
                                 >
-                                    <Avatar size="sm" name={`${user.first_name} ${user.last_name}`} src={user.avatar_url} />
+                                    <Avatar size="sm" name={`${user.first_name} ${user.last_name}`} src={user.profile_picture} />
                                 </MenuButton>
                                 <MenuList>
                                     <MenuItem onClick={onProfileClick}>
@@ -222,7 +222,7 @@ const Navbar: FC<NavbarProps> = ({
                             {user ? (
                                 <>
                                     <HStack spacing={3} py={2}>
-                                        <Avatar size="sm" name={`${user.first_name} ${user.last_name}`} src={user.avatar_url} />
+                                        <Avatar size="sm" name={`${user.first_name} ${user.last_name}`} src={user.profile_picture} />
                                         <Text fontWeight="bold">{user.first_name}</Text>
                                     </HStack>
                                     <Button onClick={() => { onClose(); onProfileClick(); }} w="full" variant="outline">Profile</Button>

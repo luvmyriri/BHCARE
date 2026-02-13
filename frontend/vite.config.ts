@@ -95,6 +95,7 @@ export default defineConfig({
             '/user': 'http://localhost:5000',
             '/appointments': 'http://localhost:5000',
             '/services': 'http://localhost:5000',
+            '/validate-reset-token': 'http://localhost:5000',
         },
     },
     build: {

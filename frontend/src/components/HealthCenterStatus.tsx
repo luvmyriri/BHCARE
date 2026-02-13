@@ -9,7 +9,7 @@ import {
     Tooltip,
     Flex,
 } from '@chakra-ui/react';
-import { FiUsers, FiClock, FiActivity } from 'react-icons/fi';
+import { FiUsers, FiActivity } from 'react-icons/fi';
 
 const HealthCenterStatus: React.FC = () => {
     const [statusData, setStatusData] = useState<any>(null);

@@ -1,0 +1,2 @@
+src/components/SoapNoteForm.tsx(13,5): error TS6133: 'InputGroup' is declared but its value is never read.
+src/components/SoapNoteForm.tsx(14,5): error TS6133: 'InputLeftAddon' is declared but its value is never read.

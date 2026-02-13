@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './App.css';
 import LoginForm from './LoginForm';
 import Navbar from './components/Navbar';
@@ -14,6 +15,7 @@ import DoctorDashboard from './DoctorDashboard';
 import AdminDashboard from './AdminDashboard';
 import SecurityDashboard from './SecurityDashboard';
 import FloatingActions from './components/FloatingActions';
+
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);
@@ -39,6 +41,47 @@ function App() {
       return null;
     }
   });
+
+  // Fetch fresh user data from backend on mount to ensure profile picture is loaded
+  useEffect(() => {
+    const refreshUserData = async () => {
+      const storedUser = localStorage.getItem('bh_user');
+      if (!storedUser) return;
+
+      try {
+        const userData = JSON.parse(storedUser);
+        // Skip refresh for hardcoded admin/doctor accounts
+        if (userData.email === 'admin@bhcare.ph' || userData.email === 'doctor@bhcare.ph' || userData.email === 'security@bhcare.ph' || userData.email === 'security1741@bhcare.ph') {
+          return;
+        }
+
+        const response = await fetch(`/user/${userData.id}`);
+        if (response.ok) {
+          const freshData = await response.json();
+
+          // Apply role
+          if (freshData.email === 'admin@bhcare.ph') {
+            freshData.role = 'admin';
+          } else if (freshData.email === 'doctor@bhcare.ph') {
+            freshData.role = 'doctor';
+          } else if (freshData.email === 'security@bhcare.ph' || freshData.email === 'security1741@bhcare.ph') {
+            freshData.role = 'security';
+          } else {
+            freshData.role = 'patient';
+          }
+
+          // Update both state and localStorage
+          setUser(freshData);
+          localStorage.setItem('bh_user', JSON.stringify(freshData));
+        }
+      } catch (error) {
+        console.error('Failed to refresh user data:', error);
+      }
+    };
+
+    refreshUserData();
+  }, []);
+
 
   const openLogin = (mode: 'login' | 'register' = 'login') => {
     setLoginMode(mode);
@@ -83,6 +126,7 @@ function App() {
         <DoctorDashboard
           user={user}
           onLogout={onLogoutClick}
+          onUserUpdated={setUser}
         />
       );
     }
@@ -98,45 +142,54 @@ function App() {
       <Dashboard
         user={user}
         onLogout={onLogoutClick}
+        onUserUpdated={setUser}
       />
     );
   }
 
-  // Otherwise show the landing page
+  // Otherwise show the landing page or password reset pages
   return (
-    <div className="app">
-      <FloatingImages />
-      <FloatingParticles />
-      <Navbar
-        onLoginClick={() => openLogin('login')}
-        onLogoutClick={onLogoutClick}
-        onProfileClick={() => { }}
-        onAppointmentClick={() => openLogin('login')}
-        user={user}
-      />
-      <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
-      <LocationShowcase />
-      <Services />
-      <ContactForm />
-      <Footer onAppointmentClick={() => openLogin('login')} />
-      <FloatingActions />
+    <BrowserRouter>
+      <Routes>
 
-      {showLogin && (
-        <div className="modal-overlay" onClick={closeLogin}>
-          <div
-            className="modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="modal-close" onClick={closeLogin} aria-label="Close modal">
-              ×
-            </button>
-            <div className="form-scroll">
-              <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
-            </div>
+
+        <Route path="/*" element={
+          <div className="app">
+            <FloatingImages />
+            <FloatingParticles />
+            <Navbar
+              onLoginClick={() => openLogin('login')}
+              onLogoutClick={onLogoutClick}
+              onProfileClick={() => { }}
+              onAppointmentClick={() => openLogin('login')}
+              user={user}
+            />
+            <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
+            <LocationShowcase />
+            <Services />
+            <ContactForm />
+            <Footer onAppointmentClick={() => openLogin('login')} />
+            <FloatingActions />
+
+            {showLogin && (
+              <div className="modal-overlay" onClick={closeLogin}>
+                <div
+                  className="modal-content"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button className="modal-close" onClick={closeLogin} aria-label="Close modal">
+                    ×
+                  </button>
+                  <div className="form-scroll">
+                    <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        } />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
