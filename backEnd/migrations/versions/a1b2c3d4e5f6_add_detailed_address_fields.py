@@ -20,22 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add detailed address fields to users table."""
-    # Add detailed street address columns
-    op.add_column('users', sa.Column('house_number', sa.String(20), nullable=True))
-    op.add_column('users', sa.Column('block_number', sa.String(20), nullable=True))
-    op.add_column('users', sa.Column('lot_number', sa.String(20), nullable=True))
-    op.add_column('users', sa.Column('street_name', sa.String(100), nullable=True))
-    op.add_column('users', sa.Column('subdivision', sa.String(100), nullable=True))
-    op.add_column('users', sa.Column('zip_code', sa.String(10), nullable=True))
-    op.add_column('users', sa.Column('full_address', sa.String(500), nullable=True))
+    # Columns are already created in c9dccf683a46 which now runs before this
+    pass
 
 
 def downgrade() -> None:
     """Remove detailed address fields from users table."""
-    op.drop_column('users', 'full_address')
-    op.drop_column('users', 'zip_code')
-    op.drop_column('users', 'subdivision')
-    op.drop_column('users', 'street_name')
-    op.drop_column('users', 'lot_number')
-    op.drop_column('users', 'block_number')
-    op.drop_column('users', 'house_number')
+    pass

@@ -1,0 +1,11 @@
+Attempting connection to: localhost:5432 as postgres
+Password provided: Yes (Hidden)
+
+1. Connecting to default 'postgres' database...
+SUCCESS: Connected to 'postgres' database successfully!
+FAIL: Database 'bhcare' does not exist.
+Attempting to create database 'bhcare'...
+SUCCESS: Database 'bhcare' created successfully!
+
+3. Connecting to 'bhcare' database...
+SUCCESS: Connected to 'bhcare' database successfully!

@@ -1,0 +1,5 @@
+FAIL: localhost - connection to server at "localhost" (::1), port 5432 failed: fe_sendauth: no password supplied
+
+FAIL: 127.0.0.1 - connection to server at "127.0.0.1", port 5432 failed: fe_sendauth: no password supplied
+
+FAIL: ::1 - connection to server at "::1", port 5432 failed: fe_sendauth: no password supplied
