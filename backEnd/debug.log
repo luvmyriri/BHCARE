@@ -1,0 +1,10 @@
+
+[DEBUG] 2026-02-11 15:27:56.907808 Received /forgot-password request
+[DEBUG] Request data: {'email': 'alexismarc066@gmail.com'}
+[DEBUG] Email requested: alexismarc066@gmail.com
+[DEBUG] Checking database for user...
+[DEBUG] User found: True
+[DEBUG] Generating token...
+[DEBUG] Token stored for alexismarc066@gmail.com
+[DEBUG] Attempting to send email...
+[PASSWORD RESET] Email sent to alexismarc066@gmail.com

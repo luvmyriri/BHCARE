@@ -48,9 +48,12 @@ import Appointments from './Appointments';
 import AIChatbot from './AIChatbot';
 import HealthCalculators from './components/HealthCalculators';
 
+import NotificationBell from './components/NotificationBell';
+
 interface DashboardProps {
     user: any;
     onLogout: () => void;
+    onUserUpdated: (user: any) => void;
 }
 
 const NavItem = ({ icon, children, active, onClick }: any) => {
@@ -159,11 +162,13 @@ const PageHero = ({ title, description, badge }: any) => (
     </Box>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
-    const [selectedCard, setSelectedCard] = useState('');
+    const { isOpen: isAppointmentsOpen, onOpen: onAppointmentsOpen, onClose: onAppointmentsClose } = useDisclosure();
+    const { isOpen: isImageZoomOpen, onOpen: onImageZoomOpen, onClose: onImageZoomClose } = useDisclosure();
+    const [selectedCard, setSelectedCard] = useState<string | null>(null);
 
     const handleCardClick = (card: string) => {
         setSelectedCard(card);
@@ -294,14 +299,149 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 );
             case 'appointments':
                 return (
-                    <VStack align="stretch">
+                    <>
                         <PageHero
                             badge="APPOINTMENTS"
                             title="Schedule & Book Consultations"
                             description="Book new appointments or manage your existing ones with ease. Select your preferred date and time below."
                         />
-                        <Appointments user={user} onClose={() => setActiveTab('overview')} />
-                    </VStack>
+                        <VStack spacing={8} align="stretch">
+                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                                <Box
+                                    p={8}
+                                    bg="white"
+                                    borderRadius="2xl"
+                                    border="2px solid"
+                                    borderColor="teal.200"
+                                    cursor="pointer"
+                                    transition="all 0.3s"
+                                    _hover={{
+                                        transform: 'translateY(-4px)',
+                                        boxShadow: 'xl',
+                                        borderColor: 'teal.400'
+                                    }}
+                                    onClick={onAppointmentsOpen}
+                                >
+                                    <VStack spacing={4} align="start">
+                                        <Flex
+                                            w="60px"
+                                            h="60px"
+                                            borderRadius="xl"
+                                            bgGradient="linear(to-br, teal.400, teal.600)"
+                                            align="center"
+                                            justify="center"
+                                            fontSize="3xl"
+                                            color="white"
+                                        >
+                                            📅
+                                        </Flex>
+                                        <Heading size="md" color="teal.800">Book New Appointment</Heading>
+                                        <Text color="gray.600" fontSize="sm">
+                                            Schedule a consultation with our healthcare providers. Choose your preferred date and time.
+                                        </Text>
+                                        <Button
+                                            bgGradient="linear(to-r, teal.500, teal.600)"
+                                            color="white"
+                                            size="md"
+                                            fontWeight="700"
+                                            borderRadius="lg"
+                                            _hover={{
+                                                transform: 'translateY(-2px)',
+                                                boxShadow: 'lg',
+                                                bgGradient: "linear(to-r, teal.600, teal.700)"
+                                            }}
+                                        >
+                                            Book Now →
+                                        </Button>
+                                    </VStack>
+                                </Box>
+
+                                <Box
+                                    p={8}
+                                    bg="white"
+                                    borderRadius="2xl"
+                                    border="2px solid"
+                                    borderColor="teal.200"
+                                    cursor="pointer"
+                                    transition="all 0.3s"
+                                    _hover={{
+                                        transform: 'translateY(-4px)',
+                                        boxShadow: 'xl',
+                                        borderColor: 'teal.400'
+                                    }}
+                                    onClick={onAppointmentsOpen}
+                                >
+                                    <VStack spacing={4} align="start">
+                                        <Flex
+                                            w="60px"
+                                            h="60px"
+                                            borderRadius="xl"
+                                            bgGradient="linear(to-br, green.400, teal.500)"
+                                            align="center"
+                                            justify="center"
+                                            fontSize="3xl"
+                                            color="white"
+                                        >
+                                            📋
+                                        </Flex>
+                                        <Heading size="md" color="teal.800">View My Appointments</Heading>
+                                        <Text color="gray.600" fontSize="sm">
+                                            Check your upcoming appointments, view history, and manage your bookings.
+                                        </Text>
+                                        <Button
+                                            bgGradient="linear(to-r, green.500, teal.500)"
+                                            color="white"
+                                            size="md"
+                                            fontWeight="700"
+                                            borderRadius="lg"
+                                            _hover={{
+                                                transform: 'translateY(-2px)',
+                                                boxShadow: 'lg',
+                                                bgGradient: "linear(to-r, green.600, teal.600)"
+                                            }}
+                                        >
+                                            View Appointments →
+                                        </Button>
+                                    </VStack>
+                                </Box>
+                            </SimpleGrid>
+
+                            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+                                <Box p={6} bg="teal.50" borderRadius="xl" border="1px solid" borderColor="teal.100">
+                                    <HStack spacing={3} mb={2}>
+                                        <Text fontSize="2xl">⏰</Text>
+                                        <Heading size="sm" color="teal.800">Quick & Easy</Heading>
+                                    </HStack>
+                                    <Text fontSize="sm" color="teal.700">
+                                        Book appointments in just 3 simple steps
+                                    </Text>
+                                </Box>
+                                <Box p={6} bg="blue.50" borderRadius="xl" border="1px solid" borderColor="blue.100">
+                                    <HStack spacing={3} mb={2}>
+                                        <Text fontSize="2xl">🏥</Text>
+                                        <Heading size="sm" color="blue.800">Multiple Services</Heading>
+                                    </HStack>
+                                    <Text fontSize="sm" color="blue.700">
+                                        Choose from various healthcare services
+                                    </Text>
+                                </Box>
+                                <Box p={6} bg="green.50" borderRadius="xl" border="1px solid" borderColor="green.100">
+                                    <HStack spacing={3} mb={2}>
+                                        <Text fontSize="2xl">📱</Text>
+                                        <Heading size="sm" color="green.800">Instant Confirmation</Heading>
+                                    </HStack>
+                                    <Text fontSize="sm" color="green.800">
+                                        Get immediate booking confirmation
+                                    </Text>
+                                </Box>
+                            </SimpleGrid>
+                        </VStack>
+                        <Appointments
+                            user={user}
+                            onClose={onAppointmentsClose}
+                            isOpen={isAppointmentsOpen}
+                        />
+                    </>
                 );
             case 'profile':
                 return (
@@ -311,7 +451,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             title="Personal & Health Information"
                             description="Keep your contact details and medical preferences up to date for better healthcare delivery."
                         />
-                        <Profile user={user} onClose={() => setActiveTab('overview')} onUpdated={() => { }} />
+                        <Profile user={user} onClose={() => setActiveTab('overview')} onUpdated={onUserUpdated} />
                     </VStack>
                 );
             case 'records':
@@ -445,9 +585,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
             {/* Main Content Area */}
             <Box ml={{ base: 0, md: '280px' }} p={{ base: 4, sm: 6, md: 8 }} position="relative">
-                <Flex 
-                    justify="space-between" 
-                    align={{ base: "start", sm: "center" }} 
+                <Flex
+                    justify="space-between"
+                    align={{ base: "start", sm: "center" }}
                     mb={{ base: 6, md: 10 }}
                     direction={{ base: "column", sm: "row" }}
                     gap={4}
@@ -471,11 +611,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         </VStack>
                     </HStack>
                     <HStack spacing={3} align={{ base: "start", sm: "center" }} pl={{ base: 12, sm: 0 }} maxW={{ base: "calc(100% - 60px)", sm: "auto" }}>
+                        <NotificationBell userId={user?.id} />
                         <VStack align="end" spacing={0} mr={2} overflow="hidden">
-                            <Text 
-                                fontWeight="700" 
-                                color="teal.800" 
-                                fontSize={{ base: "sm", md: "md" }} 
+                            <Text
+                                fontWeight="700"
+                                color="teal.800"
+                                fontSize={{ base: "sm", md: "md" }}
                                 isTruncated
                                 maxW="full"
                             >
@@ -485,7 +626,20 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                                 Patient
                             </Badge>
                         </VStack>
-                        <Avatar size={{ base: "sm", md: "md" }} name={`${user?.first_name} ${user?.last_name}`} bg="teal.500" color="white" border="2px solid white" boxShadow="md" flexShrink={0} />
+                        <Avatar
+                            size={{ base: "sm", md: "md" }}
+                            name={`${user?.first_name} ${user?.last_name}`}
+                            src={user?.profile_picture}
+                            bg="teal.500"
+                            color="white"
+                            border="2px solid white"
+                            boxShadow="md"
+                            flexShrink={0}
+                            cursor="pointer"
+                            onClick={onImageZoomOpen}
+                            _hover={{ transform: 'scale(1.1)', transition: 'transform 0.2s' }}
+                            title="Click to zoom"
+                        />
                     </HStack>
                 </Flex>
 
@@ -493,6 +647,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     {renderContent()}
                 </Box>
             </Box>
+
+            {/* Image Zoom Modal */}
+            <Modal isOpen={isImageZoomOpen} onClose={onImageZoomClose} size="full" isCentered>
+                <ModalOverlay bg="blackAlpha.900" backdropFilter="blur(10px)" />
+                <ModalContent bg="transparent" boxShadow="none">
+                    <ModalCloseButton color="white" size="lg" zIndex={2} />
+                    <ModalBody display="flex" alignItems="center" justifyContent="center" p={8}>
+                        <Box
+                            maxW="90vw"
+                            maxH="90vh"
+                            position="relative"
+                            onClick={onImageZoomClose}
+                            cursor="zoom-out"
+                        >
+                            <img
+                                src={user?.profile_picture || "https://bit.ly/broken-link"}
+                                alt={`${user?.first_name} ${user?.last_name}`}
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '90vh',
+                                    objectFit: 'contain',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+                                }}
+                            />
+                        </Box>
+                    </ModalBody>
+                </ModalContent>
+            </Modal>
 
             {/* AI Chatbot */}
             <AIChatbot />

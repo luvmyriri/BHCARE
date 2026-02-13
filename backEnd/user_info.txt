@@ -1,0 +1,11 @@
+--- User 1 Summary ---
+Name: Emmanuel Evangelista
+Email: alexismarc066@gmail.com
+Age: 21
+Address:
+  House: ''
+  Street: ''
+  Barangay: 'Barangay 171'
+  City: 'Caloocan City'
+  Province: 'Metro Manila'
+---------------------------

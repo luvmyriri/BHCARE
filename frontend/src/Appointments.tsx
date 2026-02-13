@@ -1,4 +1,28 @@
 import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    VStack,
+    HStack,
+    Heading,
+    Text,
+    Button,
+    SimpleGrid,
+    Textarea,
+    Badge,
+    Icon,
+    Flex,
+    Divider,
+    useToast,
+    IconButton,
+    Grid,
+    Modal,
+    ModalOverlay,
+    ModalContent,
+    ModalHeader,
+    ModalBody,
+    ModalCloseButton,
+} from '@chakra-ui/react';
+import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 interface Service {
     id: number;
@@ -25,9 +49,10 @@ interface Appointment {
 interface AppointmentsProps {
     user: any;
     onClose: () => void;
+    isOpen: boolean;
 }
 
-const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
+const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen }) => {
     const [step, setStep] = useState(1);
     const [services, setServices] = useState<Service[]>([]);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -38,6 +63,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
     const [myAppointments, setMyAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(false);
     const [view, setView] = useState<'book' | 'my-appointments'>('book');
+    const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+    const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+    const toast = useToast();
 
     useEffect(() => {
         fetchServices();
@@ -59,6 +87,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
             setServices(data);
         } catch (error) {
             console.error('Error fetching services:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to load services',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+            });
         }
     };
 
@@ -84,7 +119,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const handleBookAppointment = async () => {
         if (!selectedService || !selectedDate || !selectedTime) {
-            alert('Please complete all fields');
+            toast({
+                title: 'Incomplete Information',
+                description: 'Please complete all required fields',
+                status: 'warning',
+                duration: 3000,
+                isClosable: true,
+            });
             return;
         }
 
@@ -95,15 +136,21 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: user.id,
+                    service_id: selectedService.id,
                     appointment_date: selectedDate,
                     appointment_time: selectedTime,
-                    service_type: selectedService.name,
                     reason: reason
                 })
             });
 
             if (response.ok) {
-                alert('Appointment booked successfully!');
+                toast({
+                    title: 'Success!',
+                    description: 'Appointment booked successfully',
+                    status: 'success',
+                    duration: 3000,
+                    isClosable: true,
+                });
                 setStep(1);
                 setSelectedService(null);
                 setSelectedDate('');
@@ -113,339 +160,919 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
                 setView('my-appointments');
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to book appointment');
+                toast({
+                    title: 'Booking Failed',
+                    description: error.error || 'Failed to book appointment',
+                    status: 'error',
+                    duration: 3000,
+                    isClosable: true,
+                });
             }
         } catch (error) {
-            alert('Error booking appointment');
+            toast({
+                title: 'Error',
+                description: 'Error booking appointment',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+            });
         } finally {
             setLoading(false);
         }
     };
 
     const handleCancelAppointment = async (appointmentId: number) => {
-        if (!window.confirm('Are you sure you want to cancel this appointment?')) {
-            return;
-        }
-
         try {
             const response = await fetch(`/api/appointments/${appointmentId}/cancel`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: 'Cancelled by patient' })
             });
 
             if (response.ok) {
-                alert('Appointment cancelled successfully');
+                toast({
+                    title: 'Cancelled',
+                    description: 'Appointment cancelled successfully',
+                    status: 'info',
+                    duration: 3000,
+                    isClosable: true,
+                });
                 fetchMyAppointments();
             }
         } catch (error) {
-            alert('Error cancelling appointment');
+            toast({
+                title: 'Error',
+                description: 'Error cancelling appointment',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+            });
         }
-    };
-
-    const getMinDate = () => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
-    };
-
-    const getMaxDate = () => {
-        const maxDate = new Date();
-        maxDate.setDate(maxDate.getDate() + 30);
-        return maxDate.toISOString().split('T')[0];
     };
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'pending': return 'bg-blue-100 text-blue-800';
-            case 'confirmed': return 'bg-green-100 text-green-800';
-            case 'cancelled': return 'bg-red-100 text-red-800';
-            case 'completed': return 'bg-gray-100 text-gray-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'pending': return 'teal';
+            case 'confirmed': return 'green';
+            case 'cancelled': return 'red';
+            case 'completed': return 'gray';
+            default: return 'gray';
         }
     };
 
+    // Calendar helper functions
+    const getDaysInMonth = (month: number, year: number) => {
+        return new Date(year, month + 1, 0).getDate();
+    };
+
+    const getFirstDayOfMonth = (month: number, year: number) => {
+        return new Date(year, month, 1).getDay();
+    };
+
+    const formatDateForInput = (day: number, month: number, year: number) => {
+        const monthStr = String(month + 1).padStart(2, '0');
+        const dayStr = String(day).padStart(2, '0');
+        return `${year}-${monthStr}-${dayStr}`;
+    };
+
+    const isDateDisabled = (day: number, month: number, year: number) => {
+        const date = new Date(year, month, day);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return date < today;
+    };
+
+    const isToday = (day: number, month: number, year: number) => {
+        const date = new Date(year, month, day);
+        const today = new Date();
+        return date.toDateString() === today.toDateString();
+    };
+
+    const isSelectedDate = (day: number, month: number, year: number) => {
+        if (!selectedDate) return false;
+        const formatted = formatDateForInput(day, month, year);
+        return formatted === selectedDate;
+    };
+
+    const handlePrevMonth = () => {
+        if (currentMonth === 0) {
+            setCurrentMonth(11);
+            setCurrentYear(currentYear - 1);
+        } else {
+            setCurrentMonth(currentMonth - 1);
+        }
+    };
+
+    const handleNextMonth = () => {
+        if (currentMonth === 11) {
+            setCurrentMonth(0);
+            setCurrentYear(currentYear + 1);
+        } else {
+            setCurrentMonth(currentMonth + 1);
+        }
+    };
+
+    const handleDateSelect = (day: number) => {
+        if (!isDateDisabled(day, currentMonth, currentYear)) {
+            const formatted = formatDateForInput(day, currentMonth, currentYear);
+            setSelectedDate(formatted);
+            setSelectedTime('');
+        }
+    };
+
+    // CalendarPicker Component with vibrant colors
+    const CalendarPicker = () => {
+        const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+        const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        // Generate calendar grid
+        const calendarDays = [];
+        for (let i = 0; i < firstDay; i++) {
+            calendarDays.push(null);
+        }
+        for (let day = 1; day <= daysInMonth; day++) {
+            calendarDays.push(day);
+        }
+
+        return (
+            <Box
+                borderRadius="2xl"
+                overflow="hidden"
+                boxShadow="xl"
+                border="1px solid"
+                borderColor="gray.100"
+            >
+                {/* Calendar Header - Vibrant Gradient */}
+                <Flex
+                    align="center"
+                    justify="space-between"
+                    px={6}
+                    py={5}
+                    bgGradient="linear(to-r, green.500, teal.500)"
+                    position="relative"
+                    _before={{
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        bgGradient: 'linear(to-br, rgba(255,255,255,0.2), transparent)',
+                        pointerEvents: 'none'
+                    }}
+                >
+                    <IconButton
+                        aria-label="Previous month"
+                        icon={<Icon as={FiChevronLeft} boxSize={5} />}
+                        onClick={handlePrevMonth}
+                        size="md"
+                        variant="ghost"
+                        color="white"
+                        _hover={{ bg: 'whiteAlpha.300', transform: 'scale(1.1)' }}
+                        _active={{ bg: 'whiteAlpha.400' }}
+                        transition="all 0.2s"
+                        borderRadius="lg"
+                    />
+                    <VStack spacing={0}>
+                        <Heading size="lg" color="white" fontWeight="700" letterSpacing="tight">
+                            {monthNames[currentMonth]}
+                        </Heading>
+                        <Text color="whiteAlpha.900" fontSize="sm" fontWeight="600">
+                            {currentYear}
+                        </Text>
+                    </VStack>
+                    <IconButton
+                        aria-label="Next month"
+                        icon={<Icon as={FiChevronRight} boxSize={5} />}
+                        onClick={handleNextMonth}
+                        size="md"
+                        variant="ghost"
+                        color="white"
+                        _hover={{ bg: 'whiteAlpha.300', transform: 'scale(1.1)' }}
+                        _active={{ bg: 'whiteAlpha.400' }}
+                        transition="all 0.2s"
+                        borderRadius="lg"
+                    />
+                </Flex>
+
+                {/* Day Names */}
+                <Grid
+                    templateColumns="repeat(7, 1fr)"
+                    bg="gradient-to-b from-gray-50 to-white"
+                    borderBottom="2px solid"
+                    borderColor="gray.100"
+                    py={3}
+                >
+                    {dayNames.map(day => (
+                        <Box key={day} textAlign="center">
+                            <Text
+                                fontSize="sm"
+                                fontWeight="700"
+                                color="gray.600"
+                                textTransform="uppercase"
+                                letterSpacing="wide"
+                            >
+                                {day}
+                            </Text>
+                        </Box>
+                    ))}
+                </Grid>
+
+                {/* Calendar Grid */}
+                <Grid templateColumns="repeat(7, 1fr)" bg="white" p={2} gap={1}>
+                    {calendarDays.map((day, index) => {
+                        if (day === null) {
+                            return <Box key={`empty-${index}`} />;
+                        }
+
+                        const disabled = isDateDisabled(day, currentMonth, currentYear);
+                        const today = isToday(day, currentMonth, currentYear);
+                        const selected = isSelectedDate(day, currentMonth, currentYear);
+
+                        return (
+                            <Box
+                                key={day}
+                                p={1}
+                                textAlign="center"
+                                cursor={disabled ? 'not-allowed' : 'pointer'}
+                                onClick={() => !disabled && handleDateSelect(day)}
+                                opacity={disabled ? 0.3 : 1}
+                            >
+                                <Flex
+                                    w="42px"
+                                    h="42px"
+                                    mx="auto"
+                                    align="center"
+                                    justify="center"
+                                    borderRadius="xl"
+                                    bg={selected
+                                        ? 'linear-gradient(to right, #38A169, #319795)'
+                                        : today
+                                            ? 'orange.100'
+                                            : 'transparent'}
+                                    color={selected
+                                        ? 'white'
+                                        : today
+                                            ? 'orange.700'
+                                            : 'gray.700'}
+                                    fontWeight={selected || today ? 'bold' : '600'}
+                                    fontSize="sm"
+                                    border={today && !selected ? '2px solid' : 'none'}
+                                    borderColor="orange.400"
+                                    transition="all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+                                    boxShadow={selected ? 'lg' : 'none'}
+                                    _hover={!disabled ? {
+                                        transform: 'scale(1.15)',
+                                        bg: selected
+                                            ? 'linear-gradient(to right, #38A169, #319795)'
+                                            : 'teal.50',
+                                        boxShadow: 'md',
+                                        zIndex: 10
+                                    } : {}}
+                                >
+                                    {day}
+                                </Flex>
+                            </Box>
+                        );
+                    })}
+                </Grid>
+            </Box>
+        );
+    };
+
+    // Group time slots by time of day
+    const groupTimeSlots = () => {
+        const morning = availableSlots.filter(slot => {
+            const hour = parseInt(slot.time.split(':')[0]);
+            return hour >= 8 && hour < 12;
+        });
+        const afternoon = availableSlots.filter(slot => {
+            const hour = parseInt(slot.time.split(':')[0]);
+            return hour >= 12 && hour < 17;
+        });
+        const evening = availableSlots.filter(slot => {
+            const hour = parseInt(slot.time.split(':')[0]);
+            return hour >= 17;
+        });
+        return { morning, afternoon, evening };
+    };
+
     return (
-        <div className="auth-card" style={{ maxWidth: '900px', width: '95%', padding: '30px', margin: '20px auto' }}>
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <button
-                    onClick={onClose}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
+        <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside" isCentered>
+            <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(12px)" />
+            <ModalContent
+                maxH="92vh"
+                borderRadius="3xl"
+                boxShadow="2xl"
+                mx={4}
+            >
+                <ModalHeader
+                    bgGradient="linear(to-r, green.500, teal.500)"
+                    color="white"
+                    borderTopRadius="3xl"
+                    py={8}
+                    px={8}
+                    position="relative"
+                    _before={{
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        bgGradient: 'linear(to-br, rgba(255,255,255,0.2), transparent)',
+                        pointerEvents: 'none',
+                        borderTopRadius: '3xl'
+                    }}
                 >
-                    <span>←</span>
-                    <span>Back</span>
-                </button>
-                <h2 className="text-3xl font-bold text-gray-900">Appointments</h2>
-                <div className="w-20"></div>
-            </div>
-
-            {/* View Toggle */}
-            <div className="flex gap-2 mb-8 bg-gray-100 p-1 rounded-lg">
-                <button
-                    className={`flex-1 py-2 px-4 rounded-md font-medium transition ${view === 'book'
-                        ? 'bg-white text-primary shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    onClick={() => setView('book')}
-                >
-                    Book Appointment
-                </button>
-                <button
-                    className={`flex-1 py-2 px-4 rounded-md font-medium transition ${view === 'my-appointments'
-                        ? 'bg-white text-primary shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    onClick={() => setView('my-appointments')}
-                >
-                    My Appointments
-                </button>
-            </div>
-
-            {view === 'book' ? (
-                <div>
-                    {/* Step Indicator */}
-                    <div className="flex items-center justify-center mb-12">
-                        <div className="flex items-center gap-4">
-                            {/* Step 1 */}
-                            <div className="flex flex-col items-center">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                                    }`}>
-                                    1
-                                </div>
-                                <span className="text-xs mt-2 text-gray-600">Service</span>
-                            </div>
-
-                            <div className={`w-16 h-0.5 ${step >= 2 ? 'bg-primary' : 'bg-gray-200'}`}></div>
-
-                            {/* Step 2 */}
-                            <div className="flex flex-col items-center">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 2 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                                    }`}>
-                                    2
-                                </div>
-                                <span className="text-xs mt-2 text-gray-600">Date & Time</span>
-                            </div>
-
-                            <div className={`w-16 h-0.5 ${step >= 3 ? 'bg-primary' : 'bg-gray-200'}`}></div>
-
-                            {/* Step 3 */}
-                            <div className="flex flex-col items-center">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 3 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                                    }`}>
-                                    3
-                                </div>
-                                <span className="text-xs mt-2 text-gray-600">Confirm</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Step 1: Select Service */}
-                    {step === 1 && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-semibold text-gray-900">Select a Service</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {services.map(service => (
-                                    <div
-                                        key={service.id}
-                                        onClick={() => setSelectedService(service)}
-                                        className={`p-6 rounded-xl border-2 cursor-pointer transition ${selectedService?.id === service.id
-                                            ? 'border-primary bg-green-50'
-                                            : 'border-gray-200 hover:border-primary hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <div className="text-4xl">🏥</div>
-                                            <div className="flex-1">
-                                                <h4 className="font-semibold text-lg text-gray-900">{service.name}</h4>
-                                                <p className="text-sm text-gray-600 mt-1">{service.description}</p>
-                                                <span className="inline-block mt-3 text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-700">
-                                                    {service.duration_minutes} mins
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <button
-                                disabled={!selectedService}
-                                onClick={() => setStep(2)}
-                                className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-green-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-                            >
-                                Next →
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Step 2: Select Date & Time */}
-                    {step === 2 && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-semibold text-gray-900">Choose Date & Time</h3>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
-                                <input
-                                    type="date"
-                                    value={selectedDate}
-                                    onChange={(e) => {
-                                        setSelectedDate(e.target.value);
-                                        setSelectedTime('');
-                                    }}
-                                    min={getMinDate()}
-                                    max={getMaxDate()}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                                />
-                            </div>
-
-                            {selectedDate && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">Available Time Slots</label>
-                                    {availableSlots.length > 0 ? (
-                                        <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                                            {availableSlots.map((slot, index) => (
-                                                <button
-                                                    key={index}
-                                                    onClick={() => setSelectedTime(slot.time)}
-                                                    className={`py-3 px-4 rounded-lg font-medium transition ${selectedTime === slot.time
-                                                        ? 'bg-primary text-white'
-                                                        : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-primary'
-                                                        }`}
-                                                >
-                                                    {slot.display}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-gray-500 text-center py-8">No available slots for this date</p>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setStep(1)}
-                                    className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
-                                >
-                                    ← Back
-                                </button>
-                                <button
-                                    disabled={!selectedDate || !selectedTime}
-                                    onClick={() => setStep(3)}
-                                    className="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-green-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                >
-                                    Next →
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 3: Confirm */}
-                    {step === 3 && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-semibold text-gray-900">Confirm Appointment</h3>
-
-                            <div className="bg-gray-50 rounded-xl p-6 space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Service:</span>
-                                    <span className="font-semibold text-gray-900">{selectedService?.name}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Date:</span>
-                                    <span className="font-semibold text-gray-900">
-                                        {new Date(selectedDate).toLocaleDateString('en-US', {
-                                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                                        })}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Time:</span>
-                                    <span className="font-semibold text-gray-900">
-                                        {availableSlots.find(s => s.time === selectedTime)?.display}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Duration:</span>
-                                    <span className="font-semibold text-gray-900">{selectedService?.duration_minutes} minutes</span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Reason for Visit (Optional)</label>
-                                <textarea
-                                    value={reason}
-                                    onChange={(e) => setReason(e.target.value)}
-                                    placeholder="Describe your symptoms or reason for visit..."
-                                    rows={4}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                                />
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setStep(2)}
-                                    className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
-                                >
-                                    ← Back
-                                </button>
-                                <button
-                                    onClick={handleBookAppointment}
-                                    disabled={loading}
-                                    className="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-green-600 transition disabled:bg-gray-400"
-                                >
-                                    {loading ? 'Booking...' : 'Confirm Booking'}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div>
-                    <h3 className="text-2xl font-semibold text-gray-900 mb-6">My Appointments</h3>
-                    {myAppointments.length > 0 ? (
-                        <div className="space-y-4">
-                            {myAppointments.map(apt => (
-                                <div key={apt.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <h4 className="text-lg font-semibold text-gray-900">{apt.service_type}</h4>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
-                                            {apt.status}
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-6 text-sm text-gray-600 mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <span>📅</span>
-                                            <span>{new Date(apt.appointment_date).toLocaleDateString()}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span>🕐</span>
-                                            <span>{apt.appointment_time}</span>
-                                        </div>
-                                    </div>
-                                    {apt.status === 'pending' && (
-                                        <button
-                                            onClick={() => handleCancelAppointment(apt.id)}
-                                            className="text-red-600 hover:text-red-700 text-sm font-medium"
-                                        >
-                                            Cancel Appointment
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-12">
-                            <p className="text-gray-500 mb-4">No appointments yet</p>
-                            <button
+                    <HStack spacing={4}>
+                        <Icon as={FiCalendar} boxSize={8} />
+                        <VStack align="start" spacing={0}>
+                            <Heading size="xl" fontWeight="800">Appointments</Heading>
+                            <Text fontSize="sm" color="whiteAlpha.900" fontWeight="500">
+                                Book and manage your healthcare appointments
+                            </Text>
+                        </VStack>
+                    </HStack>
+                </ModalHeader>
+                <ModalCloseButton
+                    color="white"
+                    size="lg"
+                    top={6}
+                    right={6}
+                    _hover={{ bg: 'whiteAlpha.300', transform: 'scale(1.1)' }}
+                    borderRadius="lg"
+                />
+                <ModalBody p={8} bg="gray.50">
+                    <Box bg="white" borderRadius="2xl" p={6} boxShadow="sm">
+                        {/* View Toggle */}
+                        <HStack spacing={3} mb={8} bg="gray.100" p={2} borderRadius="xl">
+                            <Button
+                                flex={1}
+                                variant={view === 'book' ? 'solid' : 'ghost'}
+                                bgGradient={view === 'book' ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                color={view === 'book' ? 'white' : 'gray.600'}
                                 onClick={() => setView('book')}
-                                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-green-600 transition"
+                                fontWeight="700"
+                                size="lg"
+                                borderRadius="lg"
+                                _hover={{
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: view === 'book' ? 'lg' : 'none'
+                                }}
+                                transition="all 0.2s"
                             >
-                                Book Your First Appointment
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+                                📅 Book Appointment
+                            </Button>
+                            <Button
+                                flex={1}
+                                variant={view === 'my-appointments' ? 'solid' : 'ghost'}
+                                bgGradient={view === 'my-appointments' ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                color={view === 'my-appointments' ? 'white' : 'gray.600'}
+                                onClick={() => setView('my-appointments')}
+                                fontWeight="700"
+                                size="lg"
+                                borderRadius="lg"
+                                _hover={{
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: view === 'my-appointments' ? 'lg' : 'none'
+                                }}
+                                transition="all 0.2s"
+                            >
+                                📋 My Appointments
+                            </Button>
+                        </HStack>
+
+                        {view === 'book' ? (
+                            <VStack align="stretch" spacing={8}>
+                                {/* Step Indicator */}
+                                <Flex justify="center" align="center" mb={4}>
+                                    <HStack spacing={4}>
+                                        <VStack spacing={2}>
+                                            <Flex
+                                                w="50px"
+                                                h="50px"
+                                                borderRadius="full"
+                                                align="center"
+                                                justify="center"
+                                                fontWeight="bold"
+                                                fontSize="lg"
+                                                bgGradient={step >= 1 ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                bg={step >= 1 ? 'teal.500' : 'gray.200'}
+                                                color={step >= 1 ? 'white' : 'gray.500'}
+                                                boxShadow={step >= 1 ? 'lg' : 'none'}
+                                                transition="all 0.3s"
+                                            >
+                                                1
+                                            </Flex>
+                                            <Text fontSize="xs" fontWeight="600" color="gray.600">Service</Text>
+                                        </VStack>
+
+                                        <Box w="80px" h="3px" bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 2 ? 'teal.500' : 'gray.200'} borderRadius="full" />
+
+                                        <VStack spacing={2}>
+                                            <Flex
+                                                w="50px"
+                                                h="50px"
+                                                borderRadius="full"
+                                                align="center"
+                                                justify="center"
+                                                fontWeight="bold"
+                                                fontSize="lg"
+                                                bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                bg={step >= 2 ? 'teal.500' : 'gray.200'}
+                                                color={step >= 2 ? 'white' : 'gray.500'}
+                                                boxShadow={step >= 2 ? 'lg' : 'none'}
+                                                transition="all 0.3s"
+                                            >
+                                                2
+                                            </Flex>
+                                            <Text fontSize="xs" fontWeight="600" color="gray.600">Date & Time</Text>
+                                        </VStack>
+
+                                        <Box w="80px" h="3px" bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 3 ? 'teal.500' : 'gray.200'} borderRadius="full" />
+
+                                        <VStack spacing={2}>
+                                            <Flex
+                                                w="50px"
+                                                h="50px"
+                                                borderRadius="full"
+                                                align="center"
+                                                justify="center"
+                                                fontWeight="bold"
+                                                fontSize="lg"
+                                                bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                bg={step >= 3 ? 'teal.500' : 'gray.200'}
+                                                color={step >= 3 ? 'white' : 'gray.500'}
+                                                boxShadow={step >= 3 ? 'lg' : 'none'}
+                                                transition="all 0.3s"
+                                            >
+                                                3
+                                            </Flex>
+                                            <Text fontSize="xs" fontWeight="600" color="gray.600">Confirm</Text>
+                                        </VStack>
+                                    </HStack>
+                                </Flex>
+
+                                {/* Step 1: Select Service */}
+                                {step === 1 && (
+                                    <VStack align="stretch" spacing={6}>
+                                        <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
+                                            Select a Service
+                                        </Heading>
+                                        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                                            {services.map(service => (
+                                                <Box
+                                                    key={service.id}
+                                                    onClick={() => setSelectedService(service)}
+                                                    p={6}
+                                                    borderRadius="2xl"
+                                                    border="3px solid"
+                                                    borderColor={selectedService?.id === service.id ? 'teal.400' : 'gray.200'}
+                                                    bg={selectedService?.id === service.id ? 'teal.50' : 'white'}
+                                                    cursor="pointer"
+                                                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                                                    _hover={{
+                                                        borderColor: 'teal.400',
+                                                        transform: 'translateY(-4px)',
+                                                        boxShadow: 'xl'
+                                                    }}
+                                                    boxShadow={selectedService?.id === service.id ? 'lg' : 'sm'}
+                                                >
+                                                    <HStack align="start" spacing={4}>
+                                                        <Text fontSize="5xl">🏥</Text>
+                                                        <VStack align="start" flex={1} spacing={2}>
+                                                            <Heading size="md" color="gray.900" fontWeight="700">{service.name}</Heading>
+                                                            <Text fontSize="sm" color="gray.600" lineHeight="tall">{service.description}</Text>
+                                                            <Badge
+                                                                colorScheme="teal"
+                                                                borderRadius="full"
+                                                                px={4}
+                                                                py={1.5}
+                                                                fontSize="xs"
+                                                                fontWeight="700"
+                                                            >
+                                                                ⏱️ {service.duration_minutes} mins
+                                                            </Badge>
+                                                        </VStack>
+                                                    </HStack>
+                                                </Box>
+                                            ))}
+                                        </SimpleGrid>
+                                        <Button
+                                            isDisabled={!selectedService}
+                                            onClick={() => setStep(2)}
+                                            bgGradient="linear(to-r, green.500, teal.500)"
+                                            color="white"
+                                            size="lg"
+                                            h="56px"
+                                            fontSize="lg"
+                                            fontWeight="700"
+                                            borderRadius="xl"
+                                            _hover={{
+                                                transform: 'translateY(-2px)',
+                                                boxShadow: 'xl'
+                                            }}
+                                            _active={{
+                                                transform: 'translateY(0)'
+                                            }}
+                                            transition="all 0.2s"
+                                        >
+                                            Next Step →
+                                        </Button>
+                                    </VStack>
+                                )}
+
+                                {/* Step 2: Select Date & Time */}
+                                {step === 2 && (
+                                    <VStack align="stretch" spacing={6}>
+                                        <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
+                                            Choose Date & Time
+                                        </Heading>
+
+                                        {/* Custom Calendar Picker */}
+                                        <Box>
+                                            <Text fontSize="sm" fontWeight="700" color="gray.700" mb={4}>Select Date</Text>
+                                            <CalendarPicker />
+                                        </Box>
+
+                                        {selectedDate && (
+                                            <Box>
+                                                <Text fontSize="sm" fontWeight="700" color="gray.700" mb={4}>
+                                                    Available Time Slots
+                                                </Text>
+                                                {availableSlots.length > 0 ? (
+                                                    <VStack align="stretch" spacing={6}>
+                                                        {(() => {
+                                                            const { morning, afternoon, evening } = groupTimeSlots();
+                                                            return (
+                                                                <>
+                                                                    {morning.length > 0 && (
+                                                                        <Box>
+                                                                            <HStack mb={3} spacing={2}>
+                                                                                <Icon as={FiClock} color="orange.500" boxSize={5} />
+                                                                                <Text fontSize="md" fontWeight="700" color="gray.700">
+                                                                                    🌅 Morning (8 AM - 12 PM)
+                                                                                </Text>
+                                                                            </HStack>
+                                                                            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                                                                                {morning.map((slot, index) => (
+                                                                                    <Button
+                                                                                        key={index}
+                                                                                        onClick={() => setSelectedTime(slot.time)}
+                                                                                        variant={selectedTime === slot.time ? 'solid' : 'outline'}
+                                                                                        bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                                                        color={selectedTime === slot.time ? 'white' : 'gray.700'}
+                                                                                        borderColor="teal.300"
+                                                                                        borderWidth="2px"
+                                                                                        size="lg"
+                                                                                        fontWeight="700"
+                                                                                        borderRadius="xl"
+                                                                                        _hover={{
+                                                                                            transform: 'translateY(-2px)',
+                                                                                            boxShadow: 'md'
+                                                                                        }}
+                                                                                        transition="all 0.2s"
+                                                                                    >
+                                                                                        {slot.display}
+                                                                                    </Button>
+                                                                                ))}
+                                                                            </SimpleGrid>
+                                                                        </Box>
+                                                                    )}
+
+                                                                    {afternoon.length > 0 && (
+                                                                        <Box>
+                                                                            <HStack mb={3} spacing={2}>
+                                                                                <Icon as={FiClock} color="orange.500" boxSize={5} />
+                                                                                <Text fontSize="md" fontWeight="700" color="gray.700">
+                                                                                    ☀️ Afternoon (12 PM - 5 PM)
+                                                                                </Text>
+                                                                            </HStack>
+                                                                            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                                                                                {afternoon.map((slot, index) => (
+                                                                                    <Button
+                                                                                        key={index}
+                                                                                        onClick={() => setSelectedTime(slot.time)}
+                                                                                        variant={selectedTime === slot.time ? 'solid' : 'outline'}
+                                                                                        bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                                                        color={selectedTime === slot.time ? 'white' : 'gray.700'}
+                                                                                        borderColor="teal.300"
+                                                                                        borderWidth="2px"
+                                                                                        size="lg"
+                                                                                        fontWeight="700"
+                                                                                        borderRadius="xl"
+                                                                                        _hover={{
+                                                                                            transform: 'translateY(-2px)',
+                                                                                            boxShadow: 'md'
+                                                                                        }}
+                                                                                        transition="all 0.2s"
+                                                                                    >
+                                                                                        {slot.display}
+                                                                                    </Button>
+                                                                                ))}
+                                                                            </SimpleGrid>
+                                                                        </Box>
+                                                                    )}
+
+                                                                    {evening.length > 0 && (
+                                                                        <Box>
+                                                                            <HStack mb={3} spacing={2}>
+                                                                                <Icon as={FiClock} color="orange.500" boxSize={5} />
+                                                                                <Text fontSize="md" fontWeight="700" color="gray.700">
+                                                                                    🌙 Evening (After 5 PM)
+                                                                                </Text>
+                                                                            </HStack>
+                                                                            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                                                                                {evening.map((slot, index) => (
+                                                                                    <Button
+                                                                                        key={index}
+                                                                                        onClick={() => setSelectedTime(slot.time)}
+                                                                                        variant={selectedTime === slot.time ? 'solid' : 'outline'}
+                                                                                        bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                                                        color={selectedTime === slot.time ? 'white' : 'gray.700'}
+                                                                                        borderColor="teal.300"
+                                                                                        borderWidth="2px"
+                                                                                        size="lg"
+                                                                                        fontWeight="700"
+                                                                                        borderRadius="xl"
+                                                                                        _hover={{
+                                                                                            transform: 'translateY(-2px)',
+                                                                                            boxShadow: 'md'
+                                                                                        }}
+                                                                                        transition="all 0.2s"
+                                                                                    >
+                                                                                        {slot.display}
+                                                                                    </Button>
+                                                                                ))}
+                                                                            </SimpleGrid>
+                                                                        </Box>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </VStack>
+                                                ) : (
+                                                    <Box
+                                                        p={12}
+                                                        textAlign="center"
+                                                        borderRadius="2xl"
+                                                        bg="gradient-to-br from-gray-50 to-gray-100"
+                                                        border="2px dashed"
+                                                        borderColor="gray.300"
+                                                    >
+                                                        <Icon as={FiClock} boxSize={16} color="gray.400" mb={4} />
+                                                        <Text color="gray.700" fontWeight="700" fontSize="lg" mb={2}>
+                                                            No available time slots
+                                                        </Text>
+                                                        <Text fontSize="sm" color="gray.500">
+                                                            Please select another date
+                                                        </Text>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        )}
+
+                                        <HStack spacing={3}>
+                                            <Button
+                                                onClick={() => setStep(1)}
+                                                variant="outline"
+                                                borderColor="gray.300"
+                                                borderWidth="2px"
+                                                color="gray.700"
+                                                size="lg"
+                                                flex={1}
+                                                h="56px"
+                                                fontSize="lg"
+                                                fontWeight="700"
+                                                borderRadius="xl"
+                                                _hover={{
+                                                    bg: 'gray.50'
+                                                }}
+                                            >
+                                                ← Back
+                                            </Button>
+                                            <Button
+                                                isDisabled={!selectedDate || !selectedTime}
+                                                onClick={() => setStep(3)}
+                                                bgGradient="linear(to-r, green.500, teal.500)"
+                                                color="white"
+                                                size="lg"
+                                                flex={1}
+                                                h="56px"
+                                                fontSize="lg"
+                                                fontWeight="700"
+                                                borderRadius="xl"
+                                                _hover={{
+                                                    transform: 'translateY(-2px)',
+                                                    boxShadow: 'xl'
+                                                }}
+                                                transition="all 0.2s"
+                                            >
+                                                Next Step →
+                                            </Button>
+                                        </HStack>
+                                    </VStack>
+                                )}
+
+                                {/* Step 3: Confirm */}
+                                {step === 3 && (
+                                    <VStack align="stretch" spacing={6}>
+                                        <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
+                                            Confirm Appointment
+                                        </Heading>
+
+                                        <Box
+                                            bgGradient="linear(to-br, green.50, teal.50)"
+                                            borderRadius="2xl"
+                                            p={8}
+                                            border="2px solid"
+                                            borderColor="teal.200"
+                                            boxShadow="md"
+                                        >
+                                            <VStack align="stretch" spacing={5}>
+                                                <Flex justify="space-between" align="center">
+                                                    <Text color="gray.600" fontWeight="600">Service:</Text>
+                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">{selectedService?.name}</Text>
+                                                </Flex>
+                                                <Divider borderColor="teal.200" />
+                                                <Flex justify="space-between" align="center">
+                                                    <Text color="gray.600" fontWeight="600">Date:</Text>
+                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">
+                                                        {new Date(selectedDate).toLocaleDateString('en-US', {
+                                                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                                                        })}
+                                                    </Text>
+                                                </Flex>
+                                                <Divider borderColor="teal.200" />
+                                                <Flex justify="space-between" align="center">
+                                                    <Text color="gray.600" fontWeight="600">Time:</Text>
+                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">
+                                                        {availableSlots.find(s => s.time === selectedTime)?.display}
+                                                    </Text>
+                                                </Flex>
+                                                <Divider borderColor="teal.200" />
+                                                <Flex justify="space-between" align="center">
+                                                    <Text color="gray.600" fontWeight="600">Duration:</Text>
+                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">{selectedService?.duration_minutes} minutes</Text>
+                                                </Flex>
+                                            </VStack>
+                                        </Box>
+
+                                        <Box>
+                                            <Text fontSize="sm" fontWeight="700" color="gray.700" mb={3}>Reason for Visit (Optional)</Text>
+                                            <Textarea
+                                                value={reason}
+                                                onChange={(e) => setReason(e.target.value)}
+                                                placeholder="Describe your symptoms or reason for visit..."
+                                                rows={4}
+                                                focusBorderColor="teal.400"
+                                                borderColor="gray.300"
+                                                borderWidth="2px"
+                                                borderRadius="xl"
+                                                resize="none"
+                                                fontSize="md"
+                                                _hover={{
+                                                    borderColor: 'teal.300'
+                                                }}
+                                            />
+                                        </Box>
+
+                                        <HStack spacing={3}>
+                                            <Button
+                                                onClick={() => setStep(2)}
+                                                variant="outline"
+                                                borderColor="gray.300"
+                                                borderWidth="2px"
+                                                color="gray.700"
+                                                size="lg"
+                                                flex={1}
+                                                h="56px"
+                                                fontSize="lg"
+                                                fontWeight="700"
+                                                borderRadius="xl"
+                                                _hover={{
+                                                    bg: 'gray.50'
+                                                }}
+                                            >
+                                                ← Back
+                                            </Button>
+                                            <Button
+                                                onClick={handleBookAppointment}
+                                                isLoading={loading}
+                                                loadingText="Booking..."
+                                                bgGradient="linear(to-r, green.500, teal.500)"
+                                                color="white"
+                                                size="lg"
+                                                flex={1}
+                                                h="56px"
+                                                fontSize="lg"
+                                                fontWeight="700"
+                                                borderRadius="xl"
+                                                leftIcon={<Icon as={FiCheckCircle} boxSize={6} />}
+                                                _hover={{
+                                                    transform: 'translateY(-2px)',
+                                                    boxShadow: 'xl'
+                                                }}
+                                                transition="all 0.2s"
+                                            >
+                                                Confirm Booking ✓
+                                            </Button>
+                                        </HStack>
+                                    </VStack>
+                                )}
+                            </VStack>
+                        ) : (
+                            <VStack align="stretch" spacing={6}>
+                                <Heading size="lg" bgGradient="linear(to-r, teal.600, orange.600)" bgClip="text">
+                                    My Appointments
+                                </Heading>
+                                {myAppointments.length > 0 ? (
+                                    <VStack align="stretch" spacing={4}>
+                                        {myAppointments.map(apt => (
+                                            <Box
+                                                key={apt.id}
+                                                bg="white"
+                                                border="2px solid"
+                                                borderColor="gray.200"
+                                                borderRadius="2xl"
+                                                p={6}
+                                                transition="all 0.3s"
+                                                _hover={{
+                                                    boxShadow: 'xl',
+                                                    transform: 'translateY(-2px)',
+                                                    borderColor: 'teal.300'
+                                                }}
+                                            >
+                                                <Flex justify="space-between" align="start" mb={4}>
+                                                    <Heading size="md" color="gray.900" fontWeight="700">{apt.service_type}</Heading>
+                                                    <Badge
+                                                        colorScheme={getStatusColor(apt.status)}
+                                                        borderRadius="full"
+                                                        px={4}
+                                                        py={2}
+                                                        fontSize="sm"
+                                                        fontWeight="700"
+                                                        textTransform="uppercase"
+                                                    >
+                                                        {apt.status}
+                                                    </Badge>
+                                                </Flex>
+                                                <HStack spacing={6} mb={4} fontSize="md" color="gray.600" fontWeight="600">
+                                                    <HStack>
+                                                        <Icon as={FiCalendar} boxSize={5} />
+                                                        <Text>{new Date(apt.appointment_date).toLocaleDateString()}</Text>
+                                                    </HStack>
+                                                    <HStack>
+                                                        <Icon as={FiClock} boxSize={5} />
+                                                        <Text>{apt.appointment_time}</Text>
+                                                    </HStack>
+                                                </HStack>
+                                                {apt.status === 'pending' && (
+                                                    <Button
+                                                        onClick={() => handleCancelAppointment(apt.id)}
+                                                        colorScheme="red"
+                                                        variant="ghost"
+                                                        size="md"
+                                                        fontWeight="700"
+                                                        _hover={{
+                                                            bg: 'red.50'
+                                                        }}
+                                                    >
+                                                        Cancel Appointment
+                                                    </Button>
+                                                )}
+                                            </Box>
+                                        ))}
+                                    </VStack>
+                                ) : (
+                                    <VStack py={16} spacing={5}>
+                                        <Text fontSize="6xl">📅</Text>
+                                        <Text color="gray.600" fontSize="lg" fontWeight="600">No appointments yet</Text>
+                                        <Button
+                                            onClick={() => setView('book')}
+                                            bgGradient="linear(to-r, green.500, teal.500)"
+                                            color="white"
+                                            size="lg"
+                                            fontWeight="700"
+                                            borderRadius="xl"
+                                            px={8}
+                                            _hover={{
+                                                transform: 'translateY(-2px)',
+                                                boxShadow: 'xl'
+                                            }}
+                                        >
+                                            Book Your First Appointment
+                                        </Button>
+                                    </VStack>
+                                )}
+                            </VStack>
+                        )}
+                    </Box>
+                </ModalBody>
+            </ModalContent>
+        </Modal>
     );
 };
 

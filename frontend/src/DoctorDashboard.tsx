@@ -32,7 +32,9 @@ import {
     DrawerCloseButton,
     IconButton,
     SimpleGrid,
+    Spinner,
 } from '@chakra-ui/react';
+import Profile from './Profile';
 import {
     FiGrid,
     FiUsers,
@@ -42,11 +44,13 @@ import {
     FiClipboard,
     FiBox,
     FiMenu,
+    FiUser,
 } from 'react-icons/fi';
 
 interface DoctorDashboardProps {
     user: any;
     onLogout: () => void;
+    onUserUpdated?: (user: any) => void;
 }
 
 const NavItem = ({ icon, children, active, onClick }: any) => {
@@ -156,11 +160,16 @@ const PageHero = ({ title, description, badge }: any) => (
     </Box>
 );
 
-const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => {
+import SoapNoteForm from './components/SoapNoteForm';
+
+// ... existing imports
+
+const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUserUpdated }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
     const [selectedCard, setSelectedCard] = useState('');
+    const [soapPatientId, setSoapPatientId] = useState<any>(null);
 
     // Data State
     const [patientsQueue, setPatientsQueue] = useState<any[]>([]);
@@ -210,8 +219,27 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
         onOpen();
     };
 
+    const handleOpenSoap = (patientId: any) => {
+        setSoapPatientId(patientId);
+        setSelectedCard('soap-form');
+        onOpen();
+    };
+
     const renderModalContent = () => {
         switch (selectedCard) {
+            case 'soap-form':
+                return (
+                    <Box p={2}>
+                        <SoapNoteForm
+                            patientId={soapPatientId}
+                            onSuccess={() => {
+                                onClose();
+                                // Optional: Refresh data or show success toast (handled in form)
+                            }}
+                            onCancel={onClose}
+                        />
+                    </Box>
+                );
             case 'patients':
                 return (
                     <>
@@ -219,12 +247,18 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                         <ModalBody>
                             <Box overflowX="auto">
                                 <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Time</Th><Th>Patient</Th><Th>Status</Th></Tr></Thead>
+                                    <Thead><Tr><Th>Time</Th><Th>Patient</Th><Th>Status</Th><Th>Action</Th></Tr></Thead>
                                     <Tbody>
-                                        <Tr><Td>09:00 AM</Td><Td>Juan Dela Cruz</Td><Td><Badge colorScheme="orange">Waiting</Badge></Td></Tr>
-                                        <Tr><Td>09:30 AM</Td><Td>Maria Santos</Td><Td><Badge colorScheme="green">Consulting</Badge></Td></Tr>
-                                        <Tr><Td>10:00 AM</Td><Td>Ricard Gomez</Td><Td><Badge colorScheme="blue">Scheduled</Badge></Td></Tr>
-                                        <Tr><Td>10:30 AM</Td><Td>Elena Perkins</Td><Td><Badge colorScheme="blue">Scheduled</Badge></Td></Tr>
+                                        {patientsQueue.map((p) => (
+                                            <Tr key={p.id}>
+                                                <Td>{p.appointment_time}</Td>
+                                                <Td>{p.first_name} {p.last_name}</Td>
+                                                <Td><Badge colorScheme="orange">{p.status}</Badge></Td>
+                                                <Td>
+                                                    <Button size="xs" colorScheme="teal" onClick={() => handleOpenSoap(p.user_id)}>SOAP</Button>
+                                                </Td>
+                                            </Tr>
+                                        ))}
                                     </Tbody>
                                 </Table>
                             </Box>
@@ -302,6 +336,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
 
 
     const renderContent = () => {
+        if (loading) {
+            return (
+                <Flex justify="center" align="center" h="50vh">
+                    <Spinner size="xl" color="teal.500" />
+                </Flex>
+            );
+        }
         switch (activeTab) {
             case 'overview':
                 return (
@@ -353,6 +394,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                                                     </Td>
                                                     <Td>
                                                         <Button size="xs" colorScheme="teal" variant="ghost">View Details</Button>
+                                                        <Button size="xs" colorScheme="blue" ml={2} onClick={() => handleOpenSoap(p.user_id)}>SOAP</Button>
                                                     </Td>
                                                 </Tr>
                                             ))
@@ -396,10 +438,10 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                                     </Thead>
                                     <Tbody>
                                         {[
-                                            { id: 'P-0012', name: 'Juan Dela Cruz', age: '45', gender: 'M', contact: '0917-123-4567', last: 'Feb 10, 2026' },
-                                            { id: 'P-0013', name: 'Maria Santos', age: '32', gender: 'F', contact: '0918-765-4321', last: 'Feb 12, 2026' },
-                                            { id: 'P-0015', name: 'Elena Perkins', age: '28', gender: 'F', contact: '0922-555-1234', last: 'Feb 14, 2026' },
-                                            { id: 'P-0020', name: 'Ricard Gomez', age: '60', gender: 'M', contact: '0999-888-7777', last: 'Jan 30, 2026' },
+                                            { id: 'P-0012', user_id: 12, name: 'Juan Dela Cruz', age: '45', gender: 'M', contact: '0917-123-4567', last: 'Feb 10, 2026' },
+                                            { id: 'P-0013', user_id: 13, name: 'Maria Santos', age: '32', gender: 'F', contact: '0918-765-4321', last: 'Feb 12, 2026' },
+                                            { id: 'P-0015', user_id: 15, name: 'Elena Perkins', age: '28', gender: 'F', contact: '0922-555-1234', last: 'Feb 14, 2026' },
+                                            { id: 'P-0020', user_id: 20, name: 'Ricard Gomez', age: '60', gender: 'M', contact: '0999-888-7777', last: 'Jan 30, 2026' },
                                         ].map(p => (
                                             <Tr key={p.id}>
                                                 <Td fontWeight="bold" color="teal.600">{p.id}</Td>
@@ -409,6 +451,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                                                 <Td>{p.last}</Td>
                                                 <Td>
                                                     <Button size="xs" colorScheme="blue" variant="outline">View Profile</Button>
+                                                    <Button size="xs" colorScheme="teal" ml={2} onClick={() => handleOpenSoap(p.user_id)}>SOAP</Button>
                                                 </Td>
                                             </Tr>
                                         ))}
@@ -418,6 +461,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                         </Box>
                     </VStack>
                 );
+
             case 'schedule':
                 return (
                     <VStack align="stretch" spacing={6}>
@@ -599,6 +643,23 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                         </Flex>
                     </VStack >
                 );
+            case 'profile':
+                return (
+                    <VStack align="stretch" spacing={6}>
+                        <PageHero
+                            badge="PROFILE SETTINGS"
+                            title="My Professional Profile"
+                            description="Manage your account details, security settings, and personal information."
+                        />
+                        <Profile
+                            user={user}
+                            onClose={() => setActiveTab('overview')}
+                            onUpdated={(u) => {
+                                if (onUserUpdated) onUserUpdated(u);
+                            }}
+                        />
+                    </VStack>
+                );
             default:
                 return null;
         }
@@ -641,6 +702,9 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                     </NavItem>
                     <NavItem icon={FiBox} active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')}>
                         Pharmacy Inventory
+                    </NavItem>
+                    <NavItem icon={FiUser} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')}>
+                        Profile Setting
                     </NavItem>
                 </VStack>
 
@@ -733,6 +797,9 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
                                 </NavItem>
                                 <NavItem icon={FiBox} active={activeTab === 'inventory'} onClick={() => { setActiveTab('inventory'); onSidebarClose(); }}>
                                     Pharmacy Inventory
+                                </NavItem>
+                                <NavItem icon={FiUser} active={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); onSidebarClose(); }}>
+                                    Profile Setting
                                 </NavItem>
                             </VStack>
                             <Box pos="absolute" bottom="8" w="full" px={4}>

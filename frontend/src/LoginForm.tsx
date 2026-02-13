@@ -166,6 +166,186 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [passwordCriteria, setPasswordCriteria] = useState({ length: false, upper: false, symbol: false });
 
+  // Forgot Password Modal State
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  // 3-Step Reset Password Flow State
+  // Steps: 'email' -> 'verify' -> 'reset'
+  const [resetStep, setResetStep] = useState<'email' | 'verify' | 'reset'>('email');
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  // Step 2: Verification
+  const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+
+  // Step 3: New Password
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetError, setResetError] = useState('');
+
+  // Reset Password UI State
+  const [resetPwVisible, setResetPwVisible] = useState(false);
+  const [resetConfirmPwVisible, setResetConfirmPwVisible] = useState(false);
+  const [resetPwFocused, setResetPwFocused] = useState(false);
+  const [resetPasswordCriteria, setResetPasswordCriteria] = useState({ length: false, upper: false, symbol: false });
+
+  useEffect(() => {
+    setResetPasswordCriteria({
+      length: newPassword.length >= 8,
+      upper: /[A-Z]/.test(newPassword),
+      symbol: /[^a-zA-Z0-9\s]/.test(newPassword)
+    });
+  }, [newPassword]);
+
+  // Timber Logic
+  useEffect(() => {
+    let interval: any;
+    if (showResetModal && resetStep === 'verify' && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (timer === 0) {
+      setCanResend(true);
+    }
+    return () => clearInterval(interval);
+  }, [showResetModal, resetStep, timer]);
+
+  const handleSendCode = async (e: FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetError('');
+    setResetMessage('');
+
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Failed to send code');
+
+      setResetStep('verify');
+      setTimer(60);
+      setCanResend(false);
+      setResetMessage('Code sent successfully!');
+    } catch (err: any) {
+      setResetError(err.message);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e: FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetError('');
+
+    const code = verificationCode.join('');
+    if (code.length !== 6) {
+      setResetError('Please enter the complete 6-digit code');
+      setResetLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/verify-reset-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail, code }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.valid) throw new Error(data.error || 'Invalid code');
+
+      setResetStep('reset');
+      setResetMessage('');
+    } catch (err: any) {
+      setResetError(err.message);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleCodeChange = (index: number, value: string) => {
+    if (value.length > 1) return; // Prevent pasting multiple chars (simple version)
+
+    const newCode = [...verificationCode];
+    newCode[index] = value;
+    setVerificationCode(newCode);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`code-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
+      const prevInput = document.getElementById(`code-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  const handleResetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetError('');
+    setResetMessage('');
+
+    if (newPassword !== confirmNewPassword) {
+      setResetError('Passwords do not match');
+      setResetLoading(false);
+      return;
+    }
+
+    const code = verificationCode.join('');
+
+    try {
+      const res = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail, code, password: newPassword }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Failed to reset password');
+
+      setResetMessage('Password reset successful! Redirecting to login...');
+      setTimeout(() => {
+        closeResetModal();
+      }, 2000);
+
+    } catch (err: any) {
+      setResetError(err.message);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const closeResetModal = () => {
+    setShowResetModal(false);
+    setResetStep('email');
+    setForgotEmail('');
+    setVerificationCode(['', '', '', '', '', '']);
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setResetPwVisible(false);
+    setResetConfirmPwVisible(false);
+    setResetPwFocused(false);
+    setResetMessage('');
+    setResetError('');
+  };
+
   useEffect(() => {
     setPasswordCriteria({
       length: password.length >= 8,
@@ -356,6 +536,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       }
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
+
+
 
   const handleFrontUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
@@ -751,6 +933,28 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     {loginPwVisible ? 'HIDE' : 'SHOW'}
                   </button>
                 </div>
+              </div>
+
+              <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+                <a
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowResetModal(true);
+                    setResetStep('email');
+                  }}
+                  style={{
+                    fontSize: '13px',
+                    color: '#38b2ac',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.color = '#ed8936')}
+                  onMouseOut={(e) => (e.currentTarget.style.color = '#38b2ac')}
+                >
+                  Forgot Password?
+                </a>
               </div>
 
               {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '12px', borderRadius: '10px', fontSize: '13px', marginBottom: '24px', fontWeight: 600, border: '1px solid #fed7d7' }}>⚠️ {error}</div>}
@@ -1387,6 +1591,398 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
           border-radius: 10px;
         }
       `}</style>
+
+      {/* FORGOT PASSWORD MODAL */}
+
+
+      {/* MULTI-STEP RESET PASSWORD MODAL */}
+      {showResetModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '24px',
+              padding: '40px',
+              maxWidth: '480px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              position: 'relative',
+              textAlign: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            {!resetLoading && (
+              <button
+                onClick={closeResetModal}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#A0AEC0',
+                  transition: 'color 0.2s'
+                }}
+              >
+                ×
+              </button>
+            )}
+
+            {/* Icon */}
+            <div style={{
+              width: '80px',
+              height: '80px',
+              background: '#E6FFFA',
+              borderRadius: '50%',
+              margin: '0 auto 24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '40px',
+              color: '#38B2AC'
+            }}>
+              {resetStep === 'email' ? '🔒' : resetStep === 'verify' ? '🛡️' : '🔑'}
+            </div>
+
+            {/* --- STEP 1: EMAIL --- */}
+            {resetStep === 'email' && (
+              <form onSubmit={handleSendCode}>
+                <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
+                  Forgot Password?
+                </h2>
+                <p style={{ fontSize: '15px', color: '#718096', marginBottom: '32px' }}>
+                  Enter your email and we'll send you a verification code.
+                </p>
+
+                <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A5568', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    EMAIL ADDRESS
+                  </label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      border: '2px solid #E2E8F0',
+                      fontSize: '16px',
+                      color: '#1A202C',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#38B2AC'}
+                    onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                  />
+                </div>
+
+                {resetError && (
+                  <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                    ⚠️ {resetError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: '#38B2AC',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    cursor: resetLoading ? 'not-allowed' : 'pointer',
+                    opacity: resetLoading ? 0.7 : 1,
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)'
+                  }}
+                >
+                  {resetLoading ? 'Sending Code...' : 'Send Code'}
+                </button>
+              </form>
+            )}
+
+            {/* --- STEP 2: VERIFICATION CODE --- */}
+            {resetStep === 'verify' && (
+              <form onSubmit={handleVerifyCode}>
+                <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
+                  Verify Your Code
+                </h2>
+                <p style={{ fontSize: '15px', color: '#718096', marginBottom: '8px' }}>
+                  We have sent a code to your email
+                </p>
+                <p style={{ fontSize: '15px', fontWeight: 600, color: '#38B2AC', marginBottom: '32px' }}>
+                  {forgotEmail}
+                </p>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
+                  {verificationCode.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      id={`code-${idx}`}
+                      type="text"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleCodeChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleCodeKeyDown(idx, e)}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pastedData = e.clipboardData.getData('text').slice(0, 6).split('');
+                        if (pastedData.length > 0) {
+                          const newCode = [...verificationCode];
+                          pastedData.forEach((char, i) => {
+                            if (idx + i < 6) newCode[idx + i] = char;
+                          });
+                          setVerificationCode(newCode);
+                          const nextIndex = Math.min(idx + pastedData.length, 5);
+                          document.getElementById(`code-${nextIndex}`)?.focus();
+                        }
+                      }}
+                      style={{
+                        width: '48px',
+                        height: '56px',
+                        borderRadius: '8px',
+                        border: '2px solid #E2E8F0',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        textAlign: 'center',
+                        color: '#2D3748',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#38B2AC'}
+                      onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                    />
+                  ))}
+                </div>
+
+                {resetError && (
+                  <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                    ⚠️ {resetError}
+                  </div>
+                )}
+                {resetMessage && (
+                  <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                    ✅ {resetMessage}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: '#38B2AC',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    cursor: resetLoading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)',
+                    marginBottom: '24px'
+                  }}
+                >
+                  {resetLoading ? 'Verifying...' : 'Verify'}
+                </button>
+
+                <div style={{ fontSize: '14px', color: '#718096' }}>
+                  Didn't receive code?{' '}
+                  {canResend ? (
+                    <button
+                      type="button"
+                      onClick={handleSendCode}
+                      style={{ background: 'none', border: 'none', color: '#3182CE', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                    >
+                      Resend
+                    </button>
+                  ) : (
+                    <span style={{ color: '#A0AEC0' }}>Resend in {timer}s</span>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {/* --- STEP 3: NEW PASSWORD --- */}
+            {resetStep === 'reset' && (
+              <form onSubmit={handleResetPassword}>
+                <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
+                  Reset Password
+                </h2>
+                <p style={{ fontSize: '15px', color: '#718096', marginBottom: '32px' }}>
+                  Create a new strong password for your account.
+                </p>
+
+                <div style={{ textAlign: 'left', marginBottom: '16px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>
+                    NEW PASSWORD
+                  </label>
+                  <div className={`auth-input${resetError && resetError.includes('Password') ? ' invalid' : ''}`} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: '#f7fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    marginBottom: '12px',
+                    position: 'relative'
+                  }}>
+                    <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                    <input
+                      type={resetPwVisible ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      onFocus={() => setResetPwFocused(true)}
+                      onBlur={() => setResetPwFocused(false)}
+                      placeholder="Enter new password"
+                      required
+                      style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
+                    />
+                    <button type="button" onClick={() => setResetPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '10px', color: '#4299e1', fontWeight: 700 }}>{resetPwVisible ? 'HIDE' : 'SHOW'}</button>
+
+                    {resetPwFocused && (
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: '100%',
+                        width: '100%',
+                        marginTop: '8px',
+                        background: '#2d3748',
+                        color: 'white',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        zIndex: 100,
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}>
+                        <div style={{ marginBottom: '4px', fontWeight: 'bold', borderBottom: '1px solid #4a5568', paddingBottom: '4px' }}>Password Requirements:</div>
+                        <ul style={{ paddingLeft: '16px', margin: 0, listStyleType: 'disc' }}>
+                          <li style={{ marginBottom: '2px', color: resetPasswordCriteria.length ? '#68d391' : 'white' }}>At least 8 characters</li>
+                          <li style={{ marginBottom: '2px', color: resetPasswordCriteria.upper ? '#68d391' : 'white' }}>At least one uppercase letter</li>
+                          <li style={{ color: resetPasswordCriteria.symbol ? '#68d391' : 'white' }}>At least one special character</li>
+                        </ul>
+                        <div style={{
+                          position: 'absolute',
+                          top: '-4px',
+                          left: '20px',
+                          width: '8px',
+                          height: '8px',
+                          background: '#2d3748',
+                          transform: 'rotate(45deg)'
+                        }}></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Password Criteria Checklist */}
+                  <div style={{ fontSize: '11px', color: '#718096', marginBottom: '20px', paddingLeft: '4px' }}>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <span style={{ color: resetPasswordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                        {resetPasswordCriteria.length ? '✓' : '○'} 8+ Chars
+                      </span>
+                      <span style={{ color: resetPasswordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                        {resetPasswordCriteria.upper ? '✓' : '○'} Upper (A-Z)
+                      </span>
+                      <span style={{ color: resetPasswordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                        {resetPasswordCriteria.symbol ? '✓' : '○'} Symbol (-_+ =)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>
+                    CONFIRM PASSWORD
+                  </label>
+                  <div className="auth-input" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: '#f7fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '10px 12px'
+                  }}>
+                    <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                    <input
+                      type={resetConfirmPwVisible ? 'text' : 'password'}
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      required
+                      style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
+                    />
+                    <span
+                      onClick={() => setResetConfirmPwVisible(!resetConfirmPwVisible)}
+                      style={{ cursor: 'pointer', fontSize: '16px', marginLeft: '8px', userSelect: 'none' }}
+                    >
+                      {resetConfirmPwVisible ? '👁️' : '🙈'}
+                    </span>
+                  </div>
+                </div>
+
+                {resetError && (
+                  <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                    ⚠️ {resetError}
+                  </div>
+                )}
+                {resetMessage && (
+                  <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                    ✅ {resetMessage}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: '#38B2AC',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    cursor: resetLoading ? 'not-allowed' : 'pointer',
+                    opacity: resetLoading ? 0.7 : 1,
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)'
+                  }}
+                >
+                  {resetLoading ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </form>
+            )}
+
+          </div>
+        </div>
+      )}
 
     </>
   );
