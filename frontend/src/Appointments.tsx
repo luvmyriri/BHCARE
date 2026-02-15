@@ -50,9 +50,10 @@ interface AppointmentsProps {
     user: any;
     onClose: () => void;
     isOpen: boolean;
+    initialView?: 'book' | 'my-appointments';
 }
 
-const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen }) => {
+const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, initialView = 'book' }) => {
     const [step, setStep] = useState(1);
     const [services, setServices] = useState<Service[]>([]);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -62,9 +63,16 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen }) =>
     const [reason, setReason] = useState('');
     const [myAppointments, setMyAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(false);
-    const [view, setView] = useState<'book' | 'my-appointments'>('book');
+    const [view, setView] = useState<'book' | 'my-appointments'>(initialView);
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+    useEffect(() => {
+        if (isOpen) {
+            setView(initialView);
+            setStep(1); // Reset step to 1 when opening
+        }
+    }, [isOpen, initialView]);
     const toast = useToast();
 
     useEffect(() => {
@@ -99,7 +107,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen }) =>
 
     const fetchAvailableSlots = async () => {
         try {
-            const response = await fetch(`/api/available-slots?date=${selectedDate}`);
+            const serviceParam = selectedService ? `&service_type=${encodeURIComponent(selectedService.name)}` : '';
+            const response = await fetch(`/api/available-slots?date=${selectedDate}${serviceParam}`);
             const data = await response.json();
             setAvailableSlots(data);
         } catch (error) {
@@ -136,7 +145,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen }) =>
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: user.id,
-                    service_id: selectedService.id,
+                    service_type: selectedService.name,
                     appointment_date: selectedDate,
                     appointment_time: selectedTime,
                     reason: reason
@@ -237,7 +246,46 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen }) =>
         const date = new Date(year, month, day);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        return date < today;
+
+        if (date < today) return true;
+
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+        if (dayOfWeek === 0 || dayOfWeek === 6) return true; // Weekends explicitly disabled for base check
+
+        if (!selectedService) return false;
+
+        const serviceName = selectedService.name.toLowerCase();
+
+        // Service-specific schedule logic
+        if (serviceName.includes('consultation') || serviceName.includes('check up') || serviceName.includes('nutrition')) {
+            return false;
+        }
+        if (serviceName.includes('prenatal')) {
+            // Tuesday and Thursday
+            return dayOfWeek !== 2 && dayOfWeek !== 4;
+        }
+        if (serviceName.includes('vaccination') || serviceName.includes('bakuna')) {
+            // Wednesday and Friday
+            return dayOfWeek !== 3 && dayOfWeek !== 5;
+        }
+        if (serviceName.includes('dental')) {
+            // Monday, Wednesday, Friday
+            return dayOfWeek !== 1 && dayOfWeek !== 3 && dayOfWeek !== 5;
+        }
+        if (serviceName.includes('family planning')) {
+            // Monday to Friday 1pm
+            return false;
+        }
+        if (serviceName.includes('dots')) {
+            // Monday to Friday 1pm
+            return false;
+        }
+        if (serviceName.includes('cervical')) {
+            // Monday 8am
+            return dayOfWeek !== 1;
+        }
+        return false;
     };
 
     const isToday = (day: number, month: number, year: number) => {

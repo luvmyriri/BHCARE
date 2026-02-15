@@ -23,34 +23,52 @@ function Services() {
 
   const items = [
     {
-      title: 'General Check up',
-      desc: 'A routine health exam to check overall well-being and detect health issues early.',
+      title: 'Consultation',
+      desc: 'General medical consultation and health assessment.',
+      schedule: 'Monday to Friday',
       icon: '🩺'
     },
     {
-      title: 'Senior Citizen Health Check Up',
-      desc: 'A health examination for elderly people to monitor age-related conditions and maintain health.',
-      icon: '👴'
-    },
-    {
-      title: 'PWD Health Consultation',
-      desc: 'A medical consultation for Persons With Disabilities to address their specific health needs.',
-      icon: '♿'
-    },
-    {
-      title: 'Maternal Health Check Up',
-      desc: 'A health check-up for pregnant women or mothers to ensure safe pregnancy and childbirth.',
+      title: 'Prenatal Check Up',
+      desc: 'Regular check-ups for expectant mothers.',
+      schedule: 'Tuesday and Thursday',
       icon: '🤰'
     },
     {
-      title: 'Basic Diagnostic Screening',
-      desc: 'Simple tests (like blood pressure, blood sugar, urine) to detect common health problems.',
+      title: 'Vaccination (Bakuna)',
+      desc: 'Immunization services for children and adults.',
+      schedule: 'Wednesday and Friday',
+      icon: '💉'
+    },
+    {
+      title: 'Dental Services',
+      desc: 'Dental check-ups and treatments.',
+      schedule: 'Monday, Wednesday, Friday',
+      icon: '🦷'
+    },
+    {
+      title: 'Family Planning',
+      desc: 'Reproductive health and family planning services.',
+      schedule: 'Monday to Friday 1 PM',
+      icon: '👨‍👩‍👧‍👦'
+    },
+    {
+      title: 'Dots Center',
+      desc: 'TB DOTS (Directly Observed Treatment, Short-course) services.',
+      schedule: 'Monday to Friday 1 PM',
+      icon: '🏥'
+    },
+    {
+      title: 'Cervical Screening',
+      desc: 'Screening for cervical cancer prevention.',
+      schedule: 'Monday 8 AM',
       icon: '🔬'
     },
     {
-      title: 'Medicine Refill & Follow-up visit',
-      desc: 'A visit to get prescription medicines refilled and to review treatment progress with a doctor.',
-      icon: '💊'
+      title: 'Nutrition Counseling',
+      desc: 'Guidance on healthy eating and nutrition.',
+      schedule: 'Monday to Friday',
+      icon: '🥗'
     },
   ];
 
@@ -105,6 +123,9 @@ function Services() {
             <div className="service-icon">{s.icon}</div>
             <h3>{s.title}</h3>
             <p>{s.desc}</p>
+            <div className="service-schedule" style={{ fontSize: '0.9em', color: '#4fd1c5', marginTop: '0.5rem', fontWeight: 600 }}>
+              🕒 {s.schedule}
+            </div>
           </motion.div>
         ))}
       </motion.div>

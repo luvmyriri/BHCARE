@@ -105,9 +105,9 @@ const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => 
                         <Flex alignItems="start" gap={3}>
                             <MapPinIcon boxSize={5} color="teal.400" mt={0.5} flexShrink={0} />
                             <Text fontSize="sm" color="gray.400">
-                                Kanlaon St., Camarin<br />
-                                Barangay 174, Caloocan City<br />
-                                Metro Manila, 1422
+                                Camarin 174 Health Center<br />
+                                Cadena De Amor, Caloocan<br />
+                                Philippines, 1400
                             </Text>
                         </Flex>
                         <Flex alignItems="center" gap={3}>

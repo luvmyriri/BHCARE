@@ -20,13 +20,25 @@ def get_services():
         cursor.execute("""
             SELECT id, name, description, duration_minutes, is_active
             FROM services
-            WHERE is_active = true
+            WHERE is_active = true AND name NOT ILIKE '%Laboratory%'
             ORDER BY name
         """)
         
         services = cursor.fetchall()
         cursor.close()
         conn.close()
+        
+        # Manually add Nutrition Counseling since we can't write to DB easily right now
+        # Check if it's already there to avoid duplicates if DB gets updated later
+        nutrition_exists = any(s['name'] == 'Nutrition Counseling' for s in services)
+        if not nutrition_exists:
+            services.append({
+                'id': 999, # Dummy ID
+                'name': 'Nutrition Counseling',
+                'description': 'Guidance on healthy eating and nutrition.',
+                'duration_minutes': 30,
+                'is_active': True
+            })
         
         return jsonify(services), 200
         
@@ -100,6 +112,31 @@ def get_available_slots():
         
         cursor.close()
         conn.close()
+
+        # Filter based on service type
+        service_type = request.args.get('service_type')
+        if service_type:
+            # Decode if needed, though Flask handles it
+            filtered_slots = []
+            for slot in available_slots:
+                # slot['time'] is "HH:MM" string
+                h = int(slot['time'].split(':')[0])
+                m = int(slot['time'].split(':')[1])
+                
+                st = service_type.lower()
+                
+                if 'family planning' in st or 'dots' in st:
+                    # Only 1:00 PM
+                    if h == 13 and m == 0:
+                        filtered_slots.append(slot)
+                elif 'cervical' in st:
+                    # Only 8:00 AM
+                    if h == 8 and m == 0:
+                        filtered_slots.append(slot)
+                else:
+                    filtered_slots.append(slot)
+            
+            available_slots = filtered_slots
         
         return jsonify(available_slots), 200
         
@@ -216,9 +253,19 @@ def create_appointment():
         cursor.close()
         conn.close()
         
+        appointment = dict(appointment)
+        
+        # Serialize objects for JSON
+        if appointment.get('appointment_date'):
+            appointment['appointment_date'] = appointment['appointment_date'].isoformat()
+        if appointment.get('appointment_time'):
+            appointment['appointment_time'] = appointment['appointment_time'].strftime('%H:%M')
+        if appointment.get('created_at'):
+            appointment['created_at'] = appointment['created_at'].isoformat()
+            
         return jsonify({
             "message": "Appointment created successfully",
-            "appointment": dict(appointment)
+            "appointment": appointment
         }), 201
         
     except Exception as e:

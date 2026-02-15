@@ -32,10 +32,9 @@ interface GoogleMapModalProps {
 }
 
 const GoogleMapModal: React.FC<GoogleMapModalProps> = ({ isOpen, onClose }) => {
-    // Coordinates for Barangay 174, Camarin, Caloocan City
-    // These are approximate coordinates - you can replace with exact location
-    const latitude = 14.7606;
-    const longitude = 121.0386;
+    // Coordinates for Camarin 174 Health Center
+    const latitude = 14.7621;
+    const longitude = 121.0491;
     const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}&hl=en&z=17&output=embed`;
     const directionsUrl = `https://www.google.com/maps/dir//${latitude},${longitude}/@${latitude},${longitude},17z`;
 
@@ -47,9 +46,9 @@ const GoogleMapModal: React.FC<GoogleMapModalProps> = ({ isOpen, onClose }) => {
                     <Flex alignItems="center" gap={3}>
                         <MapPinIcon boxSize={6} />
                         <Box>
-                            <Text fontSize="xl" fontWeight="bold">Barangay 174 Health Center</Text>
+                            <Text fontSize="xl" fontWeight="bold">Camarin 174 Health Center</Text>
                             <Text fontSize="sm" fontWeight="normal" color="teal.100">
-                                Kanlaon St., Camarin, Caloocan City
+                                Cadena De Amor, Caloocan, Philippines
                             </Text>
                         </Box>
                     </Flex>
@@ -107,7 +106,7 @@ const GoogleMapModal: React.FC<GoogleMapModalProps> = ({ isOpen, onClose }) => {
                                     Full Address
                                 </Text>
                                 <Text fontSize="sm" color="gray.600">
-                                    Kanlaon Street, Camarin, Barangay 174, Caloocan City, 1422 Metro Manila
+                                    Cadena De Amor, Caloocan, Philippines
                                 </Text>
                             </Box>
                         </Flex>

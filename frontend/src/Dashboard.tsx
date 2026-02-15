@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLanguage } from './contexts/LanguageContext';
 import {
     Box,
     Flex,
@@ -163,16 +164,27 @@ const PageHero = ({ title, description, badge }: any) => (
 );
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) => {
+    const { t, language, setLanguage } = useLanguage();
     const [activeTab, setActiveTab] = useState('overview');
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
     const { isOpen: isAppointmentsOpen, onOpen: onAppointmentsOpen, onClose: onAppointmentsClose } = useDisclosure();
     const { isOpen: isImageZoomOpen, onOpen: onImageZoomOpen, onClose: onImageZoomClose } = useDisclosure();
     const [selectedCard, setSelectedCard] = useState<string | null>(null);
+    const [appointmentView, setAppointmentView] = useState<'book' | 'my-appointments'>('book');
+
+    const handleOpenAppointments = (view: 'book' | 'my-appointments') => {
+        setAppointmentView(view);
+        onAppointmentsOpen();
+    };
 
     const handleCardClick = (card: string) => {
         setSelectedCard(card);
         onOpen();
+    };
+
+    const toggleLanguage = () => {
+        setLanguage(language === 'en' ? 'tl' : 'en');
     };
 
     const renderModalContent = () => {
@@ -180,21 +192,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
             case 'appointments':
                 return (
                     <>
-                        <ModalHeader>Upcoming Appointments</ModalHeader>
+                        <ModalHeader>{t.upcomingAppointments}</ModalHeader>
                         <ModalBody>
                             <Box p={4} bg="teal.50" borderRadius="lg" mb={4}>
                                 <Text fontWeight="bold" color="teal.800">Next Visit: Feb 24, 2026</Text>
                                 <Text fontSize="sm">Reason: Medical Check-up</Text>
                                 <Text fontSize="sm">Doctor: Dr. Maria Santos</Text>
                             </Box>
-                            <Button size="sm" w="full" colorScheme="teal" onClick={() => setActiveTab('appointments')}>Book New Appointment</Button>
+                            <Button size="sm" w="full" colorScheme="teal" onClick={() => setActiveTab('appointments')}>{t.bookNewAppointment}</Button>
                         </ModalBody>
                     </>
                 );
             case 'records':
                 return (
                     <>
-                        <ModalHeader>Recent Health Records</ModalHeader>
+                        <ModalHeader>{t.healthRecords}</ModalHeader>
                         <ModalBody>
                             <VStack align="stretch" spacing={2}>
                                 <HStack justify="space-between" p={2} borderBottom="1px solid" borderColor="gray.100">
@@ -213,7 +225,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
             case 'health_score':
                 return (
                     <>
-                        <ModalHeader>Health Score Breakdown</ModalHeader>
+                        <ModalHeader>{t.healthScore}</ModalHeader>
                         <ModalBody>
                             <VStack align="stretch" spacing={4}>
                                 <Box>
@@ -251,19 +263,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 return (
                     <VStack align="stretch" spacing={8}>
                         <PageHero
-                            badge="HEALTH OVERVIEW"
-                            title={`Welcome back, ${user?.first_name || 'Patient'}! 👋`}
-                            description="Your health is our priority. Manage your appointments, health records, and profile details right here."
+                            badge={t.overallHealth.toUpperCase()}
+                            title={t.welcomeUser.replace('{name}', user?.first_name || 'Patient')}
+                            description={t.healthPriority}
                         />
 
                         <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={6}>
-                            <StatCard label="Upcoming Appointments" value="1" icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
-                            <StatCard label="Health Records" value="12" icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
-                            <StatCard label="Health Score" value="98%" icon={FiActivity} color="green" onClick={() => handleCardClick('health_score')} />
+                            <StatCard label={t.upcomingAppointments} value="1" icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
+                            <StatCard label={t.healthRecords} value="12" icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
+                            <StatCard label={t.healthScore} value="98%" icon={FiActivity} color="green" onClick={() => handleCardClick('health_score')} />
                         </SimpleGrid>
 
                         <Heading size="md" color="teal.800" mt={4}>
-                            Recent Activity
+                            {t.recentActivity}
                         </Heading>
                         <VStack align="stretch" spacing={4}>
                             <Box p={5} bg="white" borderRadius="xl" boxShadow="xs" border="1px solid" borderColor="gray.50">
@@ -301,9 +313,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 return (
                     <>
                         <PageHero
-                            badge="APPOINTMENTS"
-                            title="Schedule & Book Consultations"
-                            description="Book new appointments or manage your existing ones with ease. Select your preferred date and time below."
+                            badge={t.appointments.toUpperCase()}
+                            title={t.bookNewAppointment.split(' ').slice(0, 2).join(' ') + ' & ' + t.appointments}
+                            description={t.scheduleConsultation}
                         />
                         <VStack spacing={8} align="stretch">
                             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
@@ -320,7 +332,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                         boxShadow: 'xl',
                                         borderColor: 'teal.400'
                                     }}
-                                    onClick={onAppointmentsOpen}
+                                    onClick={() => handleOpenAppointments('book')}
                                 >
                                     <VStack spacing={4} align="start">
                                         <Flex
@@ -335,9 +347,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                         >
                                             📅
                                         </Flex>
-                                        <Heading size="md" color="teal.800">Book New Appointment</Heading>
+                                        <Heading size="md" color="teal.800">{t.bookNewAppointment}</Heading>
                                         <Text color="gray.600" fontSize="sm">
-                                            Schedule a consultation with our healthcare providers. Choose your preferred date and time.
+                                            {t.scheduleConsultation}
                                         </Text>
                                         <Button
                                             bgGradient="linear(to-r, teal.500, teal.600)"
@@ -351,7 +363,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                                 bgGradient: "linear(to-r, teal.600, teal.700)"
                                             }}
                                         >
-                                            Book Now →
+                                            {t.bookNow} →
                                         </Button>
                                     </VStack>
                                 </Box>
@@ -369,7 +381,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                         boxShadow: 'xl',
                                         borderColor: 'teal.400'
                                     }}
-                                    onClick={onAppointmentsOpen}
+                                    onClick={() => handleOpenAppointments('my-appointments')}
                                 >
                                     <VStack spacing={4} align="start">
                                         <Flex
@@ -384,9 +396,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                         >
                                             📋
                                         </Flex>
-                                        <Heading size="md" color="teal.800">View My Appointments</Heading>
+                                        <Heading size="md" color="teal.800">{t.viewMyAppointments}</Heading>
                                         <Text color="gray.600" fontSize="sm">
-                                            Check your upcoming appointments, view history, and manage your bookings.
+                                            {t.checkAppointments}
                                         </Text>
                                         <Button
                                             bgGradient="linear(to-r, green.500, teal.500)"
@@ -400,7 +412,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                                 bgGradient: "linear(to-r, green.600, teal.600)"
                                             }}
                                         >
-                                            View Appointments →
+                                            {t.viewAppointments} →
                                         </Button>
                                     </VStack>
                                 </Box>
@@ -410,28 +422,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 <Box p={6} bg="teal.50" borderRadius="xl" border="1px solid" borderColor="teal.100">
                                     <HStack spacing={3} mb={2}>
                                         <Text fontSize="2xl">⏰</Text>
-                                        <Heading size="sm" color="teal.800">Quick & Easy</Heading>
+                                        <Heading size="sm" color="teal.800">{t.quickEasy}</Heading>
                                     </HStack>
                                     <Text fontSize="sm" color="teal.700">
-                                        Book appointments in just 3 simple steps
+                                        {t.bookSimple}
                                     </Text>
                                 </Box>
                                 <Box p={6} bg="blue.50" borderRadius="xl" border="1px solid" borderColor="blue.100">
                                     <HStack spacing={3} mb={2}>
                                         <Text fontSize="2xl">🏥</Text>
-                                        <Heading size="sm" color="blue.800">Multiple Services</Heading>
+                                        <Heading size="sm" color="blue.800">{t.multipleServices}</Heading>
                                     </HStack>
                                     <Text fontSize="sm" color="blue.700">
-                                        Choose from various healthcare services
+                                        {t.chooseServices}
                                     </Text>
                                 </Box>
                                 <Box p={6} bg="green.50" borderRadius="xl" border="1px solid" borderColor="green.100">
                                     <HStack spacing={3} mb={2}>
                                         <Text fontSize="2xl">📱</Text>
-                                        <Heading size="sm" color="green.800">Instant Confirmation</Heading>
+                                        <Heading size="sm" color="green.800">{t.instantConfirmation}</Heading>
                                     </HStack>
                                     <Text fontSize="sm" color="green.800">
-                                        Get immediate booking confirmation
+                                        {t.getConfirmation}
                                     </Text>
                                 </Box>
                             </SimpleGrid>
@@ -440,6 +452,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             user={user}
                             onClose={onAppointmentsClose}
                             isOpen={isAppointmentsOpen}
+                            initialView={appointmentView}
                         />
                     </>
                 );
@@ -447,9 +460,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 return (
                     <VStack align="stretch">
                         <PageHero
-                            badge="MY PROFILE"
-                            title="Personal & Health Information"
-                            description="Keep your contact details and medical preferences up to date for better healthcare delivery."
+                            badge={t.myProfile.toUpperCase()}
+                            title={t.personalInfo}
+                            description={t.keepUpdated}
                         />
                         <Profile user={user} onClose={() => setActiveTab('overview')} onUpdated={onUserUpdated} />
                     </VStack>
@@ -458,7 +471,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 return (
                     <VStack align="stretch" spacing={6}>
                         <PageHero
-                            badge="HEALTH RECORDS"
+                            badge={t.healthRecords.toUpperCase()}
                             title="Medical Logs & Results"
                             description="Access your past check-ups, diagnostic reports, and medical history in one secure place."
                         />
@@ -523,9 +536,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 return (
                     <VStack align="stretch" spacing={6}>
                         <PageHero
-                            badge="HEALTH TOOLS"
-                            title="Interactive Health Calculators"
-                            description="Monitor your health metrics with our handy tools. Staying informed is the first step to a healthier life."
+                            badge={t.healthTools.toUpperCase()}
+                            title={t.interactiveCalculators}
+                            description={t.monitorHealth}
                         />
                         <HealthCalculators />
                     </VStack>
@@ -559,26 +572,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
 
                 <VStack spacing={2} align="stretch" px={4}>
                     <NavItem icon={FiHome} active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
-                        Overview
+                        {t.overallHealth}
                     </NavItem>
                     <NavItem icon={FiCalendar} active={activeTab === 'appointments'} onClick={() => setActiveTab('appointments')}>
-                        Appointments
+                        {t.appointments}
                     </NavItem>
                     <NavItem icon={FiFileText} active={activeTab === 'records'} onClick={() => setActiveTab('records')}>
-                        Health Records
+                        {t.healthRecords}
                     </NavItem>
                     <NavItem icon={FiUser} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')}>
-                        Profile Setting
+                        {t.profileSettings}
                     </NavItem>
                     <NavItem icon={FiActivity} active={activeTab === 'health-tools'} onClick={() => setActiveTab('health-tools')}>
-                        Health Tools
+                        {t.healthTools}
                     </NavItem>
                 </VStack>
 
                 <Box pos="absolute" bottom="8" w="full" px={4}>
                     <Divider mb={4} />
                     <NavItem icon={FiLogOut} onClick={onLogout}>
-                        Logout
+                        {t.logout}
                     </NavItem>
                 </Box>
             </Box>
@@ -611,6 +624,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                         </VStack>
                     </HStack>
                     <HStack spacing={3} align={{ base: "start", sm: "center" }} pl={{ base: 12, sm: 0 }} maxW={{ base: "calc(100% - 60px)", sm: "auto" }}>
+                        <Button
+                            onClick={toggleLanguage}
+                            size="sm"
+                            variant="outline"
+                            colorScheme="teal"
+                            leftIcon={<span>{language === 'en' ? '🇺🇸' : '🇵🇭'}</span>}
+                            mr={2}
+                        >
+                            {language === 'en' ? 'EN' : 'TL'}
+                        </Button>
                         <NotificationBell userId={user?.id} />
                         <VStack align="end" spacing={0} mr={2} overflow="hidden">
                             <Text
@@ -711,26 +734,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
 
                             <VStack spacing={2} align="stretch" px={4}>
                                 <NavItem icon={FiHome} active={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); onSidebarClose(); }}>
-                                    Overview
+                                    {t.overallHealth}
                                 </NavItem>
                                 <NavItem icon={FiCalendar} active={activeTab === 'appointments'} onClick={() => { setActiveTab('appointments'); onSidebarClose(); }}>
-                                    Appointments
+                                    {t.appointments}
                                 </NavItem>
                                 <NavItem icon={FiFileText} active={activeTab === 'records'} onClick={() => { setActiveTab('records'); onSidebarClose(); }}>
-                                    Health Records
+                                    {t.healthRecords}
                                 </NavItem>
                                 <NavItem icon={FiUser} active={activeTab === 'profile'} onClick={() => { setActiveTab('profile'); onSidebarClose(); }}>
-                                    Profile Setting
+                                    {t.profileSettings}
                                 </NavItem>
                                 <NavItem icon={FiActivity} active={activeTab === 'health-tools'} onClick={() => { setActiveTab('health-tools'); onSidebarClose(); }}>
-                                    Health Tools
+                                    {t.healthTools}
                                 </NavItem>
                             </VStack>
 
                             <Box pos="absolute" bottom="8" w="full" px={4}>
                                 <Divider mb={4} />
                                 <NavItem icon={FiLogOut} onClick={onLogout}>
-                                    Logout
+                                    {t.logout}
                                 </NavItem>
                             </Box>
                         </Box>

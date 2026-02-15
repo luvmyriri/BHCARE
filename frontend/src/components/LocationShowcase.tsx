@@ -145,8 +145,8 @@ const LocationShowcase = () => {
                                     <Box>
                                         <Heading size="md" color="teal.900" mb={1}>Visit Us</Heading>
                                         <Text color="gray.600" fontSize="sm" mb={2}>
-                                            Kanlaon St., Camarin, Barangay 174,<br />
-                                            Caloocan City, Metro Manila
+                                            Cadena De Amor, Caloocan,<br />
+                                            Philippines
                                         </Text>
                                         <Button
                                             size="sm"

@@ -929,7 +929,7 @@ def login():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, profile_picture FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
@@ -963,9 +963,10 @@ def login():
             "full_address": user[19]
         }
         
-        # Add profile picture URL if exists
-        if user[20]:
-            user_data["profile_picture"] = f"http://127.0.0.1:5000/static/uploads/{user[20]}"
+        
+        # Add profile picture URL if exists (Column removed for now)
+        # if user[20]:
+        #    user_data["profile_picture"] = f"http://127.0.0.1:5000/static/uploads/{user[20]}"
         
         return jsonify({"user": user_data}), 200
         

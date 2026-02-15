@@ -58,7 +58,43 @@ export const RESOURCES = {
         selectGender: "Select Gender",
         male: "Male",
         female: "Female",
-        other: "Other"
+        other: "Other",
+
+        // Dashboard
+        overallHealth: "Overall Health",
+        appointments: "Appointments",
+        healthRecords: "Health Records",
+        profileSettings: "Profile Settings",
+        healthTools: "Health Tools",
+        logout: "Logout",
+
+        // Dashboard Content
+        welcomeUser: "Welcome back, {name}! 👋",
+        healthPriority: "Your health is our priority. Manage your appointments, health records, and profile details right here.",
+        upcomingAppointments: "Upcoming Appointments",
+        healthScore: "Health Score",
+        recentActivity: "Recent Activity",
+        bookNewAppointment: "Book New Appointment",
+        viewMyAppointments: "View My Appointments",
+        scheduleConsultation: "Schedule a consultation with our healthcare providers. Choose your preferred date and time.",
+        checkAppointments: "Check your upcoming appointments, view history, and manage your bookings.",
+        bookNow: "Book Now",
+        viewAppointments: "View Appointments",
+        quickEasy: "Quick & Easy",
+        bookSimple: "Book appointments in just 3 simple steps",
+        multipleServices: "Multiple Services",
+        chooseServices: "Choose from various healthcare services",
+        instantConfirmation: "Instant Confirmation",
+        getConfirmation: "Get immediate booking confirmation",
+
+        // Profile
+        myProfile: "My Profile",
+        personalInfo: "Personal & Health Information",
+        keepUpdated: "Keep your contact details and medical preferences up to date for better healthcare delivery.",
+
+        // Tools
+        interactiveCalculators: "Interactive Health Calculators",
+        monitorHealth: "Monitor your health metrics with our handy tools. Staying informed is the first step to a healthier life."
     },
     tl: {
         // Navbar
@@ -119,7 +155,43 @@ export const RESOURCES = {
         selectGender: "Piliin ang Kasarian",
         male: "Lalaki",
         female: "Babae",
-        other: "Iba pa"
+        other: "Iba pa",
+
+        // Dashboard
+        overallHealth: "Pangkalahatang Kalusugan",
+        appointments: "Mga Appointment",
+        healthRecords: "Mga Medikal na Rekord",
+        profileSettings: "Mga Setting ng Profile",
+        healthTools: "Mga Tool sa Kalusugan",
+        logout: "Mag-logout",
+
+        // Dashboard Content
+        welcomeUser: "Maligayang pagbabalik, {name}! 👋",
+        healthPriority: "Ang iyong kalusugan ay aming priyoridad. Pamahalaan ang iyong mga appointment, medikal na rekord, at mga detalye ng profile dito.",
+        upcomingAppointments: "Mga Paparating na Appointment",
+        healthScore: "Marka ng Kalusugan",
+        recentActivity: "Kamakailang Aktibidad",
+        bookNewAppointment: "Mag-book ng Bagong Appointment",
+        viewMyAppointments: "Tingnan ang Aking mga Appointment",
+        scheduleConsultation: "Mag-iskedyul ng konsultasyon sa aming mga healthcare provider. Piliin ang iyong gustong petsa at oras.",
+        checkAppointments: "Suriin ang iyong mga paparating na appointment, tingnan ang kasaysayan, at pamahalaan ang iyong mga booking.",
+        bookNow: "Mag-book na Ngayon",
+        viewAppointments: "Tingnan ang mga Appointment",
+        quickEasy: "Mabilis at Madali",
+        bookSimple: "Mag-book ng mga appointment sa 3 simpleng hakbang lamang",
+        multipleServices: "Maraming Serbisyo",
+        chooseServices: "Pumili mula sa iba't ibang serbisyong pangkalusugan",
+        instantConfirmation: "Agarang Kumpirmasyon",
+        getConfirmation: "Kumuha ng agarang kumpirmasyon sa booking",
+
+        // Profile
+        myProfile: "Aking Profile",
+        personalInfo: "Personal at Impormasyong Pangkalusugan",
+        keepUpdated: "Panatilihing napapanahon ang iyong mga detalye ng contact at medikal na kagustuhan para sa mas mahusay na paghahatid ng pangangalagang pangkalusugan.",
+
+        // Tools
+        interactiveCalculators: "Mga Interactive na Calculator ng Kalusugan",
+        monitorHealth: "Subaybayan ang iyong mga sukatan ng kalusugan gamit ang aming mga madaling gamiting tool. Ang pagiging may kaalaman ay ang unang hakbang sa isang mas malusog na buhay."
     }
 };
 

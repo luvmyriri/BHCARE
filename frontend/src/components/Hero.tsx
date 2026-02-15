@@ -31,11 +31,7 @@ const CheckCircleIcon = (props: any) => (
     </Icon>
 );
 
-const TrophyIcon = (props: any) => (
-    <Icon viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-    </Icon>
-);
+
 
 const LocationIcon = (props: any) => (
     <Icon viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -54,8 +50,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
     const textGradient = "linear(to-r, teal.400, orange.300)";
 
     // Responsive values for floating elements with granular control and clamp() for smooth scaling
-    const topPerformingTop = useBreakpointValue({ base: '2%', md: '5%', lg: '10%', xl: '15%' });
-    const topPerformingRight = useBreakpointValue({ base: '2%', md: '-2%', lg: '-5%', xl: '0%' });
+
 
     const readinessTop = useBreakpointValue({ base: '30%', md: '35%', lg: '40%', xl: '45%' });
     const readinessLeft = useBreakpointValue({ base: '2%', md: '-10%', lg: '-15%', xl: '-5%' });
@@ -197,33 +192,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             />
                         </Box>
 
-                        {/* POPUP 1: ACHIEVEMENTS (Top Right) */}
-                        <motion.div
-                            initial={{ x: 50, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            transition={{ delay: 0.5, duration: 0.8 }}
-                            style={{ position: 'absolute', top: topPerformingTop, right: topPerformingRight, zIndex: 2 }}
-                        >
-                            <Box
-                                bg="rgba(255, 255, 255, 0.85)"
-                                backdropFilter="blur(20px)"
-                                border="1px solid rgba(255, 255, 255, 0.6)"
-                                p={4}
-                                borderRadius="2xl"
-                                boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.1)"
-                                maxW={{ base: "140px", md: "180px", lg: "200px" }}
-                            >
-                                <HStack spacing={3} mb={1}>
-                                    <Box bg="yellow.100" p={2} borderRadius="full" color="yellow.500">
-                                        <TrophyIcon boxSize={4} />
-                                    </Box>
-                                    <Text fontWeight="bold" fontSize={{ base: "xs", md: "sm" }} color="gray.700">Top Performing</Text>
-                                </HStack>
-                                <Text fontSize={{ base: "10px", md: "xs" }} color="gray.500" pl={1}>
-                                    Awarded Best Barangay Health Center 2025
-                                </Text>
-                            </Box>
-                        </motion.div>
+
 
                         {/* POPUP 2: READINESS (Left/Middle) */}
                         <motion.div
