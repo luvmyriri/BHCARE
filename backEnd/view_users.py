@@ -31,7 +31,7 @@ def view_all_users():
             user_id, email, first_name, last_name, dob, gender, city, created = user
             print("{:<5} {:<25} {:<15} {:<15} {:<12} {:<10}".format(
                 user_id, 
-                email[:24] if email else "", 
+                email, 
                 first_name[:14] if first_name else "",
                 last_name[:14] if last_name else "",
                 gender[:11] if gender else "",

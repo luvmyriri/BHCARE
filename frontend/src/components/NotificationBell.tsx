@@ -31,7 +31,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
     const fetchNotifications = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`http://localhost:5000/api/notifications?user_id=${userId}`);
+            const response = await fetch(`/api/notifications?user_id=${userId}`);
             if (response.ok) {
                 const data = await response.json();
                 setNotifications(data);
@@ -46,7 +46,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
 
     const markAsRead = async (id: number) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/notifications/${id}/read`, {
+            const response = await fetch(`/api/notifications/${id}/read`, {
                 method: 'PUT'
             });
             if (response.ok) {

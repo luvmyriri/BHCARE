@@ -33,6 +33,9 @@ import {
     IconButton,
     SimpleGrid,
     Spinner,
+    Input,
+    InputGroup,
+    InputLeftElement,
 } from '@chakra-ui/react';
 import Profile from './Profile';
 import {
@@ -45,6 +48,9 @@ import {
     FiBox,
     FiMenu,
     FiUser,
+    FiSearch,
+    FiClock,
+    FiFileText,
 } from 'react-icons/fi';
 
 interface DoctorDashboardProps {
@@ -171,11 +177,32 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
     const [selectedCard, setSelectedCard] = useState('');
     const [soapPatientId, setSoapPatientId] = useState<any>(null);
 
+    // Search & History State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedHistory, setSelectedHistory] = useState<any>(null);
+    const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure();
+
     // Data State
     const [patientsQueue, setPatientsQueue] = useState<any[]>([]);
+    const [patients, setPatients] = useState<any[]>([]); // New state for registry
     const [labResults, setLabResults] = useState<any[]>([]);
     const [inventory, setInventory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const [medicalRecords, setMedicalRecords] = useState<any[]>([]); // New state for history tab
+
+    const handleViewHistory = async (userId: number) => {
+        try {
+            const res = await fetch(`/api/patients/${userId}/history`);
+            if (res.ok) {
+                const data = await res.json();
+                setSelectedHistory(data);
+                onHistoryOpen();
+            }
+        } catch (error) {
+            console.error("Error fetching history:", error);
+        }
+    };
 
     React.useEffect(() => {
         const fetchData = async () => {
@@ -188,6 +215,20 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 if (queueRes.ok) {
                     const queueData = await queueRes.json();
                     setPatientsQueue(queueData);
+                }
+
+                // Fetch Patient Registry
+                const patRes = await fetch('/api/doctor/patients');
+                if (patRes.ok) {
+                    const patData = await patRes.json();
+                    setPatients(patData);
+                }
+
+                // Fetch Medical Records (History Tab)
+                const histRes = await fetch('/api/doctor/medical-records');
+                if (histRes.ok) {
+                    const histData = await histRes.json();
+                    setMedicalRecords(histData);
                 }
 
                 // Fetch Lab Results
@@ -363,7 +404,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                         <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" align="center" mb={6}>
                                 <Heading size="md" color="teal.800">Current Patient Queue</Heading>
-                                <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiCalendar />}>View Schedule</Button>
+                                <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiCalendar />} onClick={() => setActiveTab('schedule')}>View Schedule</Button>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
@@ -420,9 +461,16 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             description="Search, view, and update comprehensive medical histories for all registered community members."
                         />
                         <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
-                            <Flex justify="space-between" mb={6}>
+                            <Flex justify="space-between" mb={6} align="center">
                                 <Heading size="md" color="teal.800">All Registered Patients</Heading>
-                                <Button size="sm" colorScheme="teal" leftIcon={<FiUsers />}>Add New Patient</Button>
+                                <InputGroup w="300px">
+                                    <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                    <Input
+                                        placeholder="Search by name or ID..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </InputGroup>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
@@ -437,24 +485,33 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {[
-                                            { id: 'P-0012', user_id: 12, name: 'Juan Dela Cruz', age: '45', gender: 'M', contact: '0917-123-4567', last: 'Feb 10, 2026' },
-                                            { id: 'P-0013', user_id: 13, name: 'Maria Santos', age: '32', gender: 'F', contact: '0918-765-4321', last: 'Feb 12, 2026' },
-                                            { id: 'P-0015', user_id: 15, name: 'Elena Perkins', age: '28', gender: 'F', contact: '0922-555-1234', last: 'Feb 14, 2026' },
-                                            { id: 'P-0020', user_id: 20, name: 'Ricard Gomez', age: '60', gender: 'M', contact: '0999-888-7777', last: 'Jan 30, 2026' },
-                                        ].map(p => (
-                                            <Tr key={p.id}>
-                                                <Td fontWeight="bold" color="teal.600">{p.id}</Td>
-                                                <Td fontWeight="600">{p.name}</Td>
-                                                <Td>{p.age} / {p.gender}</Td>
-                                                <Td>{p.contact}</Td>
-                                                <Td>{p.last}</Td>
-                                                <Td>
-                                                    <Button size="xs" colorScheme="blue" variant="outline">View Profile</Button>
-                                                    <Button size="xs" colorScheme="teal" ml={2} onClick={() => handleOpenSoap(p.user_id)}>SOAP</Button>
-                                                </Td>
+                                        {patients.filter(p =>
+                                            p.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                            p.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                            (p.p_id && p.p_id.toLowerCase().includes(searchQuery.toLowerCase()))
+                                        ).length > 0 ? (
+                                            patients.filter(p =>
+                                                p.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                p.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                (p.p_id && p.p_id.toLowerCase().includes(searchQuery.toLowerCase()))
+                                            ).map(p => (
+                                                <Tr key={p.id}>
+                                                    <Td fontWeight="bold" color="teal.600">{p.p_id}</Td>
+                                                    <Td fontWeight="600">{p.first_name} {p.last_name}</Td>
+                                                    <Td>{p.age} / {p.gender}</Td>
+                                                    <Td>{p.contact_number}</Td>
+                                                    <Td>{p.last_visit}</Td>
+                                                    <Td>
+                                                        <Button size="xs" colorScheme="blue" variant="outline" onClick={() => handleViewHistory(p.id)}>View Profile</Button>
+                                                        <Button size="xs" colorScheme="teal" ml={2} onClick={() => handleOpenSoap(p.id)}>SOAP</Button>
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={6} textAlign="center">No patients found.</Td>
                                             </Tr>
-                                        ))}
+                                        )}
                                     </Tbody>
                                 </Table>
                             </Box>
@@ -556,22 +613,23 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {[
-                                            { date: '2026-02-14', patient: 'Elena Perkins', diag: 'Hyperacidity', doc: 'Dr. Maria Santos' },
-                                            { date: '2026-02-12', patient: 'Maria Santos', diag: 'Common Cold', doc: 'Dr. Ricardo Gomez' },
-                                            { date: '2026-02-10', patient: 'Juan Dela Cruz', diag: 'Hypertension - Stage 1', doc: 'Dr. Maria Santos' },
-                                            { date: '2026-01-30', patient: 'Ricard Gomez', diag: 'Diabetes Mellitus Type 2', doc: 'Dr. Ricardo Gomez' },
-                                        ].map((r, i) => (
-                                            <Tr key={i}>
-                                                <Td>{r.date}</Td>
-                                                <Td fontWeight="600">{r.patient}</Td>
-                                                <Td>{r.diag}</Td>
-                                                <Td>{r.doc}</Td>
-                                                <Td>
-                                                    <Button size="xs" colorScheme="teal">View Details</Button>
-                                                </Td>
+                                        {medicalRecords.length > 0 ? (
+                                            medicalRecords.map((r, i) => (
+                                                <Tr key={i}>
+                                                    <Td>{r.appointment_date}</Td>
+                                                    <Td fontWeight="600">{r.patient_name}</Td>
+                                                    <Td>{r.diagnosis || 'N/A'}</Td>
+                                                    <Td>{r.doctor_name}</Td>
+                                                    <Td>
+                                                        <Button size="xs" colorScheme="teal" onClick={() => handleViewHistory(r.user_id)}>View Details</Button>
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={5} textAlign="center">No medical records found.</Td>
                                             </Tr>
-                                        ))}
+                                        )}
                                     </Tbody>
                                 </Table>
                             </Box>
@@ -812,6 +870,64 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     </DrawerBody>
                 </DrawerContent>
             </Drawer>
+
+            {/* Medical History Modal */}
+            <Modal isOpen={isHistoryOpen} onClose={onHistoryClose} size="3xl" scrollBehavior="inside">
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Patient Medical History</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        {selectedHistory ? (
+                            <VStack align="stretch" spacing={6}>
+                                <Box bg="blue.50" p={4} borderRadius="xl">
+                                    <HStack spacing={4}>
+                                        <Avatar size="lg" name={`${selectedHistory.patient.first_name} ${selectedHistory.patient.last_name}`} />
+                                        <VStack align="start" spacing={1}>
+                                            <Heading size="md">{selectedHistory.patient.first_name} {selectedHistory.patient.last_name}</Heading>
+                                            <Text fontSize="sm" color="gray.600">ID: P-{String(selectedHistory.patient.id).padStart(4, '0')} | {selectedHistory.patient.age} yrs | {selectedHistory.patient.gender}</Text>
+                                            <HStack>
+                                                <Badge colorScheme="blue">{selectedHistory.patient.blood_type || 'Blood Type N/A'}</Badge>
+                                                <Badge colorScheme="green">{selectedHistory.patient.height || '-'} cm</Badge>
+                                                <Badge colorScheme="orange">{selectedHistory.patient.weight || '-'} kg</Badge>
+                                            </HStack>
+                                        </VStack>
+                                    </HStack>
+                                </Box>
+
+                                <Box>
+                                    <Heading size="sm" mb={4} color="gray.700">Past Consultations</Heading>
+                                    {selectedHistory.history.length > 0 ? (
+                                        <VStack align="stretch" spacing={3}>
+                                            {selectedHistory.history.map((h: any, i: number) => (
+                                                <Box key={i} p={4} border="1px solid" borderColor="gray.200" borderRadius="lg">
+                                                    <Flex justify="space-between" mb={2}>
+                                                        <HStack>
+                                                            <Icon as={FiCalendar} color="gray.500" />
+                                                            <Text fontWeight="bold">{h.appointment_date}</Text>
+                                                            <Text color="gray.500" fontSize="sm">({h.appointment_time})</Text>
+                                                        </HStack>
+                                                        <Badge colorScheme="green">{h.service_type}</Badge>
+                                                    </Flex>
+                                                    <Text fontWeight="600" color="teal.700">Diagnosis: {h.diagnosis || 'N/A'}</Text>
+                                                    <Text fontSize="sm" mt={1} color="gray.600">{h.notes || 'No notes recorded.'}</Text>
+                                                </Box>
+                                            ))}
+                                        </VStack>
+                                    ) : (
+                                        <Text fontStyle="italic" color="gray.500">No past medical records found.</Text>
+                                    )}
+                                </Box>
+                            </VStack>
+                        ) : (
+                            <Flex justify="center" p={8}><Spinner /></Flex>
+                        )}
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button onClick={onHistoryClose}>Close</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
         </Box>
     );
 };

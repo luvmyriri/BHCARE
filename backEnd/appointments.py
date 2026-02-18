@@ -507,3 +507,77 @@ def add_walk_in():
         return jsonify({"message": "Walk-in added to queue", "appointment_id": appt_id}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
+
+
+@appointments_bp.route('/api/queue', methods=['GET'])
+def get_queue():
+    """Get today's appointment queue"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        today = date.today()
+        
+        query = """
+            SELECT 
+                a.id, 
+                a.appointment_time, 
+                a.service_type, 
+                a.status,
+                u.first_name, 
+                u.last_name,
+                u.gender
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.appointment_date = %s
+              AND a.status IN ('pending', 'confirmed', 'serving')
+            ORDER BY a.appointment_time ASC
+        """
+        
+        cursor.execute(query, (today,))
+        queue = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        # Format time objects to string
+        for item in queue:
+            if isinstance(item['appointment_time'], (datetime, time)):
+                item['appointment_time'] = item['appointment_time'].strftime('%H:%M')
+                
+        return jsonify(queue), 200
+        
+    except Exception as e:
+        print(f"Error fetching queue: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@appointments_bp.route('/api/appointments/<int:appointment_id>/status', methods=['PUT'])
+def update_appointment_status(appointment_id):
+    """Update appointment status (e.g. to 'serving' or 'completed')"""
+    try:
+        data = request.json
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({"error": "Status is required"}), 400
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE appointments 
+            SET status = %s 
+            WHERE id = %s
+        """, (new_status, appointment_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({"message": f"Appointment status updated to {new_status}"}), 200
+        
+    except Exception as e:
+        print(f"Error updating appointment status: {e}")
+        return jsonify({"error": str(e)}), 500

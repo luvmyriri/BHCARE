@@ -13,6 +13,7 @@ import Services from './services';
 import Dashboard from './Dashboard';
 import DoctorDashboard from './DoctorDashboard';
 import AdminDashboard from './AdminDashboard';
+import MedicalStaffDashboard from './MedicalStaffDashboard';
 import SecurityDashboard from './SecurityDashboard';
 import FloatingActions from './components/FloatingActions';
 
@@ -34,7 +35,8 @@ function App() {
       } else if (userData.email === 'security@bhcare.ph' || userData.email === 'security1741@bhcare.ph') {
         userData.role = 'security';
       } else {
-        userData.role = 'patient';
+        // Use existing role or default to patient
+        userData.role = userData.role || 'patient';
       }
       return userData;
     } catch {
@@ -67,7 +69,8 @@ function App() {
           } else if (freshData.email === 'security@bhcare.ph' || freshData.email === 'security1741@bhcare.ph') {
             freshData.role = 'security';
           } else {
-            freshData.role = 'patient';
+            // Use existing role or default to patient
+            freshData.role = freshData.role || 'patient';
           }
 
           // Update both state and localStorage
@@ -98,7 +101,8 @@ function App() {
     } else if (u.email === 'security@bhcare.ph' || u.email === 'security1741@bhcare.ph') {
       u.role = 'security';
     } else {
-      u.role = 'patient';
+      // Use existing role or default to patient
+      u.role = u.role || 'patient';
     }
     setUser(u);
     setShowLogin(false);
@@ -116,6 +120,14 @@ function App() {
     if (user.role === 'admin') {
       return (
         <AdminDashboard
+          user={user}
+          onLogout={onLogoutClick}
+        />
+      );
+    }
+    if (user.role === 'Medical Staff') {
+      return (
+        <MedicalStaffDashboard
           user={user}
           onLogout={onLogoutClick}
         />

@@ -523,7 +523,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault(); setLoading(true); setError('');
     try {
-      const res = await fetch('/login', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -610,7 +610,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       console.log('[OCR] Sending to /ocr-dual endpoint...');
       setOcrStatus('Scanning ID (this may take 10-20 seconds)...');
 
-      const res = await fetch('/ocr-dual', { method: 'POST', body: formData });
+      const res = await fetch('/api/ocr-dual', { method: 'POST', body: formData });
       console.log('[OCR] Response received, status:', res.status);
 
       let data;
@@ -778,7 +778,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
     setLoading(true);
     try {
-      const res = await fetch('/register', { method: 'POST', body: formData });
+      const res = await fetch('/api/register', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Registration failed');
       alert('Registration successful!');

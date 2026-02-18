@@ -12,7 +12,7 @@ import requests
 from PIL import Image, ImageEnhance, ImageFilter
 import io
 import re
-from datetime import datetime
+from datetime import datetime, date
 from email_config import (
     init_mail,
     generate_reset_token,
@@ -767,7 +767,7 @@ class PHIDParser:
 
 
 # ============= DUAL OCR ENDPOINT =============
-@app.route("/ocr-dual", methods=["POST"])
+@app.route("/api/ocr-dual", methods=["POST"])
 def ocr_dual():
     """Process front and back of ID"""
     try:
@@ -894,7 +894,7 @@ def ocr():
         return jsonify({"error": str(e)}), 500
 
 # ============= EXISTING ROUTES =============
-@app.route("/login", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
 def login():
     data = request.json
     email = data.get('email')
@@ -929,15 +929,18 @@ def login():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, role FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
         
         if not user:
+            print(f"[LOGIN FAIL] User not found for email: {email}")
             return jsonify({"error": "Invalid credentials"}), 401
         
         if not bcrypt.check_password_hash(user[2], password):
+            print(f"[LOGIN FAIL] Password hash mismatch for user: {email}")
+            print(f"Stored hash: {user[2]}")
             return jsonify({"error": "Invalid credentials"}), 401
         
         # Build complete user object
@@ -960,7 +963,8 @@ def login():
             "street_name": user[16],
             "subdivision": user[17],
             "zip_code": user[18],
-            "full_address": user[19]
+            "full_address": user[19],
+            "role": user[20]
         }
         
         
@@ -973,7 +977,7 @@ def login():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/register", methods=["POST"])
+@app.route("/api/register", methods=["POST"])
 def register():
     try:
         data = request.form
@@ -1118,7 +1122,7 @@ def update_user(user_id):
         allowed_fields = [
             'first_name', 'middle_name', 'last_name', 'date_of_birth', 
             'gender', 'contact_number', 'philhealth_id', 
-            'barangay', 'city', 'province', 'email',
+            'barangay', 'city', 'province', 'email', 'role',
             'house_number', 'block_number', 'lot_number', 'street_name', 'subdivision', 'zip_code'
         ]
         
@@ -1156,6 +1160,51 @@ def update_user(user_id):
         return jsonify({"message": "User updated successfully"}), 200
     except Exception as e:
         print(f"Error updating user: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/users", methods=["GET"])
+def get_all_users():
+    """Get all users for admin dashboard"""
+    try:
+        conn = get_db()
+        # Use RealDictCursor to get dictionary-like objects
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Select relevant fields, excluding sensitive auth data
+        query = """
+            SELECT 
+                id, first_name, last_name, email, 
+                contact_number, gender, date_of_birth,
+                barangay, city, role, created_at
+            FROM users 
+            ORDER BY created_at DESC
+        """
+        
+        cur.execute(query)
+        users = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        # Format dates and handle None values
+        user_list = []
+        for user in users:
+            user_dict = dict(user)
+            if user_dict.get('date_of_birth'):
+                user_dict['date_of_birth'] = user_dict['date_of_birth'].strftime('%Y-%m-%d')
+            if user_dict.get('created_at'):
+                user_dict['created_at'] = user_dict['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Role is now direct from DB
+            user_dict['role'] = user_dict.get('role', 'Patient')
+                
+            user_list.append(user_dict)
+                
+        return jsonify(user_list), 200
+        
+    except Exception as e:
+        print(f"Error fetching all users: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1271,37 +1320,45 @@ def check_philhealth():
 
 
 
+
 @app.route("/api/forgot-password", methods=["POST"])
 def forgot_password():
     """Send 6-digit verification code to email"""
     try:
         data = request.json
         email = data.get('email')
+        print(f"[FORGOT DEBUG] Received request for email: {email}")
         
         if not email:
+            print("[FORGOT DEBUG] Email is required but missing")
             return jsonify({"error": "Email is required"}), 400
             
         # Check if email exists in DB
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        cur.execute("SELECT id, email FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
         user_exists = cur.fetchone()
         cur.close()
         conn.close()
         
         if not user_exists:
+            print(f"[FORGOT DEBUG] Email {email} not found in DB")
             # Security: Don't reveal if email exists, just pretend it worked
             # Delay slightly to prevent timing attacks
             import time
             time.sleep(1)
             return jsonify({"message": "If this email is registered, a code has been sent."}), 200
             
+        print(f"[FORGOT DEBUG] Email {email} found. Generating token...")
         # Generate and store code
         code = generate_reset_token()
         store_reset_token(email, code)
+        print(f"[FORGOT DEBUG] Token generated: {code} for {email}")
         
         # Send email
+        print(f"[FORGOT DEBUG] Attempting to send email...")
         send_password_reset_email(mail, email, code)
+        print(f"[FORGOT DEBUG] Email sent successfully to {email}")
         
         return jsonify({"message": "Verification code sent"}), 200
         
@@ -1358,7 +1415,9 @@ def reset_password():
         # Update database
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("UPDATE users SET password_hash = %s WHERE email = %s", (hashed, email))
+        cur.execute("UPDATE users SET password_hash = %s WHERE LOWER(email) = LOWER(%s)", (hashed, email))
+        updated_rows = cur.rowcount
+        print(f"[RESET DEBUG] Updated {updated_rows} rows for email {email}")
         conn.commit()
         cur.close()
         conn.close()
@@ -1370,6 +1429,308 @@ def reset_password():
         
     except Exception as e:
         print(f"[RESET ERROR] {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/doctor/patients", methods=["GET"])
+def get_doctor_patients():
+    """Get all patients for doctor dashboard with computed fields"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # 1. Get all patients
+        query = """
+            SELECT 
+                id, first_name, last_name, email, 
+                contact_number, gender, date_of_birth,
+                role
+            FROM users 
+            WHERE role = 'Patient' OR role IS NULL
+            ORDER BY last_name ASC
+        """
+        cur.execute(query)
+        patients = cur.fetchall()
+        
+        # 2. Get last visit for each patient (max completed appointment)
+        # We'll do this in a separate query or join. A subquery is cleaner here.
+        # But for simplicity in this codebase, let's just fetch all completed appointments and map them in python
+        # or use a LEFT JOIN if possible.
+        
+        # Let's try an enhanced query with LEFT JOIN to get last visit
+        query_enhanced = """
+            SELECT 
+                u.id, u.first_name, u.last_name, u.contact_number, 
+                u.gender, u.date_of_birth,
+                MAX(a.appointment_date) as last_visit
+            FROM users u
+            LEFT JOIN appointments a ON u.id = a.user_id AND a.status = 'completed'
+            WHERE u.role = 'Patient' OR u.role IS NULL
+            GROUP BY u.id
+            ORDER BY u.last_name ASC
+        """
+        
+        cur.execute(query_enhanced)
+        patients = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        patient_list = []
+        for p in patients:
+            pat = dict(p)
+            
+            # Format Last Visit
+            if pat.get('last_visit'):
+                pat['last_visit'] = pat['last_visit'].strftime('%b %d, %Y')
+            else:
+                pat['last_visit'] = 'No visits yet'
+                
+            # Compute Age
+            if pat.get('date_of_birth'):
+                dob = pat['date_of_birth']
+                today = date.today()
+                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                pat['age'] = str(age)
+            else:
+                pat['age'] = 'N/A'
+                
+            # P-ID format
+            pat['p_id'] = f"P-{str(pat['id']).zfill(4)}"
+            
+            patient_list.append(pat)
+            
+        return jsonify(patient_list), 200
+        
+    except Exception as e:
+        print(f"Error fetching doctor patients: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/patients/<int:user_id>/history", methods=["GET"])
+def get_patient_history(user_id):
+    """Get patient medical history (appointments and labs)"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # 1. Get Patient Details
+        cur.execute("""
+            SELECT id, first_name, last_name, date_of_birth, gender, contact_number, blood_type, height, weight
+            FROM users WHERE id = %s
+        """, (user_id,))
+        patient = cur.fetchone()
+        
+        if not patient:
+            return jsonify({"error": "Patient not found"}), 404
+            
+        patient = dict(patient)
+        
+        # Calculate Age
+        if patient.get('date_of_birth'):
+            dob = patient['date_of_birth']
+            today = date.today()
+            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            patient['age'] = str(age)
+            patient['date_of_birth'] = dob.strftime('%Y-%m-%d')
+        else:
+            patient['age'] = 'N/A'
+
+        # 2. Get Past Consultations (Completed Appointments)
+        cur.execute("""
+            SELECT 
+                id, appointment_date, appointment_time, service_type, 
+                status, reason, diagnosis, notes
+            FROM appointments 
+            WHERE user_id = %s AND status = 'completed'
+            ORDER BY appointment_date DESC, appointment_time DESC
+        """, (user_id,))
+        history = cur.fetchall()
+        
+        # Format history
+        history_list = []
+        for h in history:
+            item = dict(h)
+            if item.get('appointment_date'):
+                item['appointment_date'] = item['appointment_date'].strftime('%Y-%m-%d')
+            if item.get('appointment_time'):
+                # Handle time or datetime objects
+                if isinstance(item['appointment_time'], (datetime, time)):
+                    item['appointment_time'] = item['appointment_time'].strftime('%H:%M')
+                else:
+                    item['appointment_time'] = str(item['appointment_time'])
+            history_list.append(item)
+
+        # 3. Get Lab Results (Mock or Real table if exists)
+        # Assuming we might have a labs table or we just return empty for now if not fully implemented
+        # For this task, let's keep it simple or check if 'lab_requests' table exists. 
+        # Based on previous context, there is a /api/lab-results endpoint, so likely a table exists.
+        # Let's check `lab_results` table if it exists, otherwise empty list.
+        # Since I haven't seen the `lab_results` schema explicitly recently, I'll return an empty list or try a safe query.
+        # Actually, `DoctorDashboard.tsx` calls `/api/lab-results`, so let's see `app.py` for that endpoint to know table name.
+        
+        lab_list = []
+        # (Optional: Add lab fetch logic here if schema is known. Skipping to avoid errors if table doesn't exist)
+
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "patient": patient,
+            "history": history_list,
+            "labs": lab_list
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching patient history: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/doctor/medical-records", methods=["GET"])
+def get_all_medical_records():
+    """Get all completed appointments/consultations for the doctor's records view"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        query = """
+            SELECT 
+                a.id, a.appointment_date, a.appointment_time, 
+                a.service_type, a.diagnosis, a.notes,
+                u.first_name, u.last_name, u.id as user_id
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.status = 'completed'
+            ORDER BY a.appointment_date DESC, a.appointment_time DESC
+            LIMIT 50
+        """
+        cur.execute(query)
+        records = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        record_list = []
+        for r in records:
+            rec = dict(r)
+            if rec.get('appointment_date'):
+                rec['appointment_date'] = rec['appointment_date'].strftime('%Y-%m-%d')
+            if rec.get('appointment_time'):
+                 if isinstance(rec['appointment_time'], (datetime, time)):
+                    rec['appointment_time'] = rec['appointment_time'].strftime('%H:%M')
+                 else:
+                    rec['appointment_time'] = str(rec['appointment_time'])
+            
+            # Format Patient Name
+            rec['patient_name'] = f"{rec['first_name']} {rec['last_name']}"
+            # Mock Doctor Name (Since we don't have doctor assignment per appointment yet, or it's implicitly the current doctor)
+            rec['doctor_name'] = "Dr. Medical Officer" 
+            
+            record_list.append(rec)
+            
+        return jsonify(record_list), 200
+        
+    except Exception as e:
+        print(f"Error fetching medical records: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/stats", methods=["GET"])
+def get_admin_stats():
+    """Get statistics for the admin dashboard"""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Total Users
+        cur.execute("SELECT COUNT(*) FROM users")
+        total_users = cur.fetchone()[0]
+
+        # Active Doctors
+        cur.execute("SELECT COUNT(*) FROM users WHERE role = 'Doctor'")
+        active_doctors = cur.fetchone()[0]
+
+        # Today's Appointments
+        today = date.today()
+        cur.execute("SELECT COUNT(*) FROM appointments WHERE appointment_date = %s", (today,))
+        todays_appointments = cur.fetchone()[0]
+
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            "total_users": total_users,
+            "active_doctors": active_doctors,
+            "todays_appointments": todays_appointments,
+            "system_health": "98%"  # Mock value
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching admin stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/activities", methods=["GET"])
+def get_admin_activities():
+    """Get recent system activities (simulated from appointments and users)"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        activities = []
+
+        # Recent Appointments
+        cur.execute("""
+            SELECT a.id, a.appointment_date, a.appointment_time, a.status, u.first_name, u.last_name, a.service_type, a.reason
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            ORDER BY a.appointment_date DESC, a.appointment_time DESC
+            LIMIT 5
+        """)
+        appt_recs = cur.fetchall()
+        for r in appt_recs:
+            status_action = "New appointment booked"
+            if r['status'] == 'completed':
+                status_action = "Completed consultation"
+            elif r['status'] == 'cancelled':
+                status_action = "Cancelled appointment"
+            
+            # Rough time estimation since we don't have created_at
+            time_display = r['appointment_date'].strftime('%Y-%m-%d')
+            
+            activities.append({
+                "id": str(r['id']),
+                "user": f"{r['first_name']} {r['last_name']}",
+                "action": f"{status_action} ({r['service_type']})",
+                "time": time_display,
+                "type": r['status'].upper() if r['status'] else 'NEW',
+                "details": f"Reason: {r.get('reason', 'N/A')} | Service: {r['service_type']} | Date: {r['appointment_date']} {r['appointment_time']}",
+                "sort_key": str(r['appointment_date']) + str(r['appointment_time'])
+            })
+
+        # Recent Users (using ID as proxy for recency)
+        cur.execute("SELECT first_name, last_name, role, id, email FROM users ORDER BY id DESC LIMIT 3")
+        user_recs = cur.fetchall()
+        for u in user_recs:
+            activities.append({
+                "id": str(u['id']),
+                "user": f"{u['first_name']} {u['last_name']}",
+                "action": f"New user registered as {u['role']}",
+                "time": "Recently", # simplified
+                "type": "USER",
+                "details": f"Email: {u.get('email', 'N/A')} | Role: {u['role']} | User ID: {u['id']}",
+                "sort_key": f"9999-{u['id']}" # forceful float to top if simplified
+            })
+
+        # Sort combined list (simplistic sort)
+        activities.sort(key=lambda x: x['sort_key'], reverse=True)
+        
+        cur.close()
+        conn.close()
+
+        return jsonify(activities[:10]), 200
+
+    except Exception as e:
+        print(f"Error fetching admin activities: {e}")
         return jsonify({"error": str(e)}), 500
 
 

@@ -31,6 +31,7 @@ import {
     DrawerContent,
     DrawerCloseButton,
     IconButton,
+    Select,
 } from '@chakra-ui/react';
 import {
     FiGrid,
@@ -173,6 +174,125 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
     const [selectedCard, setSelectedCard] = useState('');
+    const [users, setUsers] = useState<any[]>([]);
+
+    // User Management State
+    const [editUser, setEditUser] = useState<any>(null);
+    const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
+    const [formData, setFormData] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        contact_number: '',
+        role: 'Patient'
+    });
+
+    // Stats & Activities State
+    const [stats, setStats] = useState({
+        total_users: 0,
+        active_doctors: 0,
+        todays_appointments: 0,
+        system_health: '98%'
+    });
+    const [recentActivities, setRecentActivities] = useState<any[]>([]);
+    const [selectedActivity, setSelectedActivity] = useState<any>(null);
+    const { isOpen: isActivityOpen, onOpen: onActivityOpen, onClose: onActivityClose } = useDisclosure();
+
+    const handleViewActivity = (activity: any) => {
+        setSelectedActivity(activity);
+        onActivityOpen();
+    };
+
+    React.useEffect(() => {
+        if (activeTab === 'users') {
+            fetchUsers();
+        }
+        if (activeTab === 'overview') {
+            fetchDashboardData();
+        }
+    }, [activeTab]);
+
+    const fetchDashboardData = async () => {
+        try {
+            const statsRes = await fetch('/api/admin/stats');
+            if (statsRes.ok) {
+                const data = await statsRes.json();
+                setStats(data);
+            }
+
+            const actRes = await fetch('/api/admin/activities');
+            if (actRes.ok) {
+                const data = await actRes.json();
+                setRecentActivities(data);
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        }
+    };
+
+    const fetchUsers = async () => {
+        try {
+            const response = await fetch('/api/admin/users');
+            if (response.ok) {
+                const data = await response.json();
+                setUsers(data);
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    };
+
+    const handleEditClick = (user: any) => {
+        setEditUser(user);
+        setFormData({
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            email: user.email || '',
+            contact_number: user.contact_number || '',
+            role: user.role || 'Patient'
+        });
+        onEditOpen();
+    };
+
+    const handleUpdateUser = async () => {
+        if (!editUser) return;
+
+        try {
+            const response = await fetch(`/user/${editUser.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                onEditClose();
+                fetchUsers(); // Refresh list
+            } else {
+                alert('Failed to update user');
+            }
+        } catch (error) {
+            console.error('Error updating user:', error);
+        }
+    };
+
+    const handleDeleteUser = async (id: number) => {
+        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+
+        try {
+            const response = await fetch(`/api/admin/users/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                fetchUsers(); // Refresh list
+            } else {
+                alert('Failed to delete user');
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+        }
+    };
+
 
     const handleCardClick = (card: string) => {
         setSelectedCard(card);
@@ -267,6 +387,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </>
                 );
             // FHSIS Modal Content
+            case 'activity':
+                return (
+                    <ModalBody>
+                        {selectedActivity ? (
+                            <VStack align="stretch" spacing={4}>
+                                <Box>
+                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">User</Text>
+                                    <Text fontSize="lg">{selectedActivity.user}</Text>
+                                </Box>
+                                <Box>
+                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Action</Text>
+                                    <Text>{selectedActivity.action}</Text>
+                                </Box>
+                                <Box>
+                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Type</Text>
+                                    <Badge colorScheme={
+                                        selectedActivity.type === 'UPDATE' ? 'blue' :
+                                            selectedActivity.type === 'NEW' ? 'green' :
+                                                selectedActivity.type === 'COMPLETE' ? 'orange' :
+                                                    selectedActivity.type === 'COMPLETED' ? 'orange' : 'gray'
+                                    }>{selectedActivity.type}</Badge>
+                                </Box>
+                                <Box>
+                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Timestamp</Text>
+                                    <Text>{selectedActivity.time}</Text>
+                                </Box>
+                                <Divider />
+                                <Box>
+                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Additional Details</Text>
+                                    <Text mt={1} p={3} bg="gray.50" borderRadius="md">{selectedActivity.details || 'No further details available.'}</Text>
+                                </Box>
+                            </VStack>
+                        ) : (
+                            <Text>No activity selected.</Text>
+                        )}
+                    </ModalBody>
+                );
             case 'prenatal':
                 return (
                     <>
@@ -321,13 +478,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         }
     };
 
-    const recentActivities = [
-        { id: 1, user: 'Dr. Maria Santos', action: 'Updated patient record', time: '5 mins ago', type: 'update' },
-        { id: 2, user: 'Juan Dela Cruz', action: 'New appointment booked', time: '15 mins ago', type: 'new' },
-        { id: 3, user: 'Dr. Ricardo Gomez', action: 'Completed consultation', time: '30 mins ago', type: 'complete' },
-        { id: 4, user: 'System', action: 'Daily backup completed', time: '1 hour ago', type: 'system' },
-    ];
-
     const renderContent = () => {
         switch (activeTab) {
             case 'overview':
@@ -342,14 +492,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={6}>
                             <AdminStatCard
                                 label="Total Users"
-                                value="156"
+                                value={stats.total_users}
                                 icon={FiUsers}
                                 color="teal"
                                 onClick={() => handleCardClick('users')}
                             />
-                            <AdminStatCard label="Active Doctors" value="8" icon={FiActivity} color="orange" onClick={() => handleCardClick('doctors')} />
-                            <AdminStatCard label="Today's Appointments" value="42" icon={FiCalendar} color="blue" onClick={() => handleCardClick('appointments')} />
-                            <AdminStatCard label="System Health" value="98%" icon={FiBarChart2} color="green" onClick={() => handleCardClick('system')} />
+                            <AdminStatCard label="Active Doctors" value={stats.active_doctors} icon={FiActivity} color="orange" onClick={() => handleCardClick('doctors')} />
+                            <AdminStatCard label="Today's Appointments" value={stats.todays_appointments} icon={FiCalendar} color="blue" onClick={() => handleCardClick('appointments')} />
+                            <AdminStatCard label="System Health" value={stats.system_health} icon={FiBarChart2} color="green" onClick={() => handleCardClick('system')} />
                         </SimpleGrid>
 
                         <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
@@ -369,26 +519,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {recentActivities.map(a => (
-                                            <Tr key={a.id}>
-                                                <Td fontWeight="600">{a.user}</Td>
-                                                <Td>{a.action}</Td>
-                                                <Td>{a.time}</Td>
+                                        {recentActivities.map((activity, index) => (
+                                            <Tr key={index}>
+                                                <Td fontWeight="bold">{activity.user}</Td>
+                                                <Td>{activity.action}</Td>
+                                                <Td color="gray.500" fontSize="sm">{activity.time}</Td>
                                                 <Td>
                                                     <Badge
                                                         colorScheme={
-                                                            a.type === 'new' ? 'green' :
-                                                                a.type === 'update' ? 'blue' :
-                                                                    a.type === 'complete' ? 'orange' : 'gray'
+                                                            activity.type === 'UPDATE' ? 'blue' :
+                                                                activity.type === 'NEW' ? 'green' :
+                                                                    activity.type === 'COMPLETE' ? 'orange' :
+                                                                        activity.type === 'COMPLETED' ? 'orange' : 'gray'
                                                         }
-                                                        borderRadius="full"
-                                                        px={3}
                                                     >
-                                                        {a.type}
+                                                        {activity.type}
                                                     </Badge>
                                                 </Td>
                                                 <Td>
-                                                    <Button size="xs" colorScheme="teal" variant="ghost">View</Button>
+                                                    <Button size="xs" variant="link" colorScheme="teal" onClick={() => { handleCardClick('activity'); handleViewActivity(activity); }}>View</Button>
                                                 </Td>
                                             </Tr>
                                         ))}
@@ -406,9 +555,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             title="System Users & Permissions"
                             description="Manage all user accounts, roles, and access permissions for doctors, staff, and patients."
                         />
-                        <Flex h="300px" align="center" justify="center" bg="white" borderRadius="2xl" border="1px dashed" borderColor="gray.200">
-                            <Text color="gray.400">User Management Module Integration in Progress</Text>
-                        </Flex>
+                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Flex justify="space-between" align="center" mb={6}>
+                                <Heading size="md" color="teal.800">Registered Users</Heading>
+                                <Button size="sm" colorScheme="orange" leftIcon={<FiActivity />} onClick={fetchUsers}>Refresh List</Button>
+                            </Flex>
+                            <Box overflowX="auto">
+                                <Table variant="simple">
+                                    <Thead>
+                                        <Tr>
+                                            <Th>ID</Th>
+                                            <Th>Name</Th>
+                                            <Th>Email</Th>
+                                            <Th>Role</Th>
+                                            <Th>Joined</Th>
+                                            <Th>Actions</Th>
+                                        </Tr>
+                                    </Thead>
+                                    <Tbody>
+                                        {users.length > 0 ? (
+                                            users.map((user) => (
+                                                <Tr key={user.id}>
+                                                    <Td>#{user.id}</Td>
+                                                    <Td fontWeight="600">{user.first_name} {user.last_name}</Td>
+                                                    <Td>{user.email}</Td>
+                                                    <Td>
+                                                        <Badge colorScheme={user.role === 'Administrator' ? 'red' : user.role === 'Medical Staff' ? 'blue' : 'green'}>
+                                                            {user.role}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td>{user.created_at || 'N/A'}</Td>
+                                                    <Td>
+                                                        <HStack spacing={2}>
+                                                            <Button size="xs" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
+                                                            <Button size="xs" colorScheme="red" variant="ghost" onClick={() => handleDeleteUser(user.id)}>Delete</Button>
+                                                        </HStack>
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={6} textAlign="center">No users found.</Td>
+                                            </Tr>
+                                        )}
+                                    </Tbody>
+                                </Table>
+                            </Box>
+                        </Box>
                     </VStack>
                 );
             case 'doctors':
@@ -729,6 +922,70 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </DrawerBody>
                 </DrawerContent>
             </Drawer>
+
+            {/* Edit User Modal */}
+            <Modal isOpen={isEditOpen} onClose={onEditClose}>
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Edit User</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        <VStack spacing={4}>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">First Name</Text>
+                                <input
+                                    className="chakra-input css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
+                                    value={formData.first_name}
+                                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                                />
+                            </Box>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Last Name</Text>
+                                <input
+                                    className="chakra-input css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
+                                    value={formData.last_name}
+                                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                                />
+                            </Box>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Email</Text>
+                                <input
+                                    className="chakra-input css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                />
+                            </Box>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Contact Number</Text>
+                                <input
+                                    className="chakra-input css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
+                                    value={formData.contact_number}
+                                    onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                                />
+                            </Box>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Role (Access Level)</Text>
+                                <Select
+                                    value={formData.role}
+                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                >
+                                    <option value="Patient">Patient</option>
+                                    <option value="Medical Staff">Medical Staff</option>
+                                    <option value="Administrator">Administrator</option>
+                                </Select>
+                            </Box>
+                        </VStack>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="ghost" mr={3} onClick={onEditClose}>Cancel</Button>
+                        <Button colorScheme="blue" onClick={handleUpdateUser}>Save Changes</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
         </Box>
     );
 };

@@ -187,6 +187,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
         setLanguage(language === 'en' ? 'tl' : 'en');
     };
 
+    const [appointments, setAppointments] = useState<any[]>([]);
+
+    React.useEffect(() => {
+        if (user?.id) {
+            fetch(`/api/appointments?user_id=${user.id}`)
+                .then(res => res.json())
+                .then(data => {
+                    // Filter for upcoming appointments only
+                    const upcoming = data.filter((appt: any) => new Date(appt.date) >= new Date() && appt.status !== 'Cancelled').sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    setAppointments(upcoming);
+                })
+                .catch(err => console.error(err));
+        }
+    }, [user?.id]);
+
+    const nextAppointment = appointments.length > 0 ? appointments[0] : null;
+
     const renderModalContent = () => {
         switch (selectedCard) {
             case 'appointments':
@@ -194,11 +211,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                     <>
                         <ModalHeader>{t.upcomingAppointments}</ModalHeader>
                         <ModalBody>
-                            <Box p={4} bg="teal.50" borderRadius="lg" mb={4}>
-                                <Text fontWeight="bold" color="teal.800">Next Visit: Feb 24, 2026</Text>
-                                <Text fontSize="sm">Reason: Medical Check-up</Text>
-                                <Text fontSize="sm">Doctor: Dr. Maria Santos</Text>
-                            </Box>
+                            {nextAppointment ? (
+                                <Box p={4} bg="teal.50" borderRadius="lg" mb={4}>
+                                    <Text fontWeight="bold" color="teal.800">Next Visit: {new Date(nextAppointment.date).toLocaleDateString()}</Text>
+                                    <Text fontSize="sm">Reason: {nextAppointment.service_type || 'Medical Check-up'}</Text>
+                                    <Text fontSize="sm">Doctor: {nextAppointment.doctor_name || 'Dr. Maria Santos'}</Text>
+                                    <Text fontSize="sm" color="teal.600" mt={1}>{nextAppointment.time}</Text>
+                                </Box>
+                            ) : (
+                                <Box p={4} bg="gray.50" borderRadius="lg" mb={4} textAlign="center">
+                                    <Text color="gray.500">No upcoming appointments.</Text>
+                                </Box>
+                            )}
                             <Button size="sm" w="full" colorScheme="teal" onClick={() => setActiveTab('appointments')}>{t.bookNewAppointment}</Button>
                         </ModalBody>
                     </>
@@ -269,7 +293,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                         />
 
                         <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={6}>
-                            <StatCard label={t.upcomingAppointments} value="1" icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
+                            <StatCard label={t.upcomingAppointments} value={appointments.length.toString()} icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
                             <StatCard label={t.healthRecords} value="12" icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
                             <StatCard label={t.healthScore} value="98%" icon={FiActivity} color="green" onClick={() => handleCardClick('health_score')} />
                         </SimpleGrid>
@@ -278,20 +302,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             {t.recentActivity}
                         </Heading>
                         <VStack align="stretch" spacing={4}>
-                            <Box p={5} bg="white" borderRadius="xl" boxShadow="xs" border="1px solid" borderColor="gray.50">
-                                <HStack justify="space-between">
-                                    <HStack spacing={4}>
-                                        <Box p={2} bg="teal.50" borderRadius="lg">
-                                            <Icon as={FiCalendar} color="teal.500" />
-                                        </Box>
-                                        <VStack align="start" spacing={0}>
-                                            <Text fontWeight="700">Medical Check-up Booked</Text>
-                                            <Text fontSize="sm" color="gray.500">Scheduled for Feb 24, 2026 at 10:00 AM</Text>
-                                        </VStack>
+                            {appointments.length > 0 ? (
+                                <Box p={5} bg="white" borderRadius="xl" boxShadow="xs" border="1px solid" borderColor="gray.50">
+                                    <HStack justify="space-between">
+                                        <HStack spacing={4}>
+                                            <Box p={2} bg="teal.50" borderRadius="lg">
+                                                <Icon as={FiCalendar} color="teal.500" />
+                                            </Box>
+                                            <VStack align="start" spacing={0}>
+                                                <Text fontWeight="700">Appointment Scheduled</Text>
+                                                <Text fontSize="sm" color="gray.500">{nextAppointment.service_type || 'Medical Check-up'} on {new Date(nextAppointment.date).toLocaleDateString()} at {nextAppointment.time}</Text>
+                                            </VStack>
+                                        </HStack>
+                                        <Text fontSize="sm" color="gray.400">Upcoming</Text>
                                     </HStack>
-                                    <Text fontSize="sm" color="gray.400">2 hours ago</Text>
-                                </HStack>
-                            </Box>
+                                </Box>
+                            ) : (
+                                <Box p={5} bg="white" borderRadius="xl" boxShadow="xs" border="1px solid" borderColor="gray.50">
+                                    <Text color="gray.500" fontStyle="italic">No recent activity.</Text>
+                                </Box>
+                            )}
                             <Box p={5} bg="white" borderRadius="xl" boxShadow="xs" border="1px solid" borderColor="gray.50">
                                 <HStack justify="space-between">
                                     <HStack spacing={4}>

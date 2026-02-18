@@ -31,6 +31,37 @@ interface SoapNoteFormProps {
     onCancel?: () => void;
 }
 
+const FormSection = ({ label, icon, value, setValue, placeholder, color }: any) => (
+    <FormControl isRequired>
+        <HStack mb={2}>
+            <Box p={2} bg={`${color}.100`} borderRadius="md">
+                <Icon as={icon} color={`${color}.600`} />
+            </Box>
+            <FormLabel fontWeight="bold" color="gray.700" m={0} fontSize="sm">
+                {label}
+            </FormLabel>
+        </HStack>
+        <Textarea
+            value={value}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setValue(e.target.value)}
+            placeholder={placeholder}
+            rows={4}
+            bg="gray.50"
+            borderColor="gray.200"
+            _hover={{ borderColor: `${color}.300` }}
+            _focus={{ borderColor: `${color}.500`, boxShadow: 'none', bg: 'white' }}
+            borderRadius="md"
+            fontSize="sm"
+        />
+    </FormControl>
+);
+
+interface SoapNoteFormProps {
+    patientId: number;
+    onSuccess?: () => void;
+    onCancel?: () => void;
+}
+
 const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, onSuccess, onCancel }) => {
     const [subjective, setSubjective] = useState('');
     const [objective, setObjective] = useState('');
@@ -93,30 +124,7 @@ const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, onSuccess, onCan
         }
     };
 
-    const FormSection = ({ label, icon, value, setValue, placeholder, color }: any) => (
-        <FormControl isRequired>
-            <HStack mb={2}>
-                <Box p={2} bg={`${color}.100`} borderRadius="md">
-                    <Icon as={icon} color={`${color}.600`} />
-                </Box>
-                <FormLabel fontWeight="bold" color="gray.700" m={0} fontSize="sm">
-                    {label}
-                </FormLabel>
-            </HStack>
-            <Textarea
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder={placeholder}
-                rows={4}
-                bg="gray.50"
-                borderColor="gray.200"
-                _hover={{ borderColor: `${color}.300` }}
-                _focus={{ borderColor: `${color}.500`, boxShadow: 'none', bg: 'white' }}
-                borderRadius="md"
-                fontSize="sm"
-            />
-        </FormControl>
-    );
+
 
     return (
         <Box

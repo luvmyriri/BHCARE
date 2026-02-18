@@ -23,15 +23,10 @@ try:
     )
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
-    print("Checking last 5 registered users:")
-    cur.execute("SELECT id, email, first_name, last_name, created_at FROM users ORDER BY id DESC LIMIT 5")
+    print("Checking last 5 notifications:")
+    cur.execute("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 5")
     rows = cur.fetchall()
-    
-    with open('users_list.txt', 'w') as f:
-        f.write("Recent Users:\n")
-        for user in rows:
-            f.write(f"ID: {user['id']} | Email: {user['email']} | Name: {user['first_name']} {user['last_name']}\n")
-    print("Users saved to users_list.txt")
+    print(json.dumps(rows, indent=2, cls=DateTimeEncoder))
     
     cur.close()
     conn.close()
