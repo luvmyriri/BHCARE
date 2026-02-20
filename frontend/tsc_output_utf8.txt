@@ -1,0 +1,5 @@
+﻿src/Dashboard.tsx(29,5): error TS6133: 'Progress' is declared but its value is never read.
+src/DoctorDashboard.tsx(52,5): error TS6133: 'FiClock' is declared but its value is never read.
+src/DoctorDashboard.tsx(53,5): error TS6133: 'FiFileText' is declared but its value is never read.
+src/MedicalStaffDashboard.tsx(8,5): error TS6133: 'Avatar' is declared but its value is never read.
+src/MedicalStaffDashboard.tsx(91,72): error TS6133: 'user' is declared but its value is never read.

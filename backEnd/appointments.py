@@ -372,7 +372,7 @@ def get_appointment(appointment_id):
 def cancel_appointment(appointment_id):
     """Cancel an appointment"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         cancellation_reason = data.get('reason', 'No reason provided')
         
         conn = get_db_connection()

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import './App.css';
 import LoginForm from './LoginForm';
 import Navbar from './components/Navbar';
@@ -18,6 +18,34 @@ import SecurityDashboard from './SecurityDashboard';
 import FloatingActions from './components/FloatingActions';
 
 
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, color: 'red' }}>
+          <h1>Something went wrong.</h1>
+          <pre>{this.state.error?.toString()}</pre>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [loginMode, setLoginMode] = useState<'login' | 'register'>('login');
@@ -27,17 +55,6 @@ function App() {
       if (!u) return null;
       let userData = JSON.parse(u);
 
-      // Hardcoded Role Assignment
-      if (userData.email === 'admin@bhcare.ph') {
-        userData.role = 'admin';
-      } else if (userData.email === 'doctor@bhcare.ph') {
-        userData.role = 'doctor';
-      } else if (userData.email === 'security@bhcare.ph' || userData.email === 'security1741@bhcare.ph') {
-        userData.role = 'security';
-      } else {
-        // Use existing role or default to patient
-        userData.role = userData.role || 'patient';
-      }
       return userData;
     } catch {
       return null;
@@ -52,28 +69,9 @@ function App() {
 
       try {
         const userData = JSON.parse(storedUser);
-        // Skip refresh for hardcoded admin/doctor accounts
-        if (userData.email === 'admin@bhcare.ph' || userData.email === 'doctor@bhcare.ph' || userData.email === 'security@bhcare.ph' || userData.email === 'security1741@bhcare.ph') {
-          return;
-        }
-
         const response = await fetch(`/user/${userData.id}`);
         if (response.ok) {
           const freshData = await response.json();
-
-          // Apply role
-          if (freshData.email === 'admin@bhcare.ph') {
-            freshData.role = 'admin';
-          } else if (freshData.email === 'doctor@bhcare.ph') {
-            freshData.role = 'doctor';
-          } else if (freshData.email === 'security@bhcare.ph' || freshData.email === 'security1741@bhcare.ph') {
-            freshData.role = 'security';
-          } else {
-            // Use existing role or default to patient
-            freshData.role = freshData.role || 'patient';
-          }
-
-          // Update both state and localStorage
           setUser(freshData);
           localStorage.setItem('bh_user', JSON.stringify(freshData));
         }
@@ -85,7 +83,6 @@ function App() {
     refreshUserData();
   }, []);
 
-
   const openLogin = (mode: 'login' | 'register' = 'login') => {
     setLoginMode(mode);
     setShowLogin(true);
@@ -93,17 +90,6 @@ function App() {
   const closeLogin = () => setShowLogin(false);
 
   const onLoginSuccess = (u: any) => {
-    // Apply hardcoded role on login too
-    if (u.email === 'admin@bhcare.ph') {
-      u.role = 'admin';
-    } else if (u.email === 'doctor@bhcare.ph') {
-      u.role = 'doctor';
-    } else if (u.email === 'security@bhcare.ph' || u.email === 'security1741@bhcare.ph') {
-      u.role = 'security';
-    } else {
-      // Use existing role or default to patient
-      u.role = u.role || 'patient';
-    }
     setUser(u);
     setShowLogin(false);
   };
@@ -117,15 +103,18 @@ function App() {
 
   // If logged in, show the appropriate Dashboard hub
   if (user) {
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'Administrator') {
       return (
-        <AdminDashboard
-          user={user}
-          onLogout={onLogoutClick}
-        />
+        <ErrorBoundary>
+          <AdminDashboard
+            user={user}
+            onLogout={onLogoutClick}
+          />
+        </ErrorBoundary>
       );
     }
-    if (user.role === 'Medical Staff') {
+    // Check for "Medical Staff" role group (Nurses, Midwives, Health Workers)
+    if (['Nurse', 'Midwife', 'Health Worker', 'Medical Staff'].includes(user.role)) {
       return (
         <MedicalStaffDashboard
           user={user}
@@ -133,7 +122,8 @@ function App() {
         />
       );
     }
-    if (user.role === 'doctor') {
+    // Check for "Doctor" role
+    if (user.role === 'doctor' || user.role === 'Doctor') {
       return (
         <DoctorDashboard
           user={user}
@@ -142,7 +132,7 @@ function App() {
         />
       );
     }
-    if (user.role === 'security') {
+    if (user.role === 'security' || user.role === 'Security') {
       return (
         <SecurityDashboard
           user={user}
@@ -161,47 +151,45 @@ function App() {
 
   // Otherwise show the landing page or password reset pages
   return (
-    <BrowserRouter>
-      <Routes>
+    <Routes>
 
 
-        <Route path="/*" element={
-          <div className="app">
-            <FloatingImages />
-            <FloatingParticles />
-            <Navbar
-              onLoginClick={() => openLogin('login')}
-              onLogoutClick={onLogoutClick}
-              onProfileClick={() => { }}
-              onAppointmentClick={() => openLogin('login')}
-              user={user}
-            />
-            <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
-            <LocationShowcase />
-            <Services />
-            <ContactForm />
-            <Footer onAppointmentClick={() => openLogin('login')} />
-            <FloatingActions />
+      <Route path="/*" element={
+        <div className="app">
+          <FloatingImages />
+          <FloatingParticles />
+          <Navbar
+            onLoginClick={() => openLogin('login')}
+            onLogoutClick={onLogoutClick}
+            onProfileClick={() => { }}
+            onAppointmentClick={() => openLogin('login')}
+            user={user}
+          />
+          <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
+          <LocationShowcase />
+          <Services />
+          <ContactForm />
+          <Footer onAppointmentClick={() => openLogin('login')} />
+          <FloatingActions />
 
-            {showLogin && (
-              <div className="modal-overlay" onClick={closeLogin}>
-                <div
-                  className="modal-content"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button className="modal-close" onClick={closeLogin} aria-label="Close modal">
-                    ×
-                  </button>
-                  <div className="form-scroll">
-                    <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
-                  </div>
+          {showLogin && (
+            <div className="modal-overlay" onClick={closeLogin}>
+              <div
+                className="modal-content"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button className="modal-close" onClick={closeLogin} aria-label="Close modal">
+                  ×
+                </button>
+                <div className="form-scroll">
+                  <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
                 </div>
               </div>
-            )}
-          </div>
-        } />
-      </Routes>
-    </BrowserRouter>
+            </div>
+          )}
+        </div>
+      } />
+    </Routes>
   );
 }
 

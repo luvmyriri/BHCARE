@@ -41,6 +41,7 @@ const Input: FC<
       <span style={{ fontSize: '16px', marginRight: '10px', opacity: 0.5 }}>{icon}</span>
       <input
         {...props}
+        autoComplete="new-password"
         style={{
           border: 'none',
           background: 'transparent',
@@ -902,6 +903,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="juan.delacruz@gmail.com"
                     required
+                    autoComplete="email"
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
                   />
                 </div>
@@ -927,6 +929,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
                   />
                   <button type="button" onClick={() => setLoginPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#38b2ac', fontWeight: 700, textTransform: 'uppercase' }}>
@@ -997,7 +1000,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
             </form>
           ) : (
             // REGISTER FORM
-            <form onSubmit={handleRegister} style={{ width: '100%', maxWidth: '800px', margin: 'auto' }}>
+            <form onSubmit={handleRegister} autoComplete="off" style={{ width: '100%', maxWidth: '800px', margin: 'auto' }}>
               <button
                 type="button"
                 onClick={() => setMode('login')}
@@ -1298,7 +1301,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         icon="👤"
                         placeholder="Juan"
                         value={firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value, setFirstName)}
+                        onChange={(e) => handleInputChange('firstName', e.target.value.replace(/[0-9]/g, ''), setFirstName)}
                         onBlur={() => validateField('firstName', firstName)}
                         confidence={confidence.first_name}
                         invalid={errors.firstName}
@@ -1309,7 +1312,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         icon="👤"
                         placeholder="Dela Cruz"
                         value={lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value, setLastName)}
+                        onChange={(e) => handleInputChange('lastName', e.target.value.replace(/[0-9]/g, ''), setLastName)}
                         onBlur={() => validateField('lastName', lastName)}
                         confidence={confidence.last_name}
                         invalid={errors.lastName}
@@ -1317,7 +1320,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       />
                     </div>
                     <div className="auth-form-row">
-                      <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value))} />
+                      <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value.replace(/[0-9]/g, '')))} />
                       <Input
                         label={t.dob}
                         icon="📅"
@@ -1355,7 +1358,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     </div>
 
                     <div className="auth-form-row">
-                      <Input label={t.contact} icon="📱" type="tel" value={contact} onChange={(e) => handleInputChange('contact', formatPHPhone(e.target.value), setContact)} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
+                      <Input label={t.contact} icon="📱" type="tel" inputMode="numeric" maxLength={11} placeholder="09XXXXXXXXX" value={contact} onChange={(e) => { const digits = e.target.value.replace(/\D/g, '').slice(0, 11); handleInputChange('contact', digits, setContact); }} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
                       <Input
                         label="Email Address"
                         icon="✉️"
@@ -1392,7 +1395,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     </div>
 
                     <div className="auth-form-row">
-                      <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} onChange={(e) => setZipCode(e.target.value)} />
+                      <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} type="tel" maxLength={4} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setZipCode(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="1400" />
+
                     </div>
 
                     <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
@@ -1411,6 +1415,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         <input
                           type={registerPwVisible ? 'text' : 'password'}
                           value={password}
+                          autoComplete="new-password"
                           onChange={(e) => handleInputChange('password', e.target.value, setPassword)}
                           onFocus={() => setPasswordFocused(true)}
                           onBlur={() => { setPasswordFocused(false); validateField('password', password); }}
@@ -1481,6 +1486,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         <input
                           type={confirmPwVisible ? 'text' : 'password'}
                           value={confirmPassword}
+                          autoComplete="new-password"
                           onChange={(e) => handleInputChange('confirmPassword', e.target.value, setConfirmPassword)}
                           onBlur={() => validateField('confirmPassword', confirmPassword)}
                           required

@@ -27,6 +27,7 @@ import {
 
 interface SoapNoteFormProps {
     patientId: number;
+    doctorEmail?: string;
     onSuccess?: () => void;
     onCancel?: () => void;
 }
@@ -58,11 +59,12 @@ const FormSection = ({ label, icon, value, setValue, placeholder, color }: any) 
 
 interface SoapNoteFormProps {
     patientId: number;
+    doctorEmail?: string;
     onSuccess?: () => void;
     onCancel?: () => void;
 }
 
-const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, onSuccess, onCancel }) => {
+const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, doctorEmail, onSuccess, onCancel }) => {
     const [subjective, setSubjective] = useState('');
     const [objective, setObjective] = useState('');
     const [assessment, setAssessment] = useState('');
@@ -75,13 +77,14 @@ const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, onSuccess, onCan
         setIsSubmitting(true);
 
         try {
-            const response = await fetch('http://localhost:5000/api/soap-notes', {
+            const response = await fetch('/api/soap-notes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     patient_id: patientId,
+                    doctor_email: doctorEmail || null,
                     subjective,
                     objective,
                     assessment,

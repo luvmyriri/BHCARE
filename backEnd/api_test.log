@@ -1,0 +1,27 @@
+STATUS: 200
+BODY: {
+  "user": {
+    "barangay": "Barangay 171",
+    "block_number": "Block 9",
+    "city": "Caloocan City",
+    "contact_number": "+639614331761",
+    "date_of_birth": "2005-06-13",
+    "email": "genetabios13@gmail.com",
+    "first_name": "Gene",
+    "full_address": "BLK 9 LOT 30, RUBY ST CELINA HOMES 3 BAGUMBONG, BARANGAY 171, CALOOCAN CITY, NCR, THIRD DISTRICT, 1421 License No.",
+    "gender": "Male",
+    "house_number": "",
+    "id": 2,
+    "last_name": "Tabios",
+    "lot_number": "Lot 30",
+    "middle_name": "Gange",
+    "philhealth_id": "",
+    "province": "Metro Manila",
+    "role": "Patient",
+    "street_name": "Ruby",
+    "subdivision": "Ruby St Celina",
+    "zip_code": "1421"
+  }
+}
+
+LOGIN: SUCCESS

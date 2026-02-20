@@ -22,7 +22,7 @@ import {
     ModalBody,
     ModalCloseButton,
 } from '@chakra-ui/react';
-import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw } from 'react-icons/fi';
 
 interface Service {
     id: number;
@@ -62,6 +62,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
     const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
     const [reason, setReason] = useState('');
     const [myAppointments, setMyAppointments] = useState<Appointment[]>([]);
+    const [reschedulingAppointmentId, setReschedulingAppointmentId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [view, setView] = useState<'book' | 'my-appointments'>(initialView);
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
@@ -120,7 +121,23 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
         try {
             const response = await fetch(`/api/appointments/user/${user.id}`);
             const data = await response.json();
-            setMyAppointments(data);
+            // Sort: active statuses (pending/waiting/confirmed) on top by nearest date,
+            // then cancelled/completed at the bottom
+            const activeStatuses = ['pending', 'waiting', 'confirmed'];
+            const sorted = data.sort((a: Appointment, b: Appointment) => {
+                const aActive = activeStatuses.includes(a.status.toLowerCase());
+                const bActive = activeStatuses.includes(b.status.toLowerCase());
+                // Active appointments come first
+                if (aActive && !bActive) return -1;
+                if (!aActive && bActive) return 1;
+                // Within active: nearest date first (ascending)
+                if (aActive && bActive) {
+                    return new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime();
+                }
+                // Within inactive: most recent first (descending)
+                return new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime();
+            });
+            setMyAppointments(sorted);
         } catch (error) {
             console.error('Error fetching appointments:', error);
         }
@@ -140,6 +157,15 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
 
         setLoading(true);
         try {
+            // If rescheduling, cancel the old appointment first
+            if (reschedulingAppointmentId) {
+                await fetch(`/api/appointments/${reschedulingAppointmentId}/cancel`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: 'Rescheduled by patient' }),
+                });
+            }
+
             const response = await fetch('/api/appointments', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -154,8 +180,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
 
             if (response.ok) {
                 toast({
-                    title: 'Success!',
-                    description: 'Appointment booked successfully',
+                    title: reschedulingAppointmentId ? 'Rescheduled!' : 'Success!',
+                    description: reschedulingAppointmentId
+                        ? 'Appointment rescheduled successfully'
+                        : 'Appointment booked successfully',
                     status: 'success',
                     duration: 3000,
                     isClosable: true,
@@ -165,6 +193,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                 setSelectedDate('');
                 setSelectedTime('');
                 setReason('');
+                setReschedulingAppointmentId(null);
                 fetchMyAppointments();
                 setView('my-appointments');
             } else {
@@ -191,9 +220,15 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
     };
 
     const handleCancelAppointment = async (appointmentId: number) => {
+        if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+            return;
+        }
+
         try {
             const response = await fetch(`/api/appointments/${appointmentId}/cancel`, {
                 method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'Cancelled by patient' }),
             });
 
             if (response.ok) {
@@ -205,6 +240,15 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                     isClosable: true,
                 });
                 fetchMyAppointments();
+            } else {
+                const errorData = await response.json();
+                toast({
+                    title: 'Error',
+                    description: errorData.error || 'Failed to cancel appointment',
+                    status: 'error',
+                    duration: 3000,
+                    isClosable: true,
+                });
             }
         } catch (error) {
             toast({
@@ -223,8 +267,53 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
             case 'confirmed': return 'green';
             case 'cancelled': return 'red';
             case 'completed': return 'gray';
+            case 'not_complete': return 'orange';
             default: return 'gray';
         }
+    };
+
+    const isAppointmentPast = (apt: Appointment) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const aptDate = new Date(apt.appointment_date + 'T00:00:00');
+        return aptDate < today;
+    };
+
+    const getDisplayStatus = (apt: Appointment) => {
+        if (['pending', 'waiting'].includes(apt.status.toLowerCase()) && isAppointmentPast(apt)) {
+            return 'NOT COMPLETE';
+        }
+        return apt.status;
+    };
+
+    const getDisplayStatusColor = (apt: Appointment) => {
+        if (['pending', 'waiting'].includes(apt.status.toLowerCase()) && isAppointmentPast(apt)) {
+            return 'orange';
+        }
+        return getStatusColor(apt.status);
+    };
+
+    const handleReschedule = (apt: Appointment) => {
+        // Store the old appointment ID so we can cancel it after new booking
+        setReschedulingAppointmentId(apt.id);
+
+        // Find the service matching this appointment
+        const matchingService = services.find(s => s.name === apt.service_type);
+        if (matchingService) {
+            setSelectedService(matchingService);
+        }
+        setStep(matchingService ? 2 : 1); // Go to date selection if service found, else service selection
+        setSelectedDate('');
+        setSelectedTime('');
+        setReason('');
+        setView('book');
+        toast({
+            title: 'Rescheduling',
+            description: `Select a new date and time for ${apt.service_type}`,
+            status: 'info',
+            duration: 3000,
+            isClosable: true,
+        });
     };
 
     // Calendar helper functions
@@ -1056,7 +1145,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                 <Flex justify="space-between" align="start" mb={4}>
                                                     <Heading size="md" color="gray.900" fontWeight="700">{apt.service_type}</Heading>
                                                     <Badge
-                                                        colorScheme={getStatusColor(apt.status)}
+                                                        colorScheme={getDisplayStatusColor(apt)}
                                                         borderRadius="full"
                                                         px={4}
                                                         py={2}
@@ -1064,7 +1153,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                         fontWeight="700"
                                                         textTransform="uppercase"
                                                     >
-                                                        {apt.status}
+                                                        {getDisplayStatus(apt)}
                                                     </Badge>
                                                 </Flex>
                                                 <HStack spacing={6} mb={4} fontSize="md" color="gray.600" fontWeight="600">
@@ -1077,7 +1166,39 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                         <Text>{apt.appointment_time}</Text>
                                                     </HStack>
                                                 </HStack>
-                                                {apt.status === 'pending' && (
+                                                {/* Past appointment with pending/waiting status → Not Complete + Reschedule */}
+                                                {['pending', 'waiting'].includes(apt.status.toLowerCase()) && isAppointmentPast(apt) && (
+                                                    <HStack spacing={3}>
+                                                        <Button
+                                                            onClick={() => handleReschedule(apt)}
+                                                            colorScheme="orange"
+                                                            variant="solid"
+                                                            size="md"
+                                                            fontWeight="700"
+                                                            leftIcon={<Icon as={FiRefreshCw} />}
+                                                            borderRadius="lg"
+                                                            _hover={{
+                                                                transform: 'translateY(-1px)',
+                                                                boxShadow: 'md'
+                                                            }}
+                                                            transition="all 0.2s"
+                                                        >
+                                                            Reschedule
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => handleCancelAppointment(apt.id)}
+                                                            colorScheme="red"
+                                                            variant="ghost"
+                                                            size="md"
+                                                            fontWeight="700"
+                                                            _hover={{ bg: 'red.50' }}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </HStack>
+                                                )}
+                                                {/* Future appointment with pending status → Cancel only */}
+                                                {apt.status.toLowerCase() === 'pending' && !isAppointmentPast(apt) && (
                                                     <Button
                                                         onClick={() => handleCancelAppointment(apt.id)}
                                                         colorScheme="red"

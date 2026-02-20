@@ -177,10 +177,81 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
     const [selectedCard, setSelectedCard] = useState('');
     const [soapPatientId, setSoapPatientId] = useState<any>(null);
 
+    // Inventory Add Item State
+    const { isOpen: isAddInventoryOpen, onOpen: onAddInventoryOpen, onClose: onAddInventoryClose } = useDisclosure();
+    const [newInventoryItem, setNewInventoryItem] = useState({
+        item_name: '',
+        category: 'Medicine',
+        stock_quantity: 0,
+        unit: 'pcs'
+    });
+
+    const handleAddInventoryItem = async () => {
+        try {
+            const res = await fetch('/api/inventory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newInventoryItem)
+            });
+            if (res.ok) {
+                // Refresh Inventory
+                const invRes = await fetch('/api/inventory');
+                if (invRes.ok) {
+                    const invData = await invRes.json();
+                    setInventory(invData);
+                }
+                onAddInventoryClose();
+                setNewInventoryItem({
+                    item_name: '',
+                    category: 'Medicine',
+                    stock_quantity: 0,
+                    unit: 'pcs'
+                });
+            } else {
+                alert("Failed to add inventory item");
+            }
+        } catch (error) {
+            console.error("Error adding item:", error);
+        }
+    };
+
+    // Inventory Restock State
+    const { isOpen: isRestockOpen, onOpen: onRestockOpen, onClose: onRestockClose } = useDisclosure();
+    const [restockItemId, setRestockItemId] = useState<number | null>(null);
+    const [restockQuantity, setRestockQuantity] = useState<number>(0);
+
+    const handleRestockItem = async () => {
+        if (!restockItemId || restockQuantity <= 0) return;
+
+        try {
+            const res = await fetch('/api/inventory/restock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ item_id: restockItemId, add_quantity: restockQuantity })
+            });
+            if (res.ok) {
+                // Refresh Inventory
+                const invRes = await fetch('/api/inventory');
+                if (invRes.ok) {
+                    const invData = await invRes.json();
+                    setInventory(invData);
+                }
+                onRestockClose();
+                setRestockItemId(null);
+                setRestockQuantity(0);
+            } else {
+                alert("Failed to restock item");
+            }
+        } catch (error) {
+            console.error("Error restocking item:", error);
+        }
+    };
+
     // Search & History State
     const [searchQuery, setSearchQuery] = useState('');
+    const [historySearchQuery, setHistorySearchQuery] = useState('');
     const [selectedHistory, setSelectedHistory] = useState<any>(null);
-    const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure();
+
 
     // Data State
     const [patientsQueue, setPatientsQueue] = useState<any[]>([]);
@@ -193,11 +264,18 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
     const handleViewHistory = async (userId: number) => {
         try {
+            // First get patient details from patients list or fetch if needed
+            const patient = patients.find(p => p.id === userId);
+
             const res = await fetch(`/api/patients/${userId}/history`);
             if (res.ok) {
                 const data = await res.json();
-                setSelectedHistory(data);
-                onHistoryOpen();
+                setSelectedHistory({
+                    patient: patient,
+                    records: data
+                });
+                setSelectedCard('history-view'); // Use a specific card view for history
+                onOpen();
             }
         } catch (error) {
             console.error("Error fetching history:", error);
@@ -273,6 +351,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     <Box p={2}>
                         <SoapNoteForm
                             patientId={soapPatientId}
+                            doctorEmail={user?.email}
                             onSuccess={() => {
                                 onClose();
                                 // Optional: Refresh data or show success toast (handled in form)
@@ -304,6 +383,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                 </Table>
                             </Box>
                         </ModalBody>
+                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
                     </>
                 );
             case 'consultations':
@@ -315,12 +395,24 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                 <Table variant="simple" size="sm">
                                     <Thead><Tr><Th>Time</Th><Th>Patient</Th><Th>Diagnosis</Th></Tr></Thead>
                                     <Tbody>
-                                        <Tr><Td>08:00 AM</Td><Td>Pedro Penduko</Td><Td>Common Cold</Td></Tr>
-                                        <Tr><Td>08:30 AM</Td><Td>Clara Barton</Td><Td>Hypertension</Td></Tr>
+                                        {patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').length > 0 ? (
+                                            patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').map(p => (
+                                                <Tr key={p.id}>
+                                                    <Td>{p.appointment_time}</Td>
+                                                    <Td>{p.first_name} {p.last_name}</Td>
+                                                    <Td>{p.diagnosis || 'N/A'}</Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={3} textAlign="center" color="gray.500">No completed consultations yet.</Td>
+                                            </Tr>
+                                        )}
                                     </Tbody>
                                 </Table>
                             </Box>
                         </ModalBody>
+                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
                     </>
                 );
             case 'critical':
@@ -328,8 +420,28 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     <>
                         <ModalHeader>Critical & High Priority Cases</ModalHeader>
                         <ModalBody>
-                            <Text fontStyle="italic" color="gray.500">No critical cases flagged for today.</Text>
+                            <Box overflowX="auto">
+                                <Table variant="simple" size="sm">
+                                    <Thead><Tr><Th>Patient</Th><Th>Priority</Th><Th>Status</Th></Tr></Thead>
+                                    <Tbody>
+                                        {patientsQueue.filter(p => p.priority === 'critical' || p.priority === 'high').length > 0 ? (
+                                            patientsQueue.filter(p => p.priority === 'critical' || p.priority === 'high').map(p => (
+                                                <Tr key={p.id}>
+                                                    <Td>{p.first_name} {p.last_name}</Td>
+                                                    <Td><Badge colorScheme="red">{p.priority}</Badge></Td>
+                                                    <Td>{p.status}</Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={3} textAlign="center" color="gray.500">No critical cases flagged for today.</Td>
+                                            </Tr>
+                                        )}
+                                    </Tbody>
+                                </Table>
+                            </Box>
                         </ModalBody>
+                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
                     </>
                 );
             case 'labs':
@@ -362,6 +474,56 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                 </Table>
                             </Box>
                         </ModalBody>
+                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
+                    </>
+                );
+            case 'history-view':
+                return (
+                    <>
+                        <ModalHeader>Medical History: {selectedHistory?.patient?.first_name} {selectedHistory?.patient?.last_name}</ModalHeader>
+                        <ModalBody>
+                            <VStack align="stretch" spacing={4}>
+                                <Box p={4} bg="gray.50" borderRadius="md">
+                                    <Heading size="sm" mb={2}>Patient Profile</Heading>
+                                    <Text fontSize="sm"><b>ID:</b> {selectedHistory?.patient?.p_id}</Text>
+                                    <Text fontSize="sm"><b>Age/Gender:</b> {selectedHistory?.patient?.age} / {selectedHistory?.patient?.gender}</Text>
+                                    <Text fontSize="sm"><b>Contact:</b> {selectedHistory?.patient?.contact_number}</Text>
+                                </Box>
+
+                                <Divider />
+                                <Heading size="md" color="teal.800">Clinical Notes</Heading>
+
+                                {selectedHistory?.records && selectedHistory.records.length > 0 ? (
+                                    selectedHistory.records.map((record: any, index: number) => (
+                                        <Box key={index} p={4} borderWidth="1px" borderRadius="lg" borderColor="gray.200">
+                                            <Flex justify="space-between" mb={2}>
+                                                <Text fontWeight="bold" color="teal.600">{record.created_at}</Text>
+                                                <Badge colorScheme="purple">{record.doctor_name || 'Medical Officer'}</Badge>
+                                            </Flex>
+                                            <VStack align="start" spacing={1} pl={2} borderLeft="2px solid" borderColor="teal.100">
+                                                <Text fontSize="sm"><b>S:</b> {record.subjective}</Text>
+                                                <Text fontSize="sm"><b>O:</b> {record.objective}</Text>
+                                                <Text fontSize="sm"><b>A:</b> {record.assessment}</Text>
+                                                <Text fontSize="sm"><b>P:</b> {record.plan}</Text>
+                                            </VStack>
+                                        </Box>
+                                    ))
+                                ) : (
+                                    <Text color="gray.500" fontStyle="italic">No medical records found for this patient.</Text>
+                                )}
+                            </VStack>
+                        </ModalBody>
+                        <ModalFooter>
+                            <Button colorScheme="teal" mr={3} onClick={onClose}>
+                                Close
+                            </Button>
+                            <Button variant="ghost" onClick={() => {
+                                onClose();
+                                handleOpenSoap(selectedHistory?.patient?.user_id || selectedHistory?.patient?.id);
+                            }}>
+                                Add New SOAP Note
+                            </Button>
+                        </ModalFooter>
                     </>
                 );
             default:
@@ -391,13 +553,25 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                         <PageHero
                             badge="CLINIC ACTIVE"
                             title={`Dr. ${user?.last_name || 'Medical Officer'}'s Station 🩺`}
-                            description="You have 8 consultations scheduled for today. 2 patients are currently in the waiting area."
+                            description={`You have ${patientsQueue.length} appointments scheduled for today. ${patientsQueue.filter(p => p.status === 'waiting' || p.status === 'pending').length} patients are currently in the waiting area.`}
                         />
 
                         <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={6}>
                             <DoctorStatCard label="Patients Today" value={patientsQueue.length || "0"} icon={FiUsers} color="teal" onClick={() => handleCardClick('patients')} />
-                            <DoctorStatCard label="Consultations Done" value="2" icon={FiClipboard} color="orange" onClick={() => handleCardClick('consultations')} />
-                            <DoctorStatCard label="Critical Cases" value="0" icon={FiActivity} color="red" onClick={() => handleCardClick('critical')} />
+                            <DoctorStatCard
+                                label="Consultations Done"
+                                value={patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').length.toString()}
+                                icon={FiClipboard}
+                                color="orange"
+                                onClick={() => handleCardClick('consultations')}
+                            />
+                            <DoctorStatCard
+                                label="Critical Cases"
+                                value={patientsQueue.filter(p => p.priority === 'critical' || p.priority === 'high').length.toString()}
+                                icon={FiActivity}
+                                color="red"
+                                onClick={() => handleCardClick('critical')}
+                            />
                             <DoctorStatCard label="Pending Lab Results" value={labResults.length || "0"} icon={FiBox} color="orange" onClick={() => handleCardClick('labs')} />
                         </SimpleGrid>
 
@@ -502,8 +676,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                     <Td>{p.contact_number}</Td>
                                                     <Td>{p.last_visit}</Td>
                                                     <Td>
-                                                        <Button size="xs" colorScheme="blue" variant="outline" onClick={() => handleViewHistory(p.id)}>View Profile</Button>
-                                                        <Button size="xs" colorScheme="teal" ml={2} onClick={() => handleOpenSoap(p.id)}>SOAP</Button>
+                                                        <Button size="xs" colorScheme="teal" variant="ghost" onClick={() => handleViewHistory(p.id)}>View History</Button>
+                                                        <Button size="xs" colorScheme="blue" ml={2} onClick={() => handleOpenSoap(p.id)}>SOAP</Button>
                                                     </Td>
                                                 </Tr>
                                             ))
@@ -529,55 +703,51 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                         />
                         <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" mb={6}>
-                                <Heading size="md" color="teal.800">Weekly Schedule</Heading>
-                                <Button size="sm" colorScheme="orange" variant="outline">Print Schedule</Button>
+                                <Heading size="md" color="teal.800">My Schedule & Assignment</Heading>
                             </Flex>
+                            <VStack align="start" spacing={4}>
+                                <Box p={4} bg="teal.50" borderRadius="xl" w="full">
+                                    <Heading size="sm" color="teal.700" mb={2}>Assigned Clinic Room</Heading>
+                                    <Text fontSize="lg" fontWeight="bold">{user?.clinic_room || 'Not Assigned'}</Text>
+                                </Box>
+                                <Box p={4} bg="orange.50" borderRadius="xl" w="full">
+                                    <Heading size="sm" color="orange.700" mb={2}>Weekly Schedule</Heading>
+                                    <Text fontSize="lg" fontWeight="bold">{user?.schedule || 'No Schedule Available'}</Text>
+                                    <Text fontSize="sm" color="gray.600" mt={1}>Please contact administration for schedule changes.</Text>
+                                </Box>
+                            </VStack>
+                        </Box>
+                    </VStack>
+                );
+            case 'history':
+                return (
+                    <VStack align="stretch" spacing={6}>
+                        <PageHero
+                            badge="MEDICAL RECORDS"
+                            title="Patient Medical History"
+                            description="Access comprehensive medical records, past diagnoses, and treatment plans."
+                        />
+                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Heading size="md" color="teal.800" mb={4}>Recent Medical Records</Heading>
+                            <Text color="gray.500" mb={4}>Select a patient from the Registry to view their full history.</Text>
+
                             <Box overflowX="auto">
                                 <Table variant="simple">
                                     <Thead>
                                         <Tr>
-                                            <Th>Day</Th>
-                                            <Th>Time Slot</Th>
-                                            <Th>Type</Th>
-                                            <Th>Assigned Room</Th>
-                                            <Th>Status</Th>
+                                            <Th>Date</Th>
+                                            <Th>Patient</Th>
+                                            <Th>Diagnosis</Th>
+                                            <Th>Attending Doctor</Th>
+                                            <Th>Action</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
+                                        {/* Dynamic content could go here, for now guiding to patient list */}
                                         <Tr>
-                                            <Td fontWeight="bold">Monday</Td>
-                                            <Td>8:00 AM - 12:00 PM</Td>
-                                            <Td>General Consultation</Td>
-                                            <Td>Room 101</Td>
-                                            <Td><Badge colorScheme="green">On Duty</Badge></Td>
-                                        </Tr>
-                                        <Tr>
-                                            <Td fontWeight="bold">Tuesday</Td>
-                                            <Td>1:00 PM - 5:00 PM</Td>
-                                            <Td>Vaccination Drive</Td>
-                                            <Td>Community Hall</Td>
-                                            <Td><Badge colorScheme="blue">Scheduled</Badge></Td>
-                                        </Tr>
-                                        <Tr>
-                                            <Td fontWeight="bold">Wednesday</Td>
-                                            <Td>8:00 AM - 12:00 PM</Td>
-                                            <Td>Prenatal Checkup</Td>
-                                            <Td>Room 102</Td>
-                                            <Td><Badge colorScheme="blue">Scheduled</Badge></Td>
-                                        </Tr>
-                                        <Tr>
-                                            <Td fontWeight="bold">Thursday</Td>
-                                            <Td>8:00 AM - 5:00 PM</Td>
-                                            <Td>Administrative / Training</Td>
-                                            <Td>Office</Td>
-                                            <Td><Badge colorScheme="purple">Training</Badge></Td>
-                                        </Tr>
-                                        <Tr>
-                                            <Td fontWeight="bold">Friday</Td>
-                                            <Td>1:00 PM - 5:00 PM</Td>
-                                            <Td>Follow-up Visits</Td>
-                                            <Td>Room 101</Td>
-                                            <Td><Badge colorScheme="blue">Scheduled</Badge></Td>
+                                            <Td colSpan={5} textAlign="center" py={4} color="gray.500">
+                                                Please go to <b>Patient Registry</b> and search for a patient to view their specific history.
+                                            </Td>
                                         </Tr>
                                     </Tbody>
                                 </Table>
@@ -586,6 +756,21 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     </VStack>
                 );
             case 'records':
+                // Logic to group medical records by patient (showing latest)
+                const uniqueRecordsMap = new Map();
+                medicalRecords.forEach(record => {
+                    if (!uniqueRecordsMap.has(record.user_id)) {
+                        uniqueRecordsMap.set(record.user_id, record);
+                    }
+                });
+
+                const uniqueRecords = Array.from(uniqueRecordsMap.values());
+
+                const filteredHistory = uniqueRecords.filter((r: any) =>
+                    r.patient_name.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+                    (r.diagnosis && r.diagnosis.toLowerCase().includes(historySearchQuery.toLowerCase()))
+                );
+
                 return (
                     <VStack align="stretch" spacing={6}>
                         <PageHero
@@ -594,34 +779,38 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             description="Review past consultations, prescriptions, and diagnostic results for patient longitudinal care."
                         />
                         <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
-                            <Flex justify="space-between" mb={6}>
-                                <Heading size="md" color="teal.800">Recent Medical Records</Heading>
-                                <HStack>
-                                    <Button size="sm" variant="outline">Filter by Date</Button>
-                                    <Button size="sm" variant="outline">Filter by Diagnosis</Button>
-                                </HStack>
+                            <Flex justify="space-between" mb={6} align="center">
+                                <Heading size="md" color="teal.800">Recent Patient Activity</Heading>
+                                <InputGroup w="300px">
+                                    <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                    <Input
+                                        placeholder="Search patient..."
+                                        value={historySearchQuery}
+                                        onChange={(e) => setHistorySearchQuery(e.target.value)}
+                                    />
+                                </InputGroup>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
                                     <Thead>
                                         <Tr>
-                                            <Th>Date</Th>
+                                            <Th>Last Visit</Th>
                                             <Th>Patient</Th>
-                                            <Th>Diagnosis</Th>
+                                            <Th>Latest Diagnosis</Th>
                                             <Th>Attending Physician</Th>
                                             <Th>Action</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {medicalRecords.length > 0 ? (
-                                            medicalRecords.map((r, i) => (
+                                        {filteredHistory.length > 0 ? (
+                                            filteredHistory.map((r: any, i: number) => (
                                                 <Tr key={i}>
                                                     <Td>{r.appointment_date}</Td>
                                                     <Td fontWeight="600">{r.patient_name}</Td>
                                                     <Td>{r.diagnosis || 'N/A'}</Td>
                                                     <Td>{r.doctor_name}</Td>
                                                     <Td>
-                                                        <Button size="xs" colorScheme="teal" onClick={() => handleViewHistory(r.user_id)}>View Details</Button>
+                                                        <Button size="xs" colorScheme="teal" onClick={() => handleViewHistory(r.user_id)}>View Full History</Button>
                                                     </Td>
                                                 </Tr>
                                             ))
@@ -648,20 +837,22 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             <Box flex="1" bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                                 <Heading size="sm" mb={4} color="teal.800">Low Stock Alerts</Heading>
                                 <VStack align="stretch" spacing={3}>
-                                    <HStack justify="space-between" p={3} bg="red.50" borderRadius="lg">
-                                        <Text fontWeight="600" color="red.700">Paracetamol 500mg</Text>
-                                        <Badge colorScheme="red">50 pcs left</Badge>
-                                    </HStack>
-                                    <HStack justify="space-between" p={3} bg="orange.50" borderRadius="lg">
-                                        <Text fontWeight="600" color="orange.700">Amoxicillin 500mg</Text>
-                                        <Badge colorScheme="orange">100 pcs left</Badge>
-                                    </HStack>
+                                    {inventory.filter(item => item.stock_quantity < 100).length > 0 ? (
+                                        inventory.filter(item => item.stock_quantity < 100).map((item: any) => (
+                                            <HStack key={item.id} justify="space-between" p={3} bg={item.stock_quantity < 50 ? 'red.50' : 'orange.50'} borderRadius="lg">
+                                                <Text fontWeight="600" color={item.stock_quantity < 50 ? 'red.700' : 'orange.700'}>{item.item_name}</Text>
+                                                <Badge colorScheme={item.stock_quantity < 50 ? 'red' : 'orange'}>{item.stock_quantity} {item.unit} left</Badge>
+                                            </HStack>
+                                        ))
+                                    ) : (
+                                        <Text color="gray.500" fontSize="sm" textAlign="center" py={4}>No low stock items</Text>
+                                    )}
                                 </VStack>
                             </Box>
                             <Box flex="2" bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                                 <Flex justify="space-between" mb={4}>
                                     <Heading size="sm" color="teal.800">Inventory List</Heading>
-                                    <Button size="xs" colorScheme="teal">Add Item</Button>
+                                    <Button size="xs" colorScheme="teal" onClick={onAddInventoryOpen}>Add Item</Button>
                                 </Flex>
                                 <Box overflowX="auto">
                                     <Table variant="simple" size="sm">
@@ -681,9 +872,23 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                         <Td>{item.category}</Td>
                                                         <Td>{item.stock_quantity} {item.unit}</Td>
                                                         <Td>
-                                                            <Badge colorScheme={item.stock_quantity < 50 ? 'red' : item.stock_quantity < 100 ? 'orange' : 'green'}>
-                                                                {item.status || (item.stock_quantity < 50 ? 'Low Stock' : 'Good')}
-                                                            </Badge>
+                                                            <HStack justify="space-between" align="center">
+                                                                <Badge colorScheme={item.stock_quantity < 50 ? 'red' : item.stock_quantity < 100 ? 'orange' : 'green'}>
+                                                                    {item.status || (item.stock_quantity < 50 ? 'Low Stock' : 'Good')}
+                                                                </Badge>
+                                                                <Button
+                                                                    size="xs"
+                                                                    colorScheme="teal"
+                                                                    variant="outline"
+                                                                    onClick={() => {
+                                                                        setRestockItemId(item.id);
+                                                                        setRestockQuantity(0);
+                                                                        onRestockOpen();
+                                                                    }}
+                                                                >
+                                                                    Restock
+                                                                </Button>
+                                                            </HStack>
                                                         </Td>
                                                     </Tr>
                                                 ))
@@ -815,13 +1020,92 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
             <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
                 <ModalOverlay />
                 <ModalContent>
-                    <ModalHeader>{selectedCard && selectedCard.charAt(0).toUpperCase() + selectedCard.slice(1)} Details</ModalHeader>
                     <ModalCloseButton />
                     {renderModalContent()}
+                </ModalContent>
+            </Modal>
+
+            {/* Add Inventory Modal */}
+            <Modal isOpen={isAddInventoryOpen} onClose={onAddInventoryClose}>
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Add New Inventory Item</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        <VStack spacing={4}>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Item Name</Text>
+                                <Input
+                                    value={newInventoryItem.item_name}
+                                    onChange={(e) => setNewInventoryItem({ ...newInventoryItem, item_name: e.target.value })}
+                                    placeholder="e.g. Paracetamol 500mg"
+                                />
+                            </Box>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Category</Text>
+                                <select
+                                    className="chakra-select css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
+                                    value={newInventoryItem.category}
+                                    onChange={(e) => setNewInventoryItem({ ...newInventoryItem, category: e.target.value })}
+                                >
+                                    <option value="Medicine">Medicine</option>
+                                    <option value="Supplies">Supplies</option>
+                                    <option value="Equipment">Equipment</option>
+                                </select>
+                            </Box>
+                            <HStack w="full">
+                                <Box w="full">
+                                    <Text mb={1} fontSize="sm" fontWeight="bold">Initial Stock</Text>
+                                    <Input
+                                        type="number"
+                                        value={newInventoryItem.stock_quantity}
+                                        onChange={(e) => setNewInventoryItem({ ...newInventoryItem, stock_quantity: parseInt(e.target.value) || 0 })}
+                                    />
+                                </Box>
+                                <Box w="full">
+                                    <Text mb={1} fontSize="sm" fontWeight="bold">Unit</Text>
+                                    <Input
+                                        value={newInventoryItem.unit}
+                                        onChange={(e) => setNewInventoryItem({ ...newInventoryItem, unit: e.target.value })}
+                                        placeholder="e.g. pcs, boxes"
+                                    />
+                                </Box>
+                            </HStack>
+                        </VStack>
+                    </ModalBody>
                     <ModalFooter>
-                        <Button colorScheme="teal" mr={3} onClick={onClose}>
-                            Close
-                        </Button>
+                        <Button variant="ghost" mr={3} onClick={onAddInventoryClose}>Cancel</Button>
+                        <Button colorScheme="teal" onClick={handleAddInventoryItem}>Add Item</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* Restock Inventory Modal */}
+            <Modal isOpen={isRestockOpen} onClose={onRestockClose} size="sm">
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Restock Item</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        <VStack spacing={4}>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Quantity to Add</Text>
+                                <Input
+                                    type="number"
+                                    value={restockQuantity === 0 ? '' : restockQuantity}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setRestockQuantity(val === '' ? 0 : parseInt(val));
+                                    }}
+                                    placeholder="Enter quantity"
+                                />
+                            </Box>
+                        </VStack>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="ghost" mr={3} onClick={onRestockClose}>Cancel</Button>
+                        <Button colorScheme="teal" onClick={handleRestockItem}>Confirm Restock</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>
@@ -871,63 +1155,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 </DrawerContent>
             </Drawer>
 
-            {/* Medical History Modal */}
-            <Modal isOpen={isHistoryOpen} onClose={onHistoryClose} size="3xl" scrollBehavior="inside">
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Patient Medical History</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
-                        {selectedHistory ? (
-                            <VStack align="stretch" spacing={6}>
-                                <Box bg="blue.50" p={4} borderRadius="xl">
-                                    <HStack spacing={4}>
-                                        <Avatar size="lg" name={`${selectedHistory.patient.first_name} ${selectedHistory.patient.last_name}`} />
-                                        <VStack align="start" spacing={1}>
-                                            <Heading size="md">{selectedHistory.patient.first_name} {selectedHistory.patient.last_name}</Heading>
-                                            <Text fontSize="sm" color="gray.600">ID: P-{String(selectedHistory.patient.id).padStart(4, '0')} | {selectedHistory.patient.age} yrs | {selectedHistory.patient.gender}</Text>
-                                            <HStack>
-                                                <Badge colorScheme="blue">{selectedHistory.patient.blood_type || 'Blood Type N/A'}</Badge>
-                                                <Badge colorScheme="green">{selectedHistory.patient.height || '-'} cm</Badge>
-                                                <Badge colorScheme="orange">{selectedHistory.patient.weight || '-'} kg</Badge>
-                                            </HStack>
-                                        </VStack>
-                                    </HStack>
-                                </Box>
 
-                                <Box>
-                                    <Heading size="sm" mb={4} color="gray.700">Past Consultations</Heading>
-                                    {selectedHistory.history.length > 0 ? (
-                                        <VStack align="stretch" spacing={3}>
-                                            {selectedHistory.history.map((h: any, i: number) => (
-                                                <Box key={i} p={4} border="1px solid" borderColor="gray.200" borderRadius="lg">
-                                                    <Flex justify="space-between" mb={2}>
-                                                        <HStack>
-                                                            <Icon as={FiCalendar} color="gray.500" />
-                                                            <Text fontWeight="bold">{h.appointment_date}</Text>
-                                                            <Text color="gray.500" fontSize="sm">({h.appointment_time})</Text>
-                                                        </HStack>
-                                                        <Badge colorScheme="green">{h.service_type}</Badge>
-                                                    </Flex>
-                                                    <Text fontWeight="600" color="teal.700">Diagnosis: {h.diagnosis || 'N/A'}</Text>
-                                                    <Text fontSize="sm" mt={1} color="gray.600">{h.notes || 'No notes recorded.'}</Text>
-                                                </Box>
-                                            ))}
-                                        </VStack>
-                                    ) : (
-                                        <Text fontStyle="italic" color="gray.500">No past medical records found.</Text>
-                                    )}
-                                </Box>
-                            </VStack>
-                        ) : (
-                            <Flex justify="center" p={8}><Spinner /></Flex>
-                        )}
-                    </ModalBody>
-                    <ModalFooter>
-                        <Button onClick={onHistoryClose}>Close</Button>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal>
         </Box>
     );
 };

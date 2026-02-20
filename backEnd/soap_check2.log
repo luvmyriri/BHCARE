@@ -1,0 +1,17 @@
+=== Latest SOAP notes ===
+{'id': 10, 'patient_id': 2, 'doctor_id': 9999, 'created_at': datetime.datetime(2026, 2, 20, 23, 24, 42, 967434)}
+{'id': 7, 'patient_id': 2, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 20, 23, 16, 17, 409565)}
+{'id': 5, 'patient_id': 2, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 18, 11, 53, 34, 746280)}
+
+=== Doctor-like users ===
+{'id': 3, 'email': 'security1741@bhcare.ph', 'first_name': 'Security', 'last_name': 'Department'}
+{'id': 9, 'email': 'dr.strange@bhcare.ph', 'first_name': 'Stephen', 'last_name': 'Strange'}
+{'id': 8, 'email': 'test.doctor@bhcare.ph', 'first_name': 'Test', 'last_name': 'Doctor'}
+
+=== All users ===
+{'id': 1, 'email': 'juan.delacruz@example.com', 'first_name': 'Juan', 'last_name': 'Dela Cruz'}
+{'id': 2, 'email': 'genetabios13@gmail.com', 'first_name': 'Gene', 'last_name': 'Tabios'}
+{'id': 3, 'email': 'security1741@bhcare.ph', 'first_name': 'Security', 'last_name': 'Department'}
+{'id': 4, 'email': 'Greg.reyes.727@gmail.com', 'first_name': 'Gregory', 'last_name': 'Estioko'}
+{'id': 8, 'email': 'test.doctor@bhcare.ph', 'first_name': 'Test', 'last_name': 'Doctor'}
+{'id': 9, 'email': 'dr.strange@bhcare.ph', 'first_name': 'Stephen', 'last_name': 'Strange'}

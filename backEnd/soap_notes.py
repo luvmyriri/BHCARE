@@ -11,7 +11,7 @@ def create_soap_note():
     try:
         data = request.json
         patient_id = data.get('patient_id')
-        doctor_id = data.get('doctor_id') # Optional
+        doctor_email = data.get('doctor_email')  # Email to resolve real doctor id
         subjective = data.get('subjective')
         objective = data.get('objective')
         assessment = data.get('assessment')
@@ -22,6 +22,14 @@ def create_soap_note():
 
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Resolve doctor_id from email (look up real users.id in DB)
+        doctor_id = None
+        if doctor_email:
+            cursor.execute("SELECT id, first_name, last_name FROM users WHERE email = %s", (doctor_email,))
+            doctor_row = cursor.fetchone()
+            if doctor_row:
+                doctor_id = doctor_row['id']
 
         # 1. Insert SOAP Note
         cursor.execute("""
@@ -35,7 +43,6 @@ def create_soap_note():
         conn.commit()
 
         # 2. Create Notification for Patient
-        # We can do this in the same transaction or separately. Same transaction is safer.
         notification_message = "Dr. has added a new SOAP note to your file."
         cursor.execute("""
             INSERT INTO notifications (user_id, type, message, related_id)
@@ -108,4 +115,78 @@ def get_my_notes():
         return get_patient_notes(patient_id)
 
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+@soap_notes_bp.route('/api/doctor/medical-records', methods=['GET'])
+def get_all_medical_records():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Fetch recent 50 SOAP notes joined with patient info
+        cursor.execute("""
+            SELECT 
+                sn.id, sn.created_at as appointment_date, sn.assessment as diagnosis,
+                u.first_name || ' ' || u.last_name as patient_name,
+                u.id as user_id,
+                'Dr. ' || d.last_name as doctor_name
+            FROM soap_notes sn
+            JOIN users u ON sn.patient_id = u.id
+            LEFT JOIN users d ON sn.doctor_id = d.id
+            ORDER BY sn.created_at DESC
+            LIMIT 50
+        """)
+        
+        records = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+
+        # Format date
+        for r in records:
+            if r.get('appointment_date'):
+                r['appointment_date'] = r['appointment_date'].strftime('%Y-%m-%d')
+
+        return jsonify(records), 200
+
+    except Exception as e:
+        print(f"Error fetching medical records: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@soap_notes_bp.route('/api/patients/<int:user_id>/history', methods=['GET'])
+def get_patient_history(user_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Fetch all SOAP notes for this patient
+        # doctor_id may reference users.id (for doctor-role users) or admin_users.id (legacy)
+        cursor.execute("""
+            SELECT 
+                sn.*,
+                CASE 
+                    WHEN u.id IS NOT NULL THEN 'Dr. ' || u.first_name || ' ' || u.last_name
+                    WHEN au.id IS NOT NULL THEN 'Dr. ' || au.username
+                    ELSE NULL
+                END as doctor_name
+            FROM soap_notes sn
+            LEFT JOIN users u ON sn.doctor_id = u.id
+            LEFT JOIN admin_users au ON sn.doctor_id = au.id AND u.id IS NULL
+            WHERE sn.patient_id = %s
+            ORDER BY sn.created_at DESC
+        """, (user_id,))
+        
+        history = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+
+        # Format dates
+        for h in history:
+            if h.get('created_at'):
+                h['created_at'] = h['created_at'].strftime('%Y-%m-%d %H:%M')
+
+        return jsonify(history), 200
+
+    except Exception as e:
+        print(f"Error fetching patient history: {e}")
         return jsonify({"error": str(e)}), 500

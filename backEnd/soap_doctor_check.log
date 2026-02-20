@@ -1,0 +1,18 @@
+=== SOAP NOTES ===
+{'id': 7, 'patient_id': 2, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 20, 23, 16, 17, 409565)}
+{'id': 5, 'patient_id': 2, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 18, 11, 53, 34, 746280)}
+{'id': 4, 'patient_id': 2, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 18, 11, 27, 3, 640623)}
+{'id': 3, 'patient_id': 1, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 18, 10, 23, 58, 129144)}
+{'id': 2, 'patient_id': 1, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 18, 10, 22, 20, 441604)}
+{'id': 1, 'patient_id': 2, 'doctor_id': None, 'created_at': datetime.datetime(2026, 2, 18, 10, 19, 31, 119680)}
+
+=== ADMIN USERS ===
+{'id': 1, 'username': 'admin', 'role': 'admin'}
+
+=== DOCTOR NAME QUERY RESULT ===
+{'id': 7, 'doctor_id': None, 'doctor_name': None}
+{'id': 5, 'doctor_id': None, 'doctor_name': None}
+{'id': 4, 'doctor_id': None, 'doctor_name': None}
+{'id': 3, 'doctor_id': None, 'doctor_name': None}
+{'id': 2, 'doctor_id': None, 'doctor_name': None}
+{'id': 1, 'doctor_id': None, 'doctor_name': None}

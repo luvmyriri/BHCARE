@@ -121,7 +121,9 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
     let value = e.target.value;
 
     // Formatting Logic
-    if (k === 'contact_number') {
+    if (k === 'first_name' || k === 'middle_name' || k === 'last_name') {
+      value = value.replace(/[0-9]/g, '');
+    } else if (k === 'contact_number') {
       let cleaned = value.replace(/[^0-9+]/g, '');
       if (cleaned.startsWith('09')) cleaned = '+63' + cleaned.substring(1);
       if (!cleaned.startsWith('+63') && cleaned.length > 0) cleaned = '+63' + cleaned.replace(/\D/g, '');
@@ -140,6 +142,12 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
   };
 
   const save = async () => {
+    // Email Validation
+    if (form.email && !form.email.toLowerCase().endsWith('@gmail.com')) {
+      toast({ title: 'Invalid Email', description: 'Email must be a @gmail.com address.', status: 'error' });
+      return;
+    }
+
     // Password Validation
     if (form.password && form.password !== form.confirm_password) {
       toast({ title: 'Passwords do not match', status: 'error' });
@@ -257,7 +265,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
             </Avatar>
             <Box ml={4}>
               <Heading size="md" color="teal.800">{user.first_name} {user.last_name} <Badge colorScheme="green" ml={2}>VERIFIED</Badge></Heading>
-              <Text fontSize="sm" color="gray.500">Member ID: {user.id} • <Button variant="link" colorScheme="teal" size="sm" onClick={handlePhotoClick}>Edit Photo</Button></Text>
+              <Text fontSize="sm" color="gray.500">Member ID: {user?.id} • <Button variant="link" colorScheme="teal" size="sm" onClick={handlePhotoClick}>Edit Photo</Button></Text>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -283,28 +291,28 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
                 <SimpleGrid columns={3} spacing={2}>
                   <FormControl isRequired>
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">FIRST NAME</FormLabel>
-                    <Input value={form.first_name} onChange={updateField('first_name')} bg="gray.50" />
+                    <Input value={form.first_name} onChange={updateField('first_name')} bg="gray.100" isReadOnly />
                   </FormControl>
                   <FormControl>
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">MIDDLE</FormLabel>
-                    <Input value={form.middle_name} onChange={updateField('middle_name')} bg="gray.50" />
+                    <Input value={form.middle_name} onChange={updateField('middle_name')} bg="gray.100" isReadOnly />
                   </FormControl>
                   <FormControl isRequired>
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">LAST NAME</FormLabel>
-                    <Input value={form.last_name} onChange={updateField('last_name')} bg="gray.50" />
+                    <Input value={form.last_name} onChange={updateField('last_name')} bg="gray.100" isReadOnly />
                   </FormControl>
                 </SimpleGrid>
                 <HStack>
                   <FormControl w="50%">
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">GENDER</FormLabel>
-                    <Select value={form.gender} onChange={updateField('gender')} bg="gray.50">
+                    <Select value={form.gender} onChange={updateField('gender')} bg="gray.100" isDisabled>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                     </Select>
                   </FormControl>
                   <FormControl w="50%">
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">BIRTH DATE</FormLabel>
-                    <Input type="date" value={form.date_of_birth} onChange={updateField('date_of_birth')} bg="gray.50" />
+                    <Input type="date" value={form.date_of_birth} onChange={updateField('date_of_birth')} bg="gray.100" isReadOnly />
                   </FormControl>
                 </HStack>
               </VStack>
@@ -377,7 +385,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
                 </FormControl>
                 <Divider />
                 <FormControl>
-                  <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">PHILHEALTH ID</FormLabel>
+                  <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">PHILHEALTH ID (OPTIONAL) </FormLabel>
                   <InputGroup>
                     <InputLeftElement><Icon as={FiCreditCard} color="gray.400" /></InputLeftElement>
                     <Input value={form.philhealth_id} onChange={updateField('philhealth_id')} bg="gray.50" />

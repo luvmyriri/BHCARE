@@ -26,7 +26,6 @@ import {
     ModalBody,
     ModalCloseButton,
     useDisclosure,
-    Progress,
     Drawer,
     DrawerBody,
     DrawerOverlay,
@@ -188,6 +187,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
     };
 
     const [appointments, setAppointments] = useState<any[]>([]);
+    const [medicalHistory, setMedicalHistory] = useState<any[]>([]);
+    const [selectedRecord, setSelectedRecord] = useState<any>(null);
 
     React.useEffect(() => {
         if (user?.id) {
@@ -197,6 +198,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                     // Filter for upcoming appointments only
                     const upcoming = data.filter((appt: any) => new Date(appt.date) >= new Date() && appt.status !== 'Cancelled').sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
                     setAppointments(upcoming);
+                })
+                .catch(err => console.error(err));
+
+            fetch(`/api/patients/${user.id}/history`)
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        setMedicalHistory(data);
+                    }
                 })
                 .catch(err => console.error(err));
         }
@@ -223,7 +233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                     <Text color="gray.500">No upcoming appointments.</Text>
                                 </Box>
                             )}
-                            <Button size="sm" w="full" colorScheme="teal" onClick={() => setActiveTab('appointments')}>{t.bookNewAppointment}</Button>
+                            <Button size="sm" w="full" colorScheme="teal" onClick={() => { setActiveTab('appointments'); onClose(); handleOpenAppointments('book'); }}>{t.bookNewAppointment}</Button>
                         </ModalBody>
                     </>
                 );
@@ -233,44 +243,64 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                         <ModalHeader>{t.healthRecords}</ModalHeader>
                         <ModalBody>
                             <VStack align="stretch" spacing={2}>
-                                <HStack justify="space-between" p={2} borderBottom="1px solid" borderColor="gray.100">
-                                    <Text fontSize="sm" fontWeight="600">Blood Test Results</Text>
-                                    <Text fontSize="xs" color="gray.500">Feb 10, 2026</Text>
-                                </HStack>
-                                <HStack justify="space-between" p={2} borderBottom="1px solid" borderColor="gray.100">
-                                    <Text fontSize="sm" fontWeight="600">Urinalysis</Text>
-                                    <Text fontSize="xs" color="gray.500">Jan 15, 2026</Text>
-                                </HStack>
-                                <Button size="sm" variant="link" colorScheme="teal" onClick={() => setActiveTab('records')}>View All Records</Button>
+                                {medicalHistory.length > 0 ? medicalHistory.slice(0, 3).map((record, index) => (
+                                    <HStack key={index} justify="space-between" p={2} borderBottom="1px solid" borderColor="gray.100">
+                                        <Text fontSize="sm" fontWeight="600">{record.assessment || 'Medical Log'}</Text>
+                                        <Text fontSize="xs" color="gray.500">{record.created_at}</Text>
+                                    </HStack>
+                                )) : (
+                                    <Text fontSize="sm" color="gray.500">No medical records found.</Text>
+                                )}
+                                <Button size="sm" variant="link" colorScheme="teal" onClick={() => { setActiveTab('records'); onClose(); }}>View All Records</Button>
                             </VStack>
                         </ModalBody>
                     </>
                 );
-            case 'health_score':
+            case 'record_detail':
                 return (
                     <>
-                        <ModalHeader>{t.healthScore}</ModalHeader>
+                        <ModalHeader>Medical Record Detail</ModalHeader>
                         <ModalBody>
-                            <VStack align="stretch" spacing={4}>
-                                <Box>
-                                    <Text fontSize="sm" fontWeight="bold">Body Mass Index (BMI)</Text>
-                                    <Progress value={80} size="sm" colorScheme="green" />
-                                    <Text fontSize="xs" mt={1}>Normal Range (22.5)</Text>
-                                </Box>
-                                <Box>
-                                    <Text fontSize="sm" fontWeight="bold">Blood Pressure</Text>
-                                    <Progress value={90} size="sm" colorScheme="green" />
-                                    <Text fontSize="xs" mt={1}>120/80 mmHg (Good)</Text>
-                                </Box>
-                                <Box>
-                                    <Text fontSize="sm" fontWeight="bold">Physical Activity</Text>
-                                    <Progress value={60} size="sm" colorScheme="orange" />
-                                    <Text fontSize="xs" mt={1}>Moderate (Needs Improvement)</Text>
-                                </Box>
-                            </VStack>
+                            {selectedRecord ? (
+                                <VStack align="stretch" spacing={4}>
+                                    <Box>
+                                        <Text fontWeight="bold" fontSize="sm">Date:</Text>
+                                        <Text>{selectedRecord.created_at}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Text fontWeight="bold" fontSize="sm">Doctor:</Text>
+                                        <Text>{selectedRecord.doctor_name || 'Unknown'}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Text fontWeight="bold" fontSize="sm">Assessment (Diagnosis):</Text>
+                                        <Text>{selectedRecord.assessment || 'None'}</Text>
+                                    </Box>
+                                    {selectedRecord.subjective && (
+                                        <Box>
+                                            <Text fontWeight="bold" fontSize="sm">Subjective (Symptoms):</Text>
+                                            <Text>{selectedRecord.subjective}</Text>
+                                        </Box>
+                                    )}
+                                    {selectedRecord.objective && (
+                                        <Box>
+                                            <Text fontWeight="bold" fontSize="sm">Objective (Findings):</Text>
+                                            <Text>{selectedRecord.objective}</Text>
+                                        </Box>
+                                    )}
+                                    {selectedRecord.plan && (
+                                        <Box>
+                                            <Text fontWeight="bold" fontSize="sm">Plan (Treatment):</Text>
+                                            <Text>{selectedRecord.plan}</Text>
+                                        </Box>
+                                    )}
+                                </VStack>
+                            ) : (
+                                <Text>No record details available.</Text>
+                            )}
                         </ModalBody>
                     </>
                 );
+            // Health score modal removed
             default:
                 return (
                     <>
@@ -292,10 +322,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             description={t.healthPriority}
                         />
 
-                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} gap={6}>
+                        <SimpleGrid columns={{ base: 1, sm: 2 }} gap={6}>
                             <StatCard label={t.upcomingAppointments} value={appointments.length.toString()} icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
-                            <StatCard label={t.healthRecords} value="12" icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
-                            <StatCard label={t.healthScore} value="98%" icon={FiActivity} color="green" onClick={() => handleCardClick('health_score')} />
+                            <StatCard label={t.healthRecords} value={medicalHistory.length.toString()} icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
                         </SimpleGrid>
 
                         <Heading size="md" color="teal.800" mt={4}>
@@ -521,21 +550,25 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                             </Tr>
                                         </Thead>
                                         <Tbody>
-                                            {[
-                                                { date: 'Feb 10, 2026', diag: 'Annual Physical Exam', doc: 'Dr. Santos', status: 'Completed' },
-                                                { date: 'Jan 15, 2026', diag: 'Flu Vaccination', doc: 'Dr. Gomez', status: 'Completed' },
-                                                { date: 'Dec 05, 2025', diag: 'Dental Cleaning', doc: 'Dr. Reyes', status: 'Completed' },
-                                            ].map((r, i) => (
-                                                <Tr key={i}>
-                                                    <Td>{r.date}</Td>
-                                                    <Td fontWeight="600">{r.diag}</Td>
-                                                    <Td>{r.doc}</Td>
-                                                    <Td><Badge colorScheme="green">{r.status}</Badge></Td>
-                                                    <Td>
-                                                        <Button size="xs" colorScheme="teal" variant="ghost">View Result</Button>
+                                            {medicalHistory.length > 0 ? (
+                                                medicalHistory.map((r, i) => (
+                                                    <Tr key={i}>
+                                                        <Td>{r.created_at}</Td>
+                                                        <Td fontWeight="600">{r.assessment || 'Medical Log'}</Td>
+                                                        <Td>{r.doctor_name || 'Unknown'}</Td>
+                                                        <Td><Badge colorScheme="green">Completed</Badge></Td>
+                                                        <Td>
+                                                            <Button size="xs" colorScheme="teal" variant="ghost" onClick={() => { setSelectedRecord(r); setSelectedCard('record_detail'); onOpen(); }}>View Result</Button>
+                                                        </Td>
+                                                    </Tr>
+                                                ))
+                                            ) : (
+                                                <Tr>
+                                                    <Td colSpan={5} textAlign="center">
+                                                        <Text color="gray.500" py={4}>No medical records found.</Text>
                                                     </Td>
                                                 </Tr>
-                                            ))}
+                                            )}
                                         </Tbody>
                                     </Table>
                                 </Box>

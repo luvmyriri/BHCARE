@@ -24,6 +24,8 @@ from email_config import (
 
 load_dotenv()
 
+START_TIME = datetime.now()
+
 app = Flask(__name__, static_folder='static')
 CORS(app)
 bcrypt = Bcrypt(app)
@@ -48,12 +50,12 @@ from security import security_bp
 
 app.register_blueprint(appointments_bp)
 app.register_blueprint(lab_results_bp)
+from soap_notes import soap_notes_bp
+app.register_blueprint(soap_notes_bp)
 app.register_blueprint(inventory_bp)
 app.register_blueprint(security_bp)
 
-from soap_notes import soap_notes_bp
 from notifications import notifications_bp
-app.register_blueprint(soap_notes_bp)
 app.register_blueprint(notifications_bp)
 
 # Startup Database Verification
@@ -903,33 +905,12 @@ def login():
     if not email or not password:
         return jsonify({"error": "Missing credentials"}), 400
     
-    # Hardcoded Doctor/Admin Bypass for Testing
-    if email == 'admin@bhcare.ph' and password == 'bhcare123':
-        return jsonify({
-            "user": {
-                "id": 9998,
-                "email": email,
-                "first_name": "System",
-                "last_name": "Administrator",
-                "role": "admin"
-            }
-        }), 200
-    
-    if email == 'doctor@bhcare.ph' and password == 'bhcare123':
-        return jsonify({
-            "user": {
-                "id": 9999,
-                "email": email,
-                "first_name": "Medical",
-                "last_name": "Officer",
-                "role": "doctor"
-            }
-        }), 200
+
     
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, role FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, role, status FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
@@ -942,6 +923,10 @@ def login():
             print(f"[LOGIN FAIL] Password hash mismatch for user: {email}")
             print(f"Stored hash: {user[2]}")
             return jsonify({"error": "Invalid credentials"}), 401
+            
+        if user[21] == 'Inactive':
+            print(f"[LOGIN FAIL] Account deactivated for user: {email}")
+            return jsonify({"error": "Account deactivated. Please contact the administrator."}), 403
         
         # Build complete user object
         user_data = {
@@ -964,7 +949,8 @@ def login():
             "subdivision": user[17],
             "zip_code": user[18],
             "full_address": user[19],
-            "role": user[20]
+            "role": user[20],
+            "status": user[21]
         }
         
         
@@ -1083,11 +1069,18 @@ def upload_photo(user_id):
 def get_user(user_id):
     try:
         conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        
         cur = conn.cursor(cursor_factory=RealDictCursor) # Use RealDictCursor
-        cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        
+        # Join with medical_staff_details to get specialized info if available
+        query = """
+            SELECT u.*, d.prc_license_number, d.specialization, d.schedule, d.clinic_room
+            FROM users u
+            LEFT JOIN medical_staff_details d ON u.id = d.user_id
+            WHERE u.id = %s
+        """
+        cur.execute(query, (user_id,))
         user_row = cur.fetchone()
+        
         cur.close()
         conn.close()
         
@@ -1113,6 +1106,7 @@ def get_user(user_id):
 def update_user(user_id):
     try:
         data = request.json
+        print(f"[UPDATE USER] user_id={user_id}, payload keys={list(data.keys()) if data else 'None'}")
         conn = get_db()
         cur = conn.cursor()
         
@@ -1123,13 +1117,23 @@ def update_user(user_id):
             'first_name', 'middle_name', 'last_name', 'date_of_birth', 
             'gender', 'contact_number', 'philhealth_id', 
             'barangay', 'city', 'province', 'email', 'role',
-            'house_number', 'block_number', 'lot_number', 'street_name', 'subdivision', 'zip_code'
+            'house_number', 'block_number', 'lot_number', 'street_name', 'subdivision', 'zip_code', 'status'
         ]
+        
+        # Fields that should be NULL instead of empty string
+        nullable_fields = ['date_of_birth', 'middle_name', 'philhealth_id', 'email',
+                          'house_number', 'block_number', 'lot_number', 'street_name', 
+                          'subdivision', 'zip_code', 'barangay', 'city', 'province',
+                          'contact_number']
         
         for key in allowed_fields:
             if key in data:
+                value = data[key]
+                # Convert empty strings to None for nullable/date fields
+                if key in nullable_fields and value == '':
+                    value = None
                 fields.append(f"{key} = %s")
-                values.append(data[key])
+                values.append(value)
         
         # Handle Password Change separately
         if 'password' in data and data['password']:
@@ -1142,24 +1146,52 @@ def update_user(user_id):
             
         values.append(user_id)
         
-        # Simplistic approach for now to avoid robust SQL composition issues in one-shot
-        # Reverting to string formatting for simplicity in this specific verified env
-        set_clause = ", ".join(fields)
-        query = f"UPDATE users SET {set_clause} WHERE id = %s RETURNING id"
+        # Execute User Update
+        if fields:
+            set_clause = ", ".join(fields)
+            query = f"UPDATE users SET {set_clause} WHERE id = %s"
+            print(f"[UPDATE USER] Query: {query}")
+            print(f"[UPDATE USER] Values: {values}")
+            cur.execute(query, tuple(values))
+
+        # Handle Medical Staff Details Update
+        staff_fields = []
+        staff_values = []
+        allowed_staff_fields = ['prc_license_number', 'specialization', 'schedule', 'clinic_room']
+
+        for key in allowed_staff_fields:
+            if key in data:
+                staff_fields.append(f"{key} = %s")
+                staff_values.append(data[key])
         
-        cur.execute(query, tuple(values))
-        updated_id = cur.fetchone()
-        
+        if staff_fields:
+            # Check if record exists
+            cur.execute("SELECT 1 FROM medical_staff_details WHERE user_id = %s", (user_id,))
+            if cur.fetchone():
+                # Update
+                staff_set_clause = ", ".join(staff_fields)
+                staff_query = f"UPDATE medical_staff_details SET {staff_set_clause} WHERE user_id = %s"
+                staff_values.append(user_id)
+                cur.execute(staff_query, tuple(staff_values))
+            else:
+                # Insert (if trying to add details to a user who didn't have them)
+                columns = ['user_id'] + [key for key in allowed_staff_fields if key in data]
+                placeholders = ['%s'] * len(columns)
+                insert_values = [user_id] + staff_values
+                staff_cols = ", ".join(columns)
+                staff_placeholders = ", ".join(placeholders)
+                staff_query = f"INSERT INTO medical_staff_details ({staff_cols}) VALUES ({staff_placeholders})"
+                cur.execute(staff_query, tuple(insert_values))
+
         conn.commit()
         cur.close()
         conn.close()
         
-        if not updated_id:
-            return jsonify({"error": "User not found"}), 404
-            
         return jsonify({"message": "User updated successfully"}), 200
     except Exception as e:
-        print(f"Error updating user: {e}")
+        import traceback
+        print(f"Error updating user {user_id}: {e}")
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -1176,7 +1208,7 @@ def get_all_users():
             SELECT 
                 id, first_name, last_name, email, 
                 contact_number, gender, date_of_birth,
-                barangay, city, role, created_at
+                barangay, city, role, created_at, status
             FROM users 
             ORDER BY created_at DESC
         """
@@ -1429,6 +1461,96 @@ def reset_password():
         
     except Exception as e:
         print(f"[RESET ERROR] {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+
+@app.route("/api/admin/medical-staff", methods=["GET"])
+def get_medical_staff():
+    """Get all medical staff members with details"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        query = """
+            SELECT 
+                u.id, u.first_name, u.last_name, u.email, 
+                u.contact_number, u.role, u.gender,
+                d.prc_license_number, d.specialization, d.schedule, d.clinic_room
+            FROM users u
+            LEFT JOIN medical_staff_details d ON u.id = d.user_id
+            WHERE u.role IN ('Doctor', 'Nurse', 'Midwife', 'Health Worker')
+            ORDER BY u.last_name ASC
+        """
+        
+        cur.execute(query)
+        staff = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify(staff), 200
+        
+    except Exception as e:
+        print(f"Error fetching medical staff: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/medical-staff", methods=["POST"])
+def create_medical_staff():
+    """Create a new medical staff account with details"""
+    try:
+        data = request.json
+        email = data.get('email')
+        password = data.get('password')
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+        role = data.get('role')
+        contact = data.get('contact_number', '')
+        
+        # New specialized fields
+        prc_license = data.get('prc_license_number', '')
+        specialization = data.get('specialization', '')
+        schedule = data.get('schedule', '')
+        clinic_room = data.get('clinic_room', '')
+        
+        if not all([email, password, first_name, last_name, role]):
+            return jsonify({"error": "Missing required fields"}), 400
+            
+        hashed = bcrypt.generate_password_hash(password).decode('utf-8')
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        # Check if email exists
+        cur.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Email already registered"}), 409
+            
+        # 1. Insert into Users Table
+        cur.execute("""
+            INSERT INTO users (email, password_hash, first_name, last_name, role, contact_number, date_of_birth, gender, full_address, barangay, city, province)
+            VALUES (%s, %s, %s, %s, %s, %s, '1980-01-01', 'Female', 'Brgy 174 Health Center', 'Brgy 174', 'Caloocan', 'Metro Manila')
+            RETURNING id
+        """, (email, hashed, first_name, last_name, role, contact))
+        
+        new_user_id = cur.fetchone()[0]
+        
+        # 2. Insert into Medical Staff Details Table
+        cur.execute("""
+            INSERT INTO medical_staff_details (user_id, prc_license_number, specialization, schedule, clinic_room)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (new_user_id, prc_license, specialization, schedule, clinic_room))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"message": "Staff account created successfully", "id": new_user_id}), 201
+        
+    except Exception as e:
+        print(f"Error creating medical staff: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1734,5 +1856,441 @@ def get_admin_activities():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/admin/system-stats", methods=["GET"])
+def get_system_stats():
+    """Get system health statistics"""
+    try:
+        stats = {
+            "database_connection": "Error",
+            "uptime": "0s",
+            "last_backup": "N/A",
+            "api_latency": "Online"
+        }
+
+        # 1. Check Database
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            cur.close()
+            conn.close()
+            stats["database_connection"] = "Stable"
+        except Exception as e:
+            stats["database_connection"] = "Critical"
+            print(f"DB Check Failed: {e}")
+
+        # 2. Server Uptime
+        uptime = datetime.now() - START_TIME
+        days = uptime.days
+        hours, remainder = divmod(uptime.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        uptime_str = []
+        if days > 0: uptime_str.append(f"{days}d")
+        if hours > 0: uptime_str.append(f"{hours}h")
+        if minutes > 0: uptime_str.append(f"{minutes}m")
+        stats["uptime"] = " ".join(uptime_str) if uptime_str else f"{seconds}s"
+
+        # 3. Last Backup (Check modification time of dump file)
+        backup_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bhcare_full_dump.sql')
+        if os.path.exists(backup_file):
+            mod_time = datetime.fromtimestamp(os.path.getmtime(backup_file))
+            # Format: 'Today, 03:00 AM'
+            if mod_time.date() == date.today():
+                date_str = "Today"
+            elif mod_time.date() == date.today() - timedelta(days=1):
+                date_str = "Yesterday"
+            else:
+                date_str = mod_time.strftime("%b %d")
+            
+            stats["last_backup"] = f"{date_str}, {mod_time.strftime('%I:%M %p')}"
+        else:
+             # Fallback to checking json dump
+            backup_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'db_dump.json')
+            if os.path.exists(backup_json):
+                 mod_time = datetime.fromtimestamp(os.path.getmtime(backup_json))
+                 stats["last_backup"] = mod_time.strftime("%Y-%m-%d %H:%M")
+
+        return jsonify(stats), 200
+
+    except Exception as e:
+        print(f"Error fetching system stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/analytics", methods=["GET"])
+def get_admin_analytics():
+    """
+    FHSIS Analytics: real data derived from appointments & users tables.
+    Returns prenatal visits, immunization counts, TB success rate,
+    top morbidity diagnoses, and dengue hotspots.
+    """
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # ── Helpers ────────────────────────────────────────────────────
+        from datetime import date as _date, timedelta as _td
+        import calendar as _cal
+        today = _date.today()
+        this_month_start = today.replace(day=1)
+        # Last month: subtract one day from this_month_start to get last day of prev month
+        _last_day_prev = this_month_start - _td(days=1)
+        last_month_start = _last_day_prev.replace(day=1)
+        last_month_end   = this_month_start
+
+
+        # ── 1. Prenatal visits ─────────────────────────────────────────
+        prenatal_filter = """(
+            service_type ILIKE '%prenatal%'
+            OR service_type ILIKE '%maternal%'
+            OR service_type ILIKE '%antenatal%'
+            OR service_type ILIKE '%obstetric%'
+        )"""
+
+        cur.execute(f"SELECT COUNT(*) as n FROM appointments WHERE {prenatal_filter}")
+        prenatal_count = cur.fetchone()['n']
+
+        cur.execute(f"""
+            SELECT COUNT(*) as n FROM appointments
+            WHERE {prenatal_filter}
+              AND appointment_date >= %s AND appointment_date < %s
+        """, (last_month_start, last_month_end))
+        prenatal_prev = cur.fetchone()['n']
+
+        # Prenatal modal patients
+        cur.execute(f"""
+            SELECT
+                u.first_name || ' ' || u.last_name AS patient_name,
+                a.appointment_date,
+                a.service_type
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE {prenatal_filter}
+              AND a.status NOT IN ('cancelled')
+            ORDER BY a.appointment_date DESC
+            LIMIT 20
+        """)
+        prenatal_patients_raw = cur.fetchall()
+        prenatal_patients = []
+        for p in prenatal_patients_raw:
+            row = dict(p)
+            if row.get('appointment_date'):
+                row['appointment_date'] = row['appointment_date'].strftime('%b %d, %Y')
+            prenatal_patients.append(row)
+
+        # ── 2. Immunization ────────────────────────────────────────────
+        immunization_filter = """(
+            service_type ILIKE '%immuniz%'
+            OR service_type ILIKE '%vaccin%'
+            OR service_type ILIKE '%bcg%'
+            OR service_type ILIKE '%hepatitis%'
+            OR service_type ILIKE '%polio%'
+            OR service_type ILIKE '%measles%'
+            OR service_type ILIKE '%pentavalent%'
+        )"""
+
+        cur.execute(f"SELECT COUNT(*) as n FROM appointments WHERE {immunization_filter}")
+        immunization_count = cur.fetchone()['n']
+
+        cur.execute(f"""
+            SELECT COUNT(*) as n FROM appointments
+            WHERE {immunization_filter}
+              AND appointment_date >= %s AND appointment_date < %s
+        """, (last_month_start, last_month_end))
+        immunization_prev = cur.fetchone()['n']
+
+        # Breakdown by vaccine type (simple keyword match)
+        vaccine_types = {
+            'BCG':        "service_type ILIKE '%bcg%'",
+            'Hepatitis B':"service_type ILIKE '%hepatitis%'",
+            'Oral Polio': "service_type ILIKE '%polio%'",
+            'Measles':    "service_type ILIKE '%measles%'",
+            'Pentavalent':"service_type ILIKE '%pentavalent%'",
+        }
+        breakdown = {}
+        for vaccine, cond in vaccine_types.items():
+            cur.execute(f"SELECT COUNT(*) as n FROM appointments WHERE {cond}")
+            breakdown[vaccine] = cur.fetchone()['n']
+
+        # Also grab the generic immunization bucket
+        cur.execute("""
+            SELECT COUNT(*) as n FROM appointments
+            WHERE (service_type ILIKE '%immuniz%' OR service_type ILIKE '%vaccin%')
+              AND service_type NOT ILIKE '%bcg%'
+              AND service_type NOT ILIKE '%hepatitis%'
+              AND service_type NOT ILIKE '%polio%'
+              AND service_type NOT ILIKE '%measles%'
+              AND service_type NOT ILIKE '%pentavalent%'
+        """)
+        breakdown['Other'] = cur.fetchone()['n']
+
+        # ── 3. TB / DOTS Treatment Success ────────────────────────────
+        tb_filter = """(
+            service_type ILIKE '%dots%'
+            OR service_type ILIKE '%tuberculosis%'
+            OR service_type ILIKE '% tb %'
+            OR service_type ILIKE '%tb-%'
+            OR service_type ILIKE '%-tb%'
+            OR diagnosis ILIKE '%tuberculosis%'
+            OR diagnosis ILIKE '%tb%'
+        )"""
+
+        cur.execute(f"""
+            SELECT status, COUNT(*) as n
+            FROM appointments
+            WHERE {tb_filter}
+            GROUP BY status
+        """)
+        tb_rows = cur.fetchall()
+        tb_total     = sum(r['n'] for r in tb_rows)
+        tb_completed = sum(r['n'] for r in tb_rows if r['status'] == 'completed')
+        tb_pct = round((tb_completed / tb_total * 100), 1) if tb_total > 0 else 0
+
+        # ── 4. Top Morbidity (by diagnosis) ───────────────────────────
+        cur.execute("""
+            SELECT diagnosis, COUNT(*) as cases
+            FROM appointments
+            WHERE status = 'completed'
+              AND diagnosis IS NOT NULL
+              AND diagnosis != ''
+            GROUP BY diagnosis
+            ORDER BY cases DESC
+            LIMIT 10
+        """)
+        morbidity_rows = cur.fetchall()
+
+        # Compute trend: compare this month vs last month for each diagnosis
+        morbidity = []
+        for row in morbidity_rows:
+            diag = row['diagnosis']
+            cur.execute("""
+                SELECT COUNT(*) as n FROM appointments
+                WHERE status='completed' AND diagnosis=%s
+                  AND appointment_date >= %s AND appointment_date < %s
+            """, (diag, this_month_start, today))
+            this_m = cur.fetchone()['n']
+
+            cur.execute("""
+                SELECT COUNT(*) as n FROM appointments
+                WHERE status='completed' AND diagnosis=%s
+                  AND appointment_date >= %s AND appointment_date < %s
+            """, (diag, last_month_start, last_month_end))
+            last_m = cur.fetchone()['n']
+
+            if last_m == 0:
+                trend = 'stable'
+            elif this_m > last_m:
+                trend = 'up'
+            elif this_m < last_m:
+                trend = 'down'
+            else:
+                trend = 'stable'
+
+            morbidity.append({
+                'name':  diag,
+                'cases': row['cases'],
+                'trend': trend
+            })
+
+        # Also include service_type as fallback if no diagnoses recorded
+        if not morbidity:
+            cur.execute("""
+                SELECT service_type as name, COUNT(*) as cases
+                FROM appointments
+                WHERE service_type IS NOT NULL AND service_type != ''
+                GROUP BY service_type
+                ORDER BY cases DESC
+                LIMIT 10
+            """)
+            for row in cur.fetchall():
+                morbidity.append({
+                    'name':  row['name'],
+                    'cases': row['cases'],
+                    'trend': 'stable'
+                })
+
+        # ── 5. Dengue Hotspots ─────────────────────────────────────────
+        cur.execute("""
+            SELECT
+                COALESCE(u.subdivision, u.barangay, u.address, 'Unknown Area') as area,
+                COUNT(*) as case_count
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE (
+                a.diagnosis ILIKE '%dengue%'
+                OR a.service_type ILIKE '%dengue%'
+            )
+              AND a.status = 'completed'
+            GROUP BY area
+            ORDER BY case_count DESC
+            LIMIT 5
+        """)
+        hotspot_rows = cur.fetchall()
+
+        dengue_hotspots = []
+        for i, r in enumerate(hotspot_rows):
+            if i == 0:
+                level = 'High'
+            elif i <= 2:
+                level = 'Medium'
+            else:
+                level = 'Low'
+            dengue_hotspots.append({
+                'area':  r['area'],
+                'count': r['case_count'],
+                'level': level
+            })
+
+        # Total dengue count for the card
+        cur.execute("""
+            SELECT COUNT(*) as n FROM appointments
+            WHERE (diagnosis ILIKE '%dengue%' OR service_type ILIKE '%dengue%')
+              AND status = 'completed'
+        """)
+        dengue_total = cur.fetchone()['n']
+
+        cur.close()
+        conn.close()
+
+        # ── Response ──────────────────────────────────────────────────
+        return jsonify({
+            "prenatal": {
+                "count":      prenatal_count,
+                "prev_month": prenatal_prev,
+                "target":     1600,
+                "patients":   prenatal_patients
+            },
+            "immunization": {
+                "count":      immunization_count,
+                "prev_month": immunization_prev,
+                "target_pct": 95,
+                "breakdown":  breakdown
+            },
+            "tb_treatment": {
+                "completed":   tb_completed,
+                "total":       tb_total,
+                "success_pct": tb_pct
+            },
+            "morbidity": morbidity,
+            "dengue_hotspots": dengue_hotspots,
+            "dengue_total": dengue_total
+        }), 200
+
+    except Exception as e:
+        import traceback
+        print(f"Error fetching analytics: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ============= INVENTORY ENDPOINTS =============
+@app.route("/api/inventory", methods=["GET"])
+def get_inventory():
+    """Get all inventory items"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM inventory ORDER BY stock_quantity ASC")
+        items = cur.fetchall()
+        
+        # Calculate status if not present
+        inventory_list = []
+        for item in items:
+            item_dict = dict(item)
+            if not item_dict.get('status'):
+                if item_dict['stock_quantity'] < 50:
+                    item_dict['status'] = 'Low Stock'
+                elif item_dict['stock_quantity'] < 100:
+                    item_dict['status'] = 'Moderate'
+                else:
+                    item_dict['status'] = 'Good'
+            inventory_list.append(item_dict)
+            
+        cur.close()
+        conn.close()
+        return jsonify(inventory_list), 200
+    except Exception as e:
+        print(f"Error fetching inventory: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/inventory", methods=["POST"])
+def add_inventory_item():
+    """Add a new item to pharmacy inventory"""
+    try:
+        data = request.json
+        item_name = data.get('item_name')
+        category = data.get('category')
+        stock_quantity = data.get('stock_quantity', 0)
+        unit = data.get('unit')
+        
+        if not all([item_name, category, unit]):
+            return jsonify({"error": "Missing required fields"}), 400
+            
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO inventory (item_name, category, stock_quantity, unit) 
+               VALUES (%s, %s, %s, %s) RETURNING id""",
+            (item_name, category, int(stock_quantity), unit)
+        )
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"message": "Item added successfully", "id": new_id}), 201
+    except Exception as e:
+        print(f"Error adding inventory item: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/inventory/restock", methods=["POST"])
+def restock_inventory_item():
+    """Increase stock quantity of an existing item"""
+    try:
+        data = request.json
+        item_id = data.get('item_id')
+        add_quantity = data.get('add_quantity', 0)
+        
+        if not item_id or int(add_quantity) <= 0:
+            return jsonify({"error": "Invalid item ID or restock quantity"}), 400
+            
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check if item exists and get current status
+        cur.execute("SELECT stock_quantity FROM inventory WHERE id = %s", (item_id,))
+        item = cur.fetchone()
+        
+        if not item:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Item not found"}), 404
+            
+        new_quantity = item['stock_quantity'] + int(add_quantity)
+        
+        # Determine new status based on new quantity
+        if new_quantity < 50:
+            new_status = 'Low Stock'
+        elif new_quantity < 100:
+            new_status = 'Moderate'
+        else:
+            new_status = 'Good'
+            
+        # Update db
+        cur.execute(
+            "UPDATE inventory SET stock_quantity = %s, status = %s WHERE id = %s",
+            (new_quantity, new_status, item_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"message": "Item restocked successfully", "new_quantity": new_quantity, "status": new_status}), 200
+    except Exception as e:
+        print(f"Error restocking inventory item: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
