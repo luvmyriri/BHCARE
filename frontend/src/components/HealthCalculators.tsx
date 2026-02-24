@@ -33,12 +33,26 @@ import {
     Alert,
     AlertIcon,
     Flex,
+    Button,
 } from '@chakra-ui/react';
-import { FiInfo, FiActivity, FiHeart, FiSettings } from 'react-icons/fi';
+import { FiInfo, FiActivity, FiHeart, FiSettings, FiSave } from 'react-icons/fi';
+import { Table, Thead, Tbody, Tr, Th, Td, useToast } from '@chakra-ui/react';
 
-const HealthCalculators: React.FC = () => {
+interface Props {
+    user?: any;
+}
+
+const HealthCalculators: React.FC<Props> = ({ user }) => {
+    const toast = useToast();
+
     // Unit State
     const [isMetric, setIsMetric] = useState(true);
+
+    // History State
+    const [bmiHistory, setBmiHistory] = useState<any[]>([]);
+    const [bpHistory, setBpHistory] = useState<any[]>([]);
+    const [isSavingBmi, setIsSavingBmi] = useState(false);
+    const [isSavingBp, setIsSavingBp] = useState(false);
 
     // BMI State
     const [weight, setWeight] = useState<number>(70); // kg or lbs
@@ -103,6 +117,77 @@ const HealthCalculators: React.FC = () => {
             setBpCategory({ label: 'Normal', color: 'green', description: 'Your blood pressure is within the healthy range.' });
         }
     }, [systolic, diastolic]);
+
+    // Fetch History
+    const fetchHistory = async () => {
+        if (!user?.id) return;
+        try {
+            const bmiRes = await fetch(`/api/patients/${user.id}/bmi-history`);
+            if (bmiRes.ok) {
+                const bmiData = await bmiRes.json();
+                setBmiHistory(bmiData);
+            }
+            const bpRes = await fetch(`/api/patients/${user.id}/bp-history`);
+            if (bpRes.ok) {
+                const bpData = await bpRes.json();
+                setBpHistory(bpData);
+            }
+        } catch (error) {
+            console.error('Error fetching history', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchHistory();
+    }, [user?.id]);
+
+    const handleSaveBmi = async () => {
+        if (!user?.id) return;
+        setIsSavingBmi(true);
+        try {
+            const payload = {
+                weight,
+                height: isMetric ? heightCm : (heightFt * 12) + heightIn,
+                bmi,
+                unit_system: isMetric ? 'metric' : 'imperial'
+            };
+            const res = await fetch(`/api/patients/${user.id}/bmi-history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                toast({ title: 'BMI Saved', status: 'success', duration: 2000 });
+                fetchHistory(); // Refresh
+            } else {
+                toast({ title: 'Error saving BMI', status: 'error', duration: 2000 });
+            }
+        } catch (error) {
+            console.error(error);
+        }
+        setIsSavingBmi(false);
+    };
+
+    const handleSaveBp = async () => {
+        if (!user?.id) return;
+        setIsSavingBp(true);
+        try {
+            const res = await fetch(`/api/patients/${user.id}/bp-history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ systolic, diastolic })
+            });
+            if (res.ok) {
+                toast({ title: 'Blood Pressure Saved', status: 'success', duration: 2000 });
+                fetchHistory(); // Refresh
+            } else {
+                toast({ title: 'Error saving BP', status: 'error', duration: 2000 });
+            }
+        } catch (error) {
+            console.error(error);
+        }
+        setIsSavingBp(false);
+    };
 
     return (
         <Box w="full">
@@ -204,9 +289,59 @@ const HealthCalculators: React.FC = () => {
                                                     {bmiCategory.description}
                                                 </Text>
                                             </HStack>
+                                            <Button
+                                                mt={6} w="full" colorScheme={bmiCategory.color}
+                                                leftIcon={<Icon as={FiSave} />}
+                                                isLoading={isSavingBmi}
+                                                onClick={handleSaveBmi}
+                                            >
+                                                Save BMI Record
+                                            </Button>
                                         </Box>
                                     </VStack>
                                 </SimpleGrid>
+
+                                {/* BMI History Table */}
+                                <Box mt={8} pt={8} borderTop="1px solid" borderColor="gray.100">
+                                    <Heading size="sm" mb={4} color="gray.700">BMI History</Heading>
+                                    {bmiHistory.length > 0 ? (
+                                        <Box overflowX="auto">
+                                            <Table variant="simple" size="sm">
+                                                <Thead bg="gray.50">
+                                                    <Tr>
+                                                        <Th>Date & Time</Th>
+                                                        <Th>Weight</Th>
+                                                        <Th>Height</Th>
+                                                        <Th>BMI</Th>
+                                                        <Th>Result</Th>
+                                                    </Tr>
+                                                </Thead>
+                                                <Tbody>
+                                                    {bmiHistory.map((log) => {
+                                                        const bmiVal = parseFloat(log.bmi);
+                                                        let color = 'green';
+                                                        let lbl = 'Normal';
+                                                        if (bmiVal === 0) { color = 'gray'; lbl = 'Zero'; }
+                                                        else if (bmiVal < 18.5) { color = 'blue'; lbl = 'Underweight'; }
+                                                        else if (bmiVal >= 25 && bmiVal < 30) { color = 'orange'; lbl = 'Overweight'; }
+                                                        else if (bmiVal >= 30) { color = 'red'; lbl = 'Obese'; }
+                                                        return (
+                                                            <Tr key={log.id}>
+                                                                <Td>{log.created_at}</Td>
+                                                                <Td>{parseFloat(log.weight).toFixed(1)} {log.unit_system === 'metric' ? 'kg' : 'lbs'}</Td>
+                                                                <Td>{parseFloat(log.height).toFixed(1)} {log.unit_system === 'metric' ? 'cm' : 'inches'}</Td>
+                                                                <Td fontWeight="bold">{bmiVal.toFixed(1)}</Td>
+                                                                <Td><Badge colorScheme={color}>{lbl}</Badge></Td>
+                                                            </Tr>
+                                                        );
+                                                    })}
+                                                </Tbody>
+                                            </Table>
+                                        </Box>
+                                    ) : (
+                                        <Text color="gray.500" fontSize="sm">No BMI records found. Save a measurement to start tracking.</Text>
+                                    )}
+                                </Box>
 
                                 <Box mt={12} p={6} bg="gray.50" borderRadius="2xl" border="1px solid" borderColor="gray.100">
                                     <Heading size="xs" mb={4} color="gray.600" textTransform="uppercase" letterSpacing="widest">Medically Important Info (WHO Standards)</Heading>
@@ -280,6 +415,14 @@ const HealthCalculators: React.FC = () => {
                                                     {bpCategory.description}
                                                 </Text>
                                             </HStack>
+                                            <Button
+                                                mt={6} w="full" colorScheme={bpCategory.color}
+                                                leftIcon={<Icon as={FiSave} />}
+                                                isLoading={isSavingBp}
+                                                onClick={handleSaveBp}
+                                            >
+                                                Save BP Record
+                                            </Button>
                                         </Box>
 
                                         <Alert status={bpCategory.color === 'purple' || bpCategory.color === 'red' ? 'error' : 'info'} borderRadius="xl" variant="subtle">
@@ -291,6 +434,47 @@ const HealthCalculators: React.FC = () => {
                                         </Alert>
                                     </VStack>
                                 </SimpleGrid>
+
+                                {/* BP History Table */}
+                                <Box mt={8} pt={8} borderTop="1px solid" borderColor="gray.100">
+                                    <Heading size="sm" mb={4} color="gray.700">Blood Pressure History</Heading>
+                                    {bpHistory.length > 0 ? (
+                                        <Box overflowX="auto">
+                                            <Table variant="simple" size="sm">
+                                                <Thead bg="gray.50">
+                                                    <Tr>
+                                                        <Th>Date & Time</Th>
+                                                        <Th>Systolic</Th>
+                                                        <Th>Diastolic</Th>
+                                                        <Th>Result</Th>
+                                                    </Tr>
+                                                </Thead>
+                                                <Tbody>
+                                                    {bpHistory.map((log) => {
+                                                        const sys = log.systolic;
+                                                        const dia = log.diastolic;
+                                                        let color = 'green';
+                                                        let lbl = 'Normal';
+                                                        if (sys >= 180 || dia >= 120) { color = 'purple'; lbl = 'Crisis'; }
+                                                        else if (sys >= 140 || dia >= 90) { color = 'red'; lbl = 'Stage 2'; }
+                                                        else if ((sys >= 130 && sys <= 139) || (dia >= 80 && dia <= 89)) { color = 'orange'; lbl = 'Stage 1'; }
+                                                        else if (sys >= 120 && sys < 130 && dia < 80) { color = 'yellow'; lbl = 'Elevated'; }
+                                                        return (
+                                                            <Tr key={log.id}>
+                                                                <Td>{log.created_at}</Td>
+                                                                <Td>{sys}</Td>
+                                                                <Td>{dia}</Td>
+                                                                <Td><Badge colorScheme={color}>{lbl}</Badge></Td>
+                                                            </Tr>
+                                                        );
+                                                    })}
+                                                </Tbody>
+                                            </Table>
+                                        </Box>
+                                    ) : (
+                                        <Text color="gray.500" fontSize="sm">No Blood Pressure records found. Save a measurement to start tracking.</Text>
+                                    )}
+                                </Box>
 
                                 <Box mt={12} p={6} bg="gray.50" borderRadius="2xl" border="1px solid" borderColor="gray.100">
                                     <Heading size="xs" mb={4} color="gray.600" textTransform="uppercase" letterSpacing="widest">AHA/ACC 2017 BP Chart</Heading>

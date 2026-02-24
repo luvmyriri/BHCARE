@@ -36,6 +36,7 @@ import {
     Input,
     InputGroup,
     InputLeftElement,
+    Select,
 } from '@chakra-ui/react';
 import Profile from './Profile';
 import {
@@ -49,8 +50,6 @@ import {
     FiMenu,
     FiUser,
     FiSearch,
-    FiClock,
-    FiFileText,
 } from 'react-icons/fi';
 
 interface DoctorDashboardProps {
@@ -103,8 +102,8 @@ const NavItem = ({ icon, children, active, onClick }: any) => {
 const DoctorStatCard = ({ label, value, icon, color, onClick }: any) => (
     <Box
         bg="white"
-        p={6}
-        borderRadius="2xl"
+        p={8}
+        borderRadius="3xl"
         boxShadow="sm"
         border="1px solid"
         borderColor="gray.100"
@@ -134,7 +133,7 @@ const DoctorStatCard = ({ label, value, icon, color, onClick }: any) => (
 const PageHero = ({ title, description, badge }: any) => (
     <Box
         bg="linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)"
-        p={{ base: 6, md: 10 }}
+        p={{ base: 8, md: 12 }}
         borderRadius={{ base: "2xl", md: "3xl" }}
         color="white"
         boxShadow="xl"
@@ -249,7 +248,9 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
     // Search & History State
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortOrder, setSortOrder] = useState('name-asc');
     const [historySearchQuery, setHistorySearchQuery] = useState('');
+    const [historySortOrder, setHistorySortOrder] = useState('newest');
     const [selectedHistory, setSelectedHistory] = useState<any>(null);
 
 
@@ -549,14 +550,14 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         switch (activeTab) {
             case 'overview':
                 return (
-                    <VStack align="stretch" spacing={8}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="CLINIC ACTIVE"
                             title={`Dr. ${user?.last_name || 'Medical Officer'}'s Station 🩺`}
                             description={`You have ${patientsQueue.length} appointments scheduled for today. ${patientsQueue.filter(p => p.status === 'waiting' || p.status === 'pending').length} patients are currently in the waiting area.`}
                         />
 
-                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={6}>
+                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={8}>
                             <DoctorStatCard label="Patients Today" value={patientsQueue.length || "0"} icon={FiUsers} color="teal" onClick={() => handleCardClick('patients')} />
                             <DoctorStatCard
                                 label="Consultations Done"
@@ -575,7 +576,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             <DoctorStatCard label="Pending Lab Results" value={labResults.length || "0"} icon={FiBox} color="orange" onClick={() => handleCardClick('labs')} />
                         </SimpleGrid>
 
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" align="center" mb={6}>
                                 <Heading size="md" color="teal.800">Current Patient Queue</Heading>
                                 <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiCalendar />} onClick={() => setActiveTab('schedule')}>View Schedule</Button>
@@ -628,23 +629,30 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 );
             case 'patients':
                 return (
-                    <VStack align="stretch" spacing={6}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="PATIENT REGISTRY"
                             title="Patient Records Management"
                             description="Search, view, and update comprehensive medical histories for all registered community members."
                         />
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" mb={6} align="center">
                                 <Heading size="md" color="teal.800">All Registered Patients</Heading>
-                                <InputGroup w="300px">
-                                    <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
-                                    <Input
-                                        placeholder="Search by name or ID..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                    />
-                                </InputGroup>
+                                <HStack>
+                                    <InputGroup w="300px">
+                                        <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                        <Input
+                                            placeholder="Search by name or ID..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                        />
+                                    </InputGroup>
+                                    <Select w="150px" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                                        <option value="name-asc">Name (A-Z)</option>
+                                        <option value="name-desc">Name (Z-A)</option>
+                                        <option value="recent">Recent Visit</option>
+                                    </Select>
+                                </HStack>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
@@ -663,12 +671,30 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                             p.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                             p.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                             (p.p_id && p.p_id.toLowerCase().includes(searchQuery.toLowerCase()))
-                                        ).length > 0 ? (
+                                        ).sort((a, b) => {
+                                            if (sortOrder === 'name-asc') {
+                                                return a.first_name.localeCompare(b.first_name);
+                                            } else if (sortOrder === 'name-desc') {
+                                                return b.first_name.localeCompare(a.first_name);
+                                            } else if (sortOrder === 'recent') {
+                                                return new Date(b.last_visit || 0).getTime() - new Date(a.last_visit || 0).getTime();
+                                            }
+                                            return 0;
+                                        }).length > 0 ? (
                                             patients.filter(p =>
                                                 p.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                 p.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                 (p.p_id && p.p_id.toLowerCase().includes(searchQuery.toLowerCase()))
-                                            ).map(p => (
+                                            ).sort((a, b) => {
+                                                if (sortOrder === 'name-asc') {
+                                                    return a.first_name.localeCompare(b.first_name);
+                                                } else if (sortOrder === 'name-desc') {
+                                                    return b.first_name.localeCompare(a.first_name);
+                                                } else if (sortOrder === 'recent') {
+                                                    return new Date(b.last_visit || 0).getTime() - new Date(a.last_visit || 0).getTime();
+                                                }
+                                                return 0;
+                                            }).map(p => (
                                                 <Tr key={p.id}>
                                                     <Td fontWeight="bold" color="teal.600">{p.p_id}</Td>
                                                     <Td fontWeight="600">{p.first_name} {p.last_name}</Td>
@@ -695,13 +721,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
             case 'schedule':
                 return (
-                    <VStack align="stretch" spacing={6}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="CLINIC SCHEDULE"
                             title="Duty and Consultation Hours"
                             description="Manage your clinic availability and view upcoming appointments in a detailed calendar view."
                         />
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" mb={6}>
                                 <Heading size="md" color="teal.800">My Schedule & Assignment</Heading>
                             </Flex>
@@ -721,13 +747,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 );
             case 'history':
                 return (
-                    <VStack align="stretch" spacing={6}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="MEDICAL RECORDS"
                             title="Patient Medical History"
                             description="Access comprehensive medical records, past diagnoses, and treatment plans."
                         />
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Heading size="md" color="teal.800" mb={4}>Recent Medical Records</Heading>
                             <Text color="gray.500" mb={4}>Select a patient from the Registry to view their full history.</Text>
 
@@ -769,26 +795,45 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 const filteredHistory = uniqueRecords.filter((r: any) =>
                     r.patient_name.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
                     (r.diagnosis && r.diagnosis.toLowerCase().includes(historySearchQuery.toLowerCase()))
-                );
+                ).sort((a, b) => {
+                    if (historySortOrder === 'newest') {
+                        return new Date(b.record_date || b.created_at || 0).getTime() - new Date(a.record_date || a.created_at || 0).getTime();
+                    } else if (historySortOrder === 'oldest') {
+                        return new Date(a.record_date || a.created_at || 0).getTime() - new Date(b.record_date || b.created_at || 0).getTime();
+                    } else if (historySortOrder === 'name-asc') {
+                        return (a.patient_name || '').localeCompare(b.patient_name || '');
+                    } else if (historySortOrder === 'name-desc') {
+                        return (b.patient_name || '').localeCompare(a.patient_name || '');
+                    }
+                    return 0;
+                });
 
                 return (
-                    <VStack align="stretch" spacing={6}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="MEDICAL HISTORY"
                             title="Clinical Logs & Archives"
                             description="Review past consultations, prescriptions, and diagnostic results for patient longitudinal care."
                         />
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" mb={6} align="center">
                                 <Heading size="md" color="teal.800">Recent Patient Activity</Heading>
-                                <InputGroup w="300px">
-                                    <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
-                                    <Input
-                                        placeholder="Search patient..."
-                                        value={historySearchQuery}
-                                        onChange={(e) => setHistorySearchQuery(e.target.value)}
-                                    />
-                                </InputGroup>
+                                <HStack>
+                                    <InputGroup w="300px">
+                                        <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                        <Input
+                                            placeholder="Search patient..."
+                                            value={historySearchQuery}
+                                            onChange={(e) => setHistorySearchQuery(e.target.value)}
+                                        />
+                                    </InputGroup>
+                                    <Select w="150px" value={historySortOrder} onChange={(e) => setHistorySortOrder(e.target.value)}>
+                                        <option value="newest">Newest First</option>
+                                        <option value="oldest">Oldest First</option>
+                                        <option value="name-asc">Name (A-Z)</option>
+                                        <option value="name-desc">Name (Z-A)</option>
+                                    </Select>
+                                </HStack>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
@@ -827,14 +872,14 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 );
             case 'inventory':
                 return (
-                    <VStack align="stretch" spacing={6}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="PHARMACY INVENTORY"
                             title="Medicine & Equipment Stock"
                             description="Track available vaccinations, medicines, and first-aid supplies within the health center."
                         />
                         <Flex gap={4}>
-                            <Box flex="1" bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Box flex="1" bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                                 <Heading size="sm" mb={4} color="teal.800">Low Stock Alerts</Heading>
                                 <VStack align="stretch" spacing={3}>
                                     {inventory.filter(item => item.stock_quantity < 100).length > 0 ? (
@@ -849,7 +894,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                     )}
                                 </VStack>
                             </Box>
-                            <Box flex="2" bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Box flex="2" bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                                 <Flex justify="space-between" mb={4}>
                                     <Heading size="sm" color="teal.800">Inventory List</Heading>
                                     <Button size="xs" colorScheme="teal" onClick={onAddInventoryOpen}>Add Item</Button>
@@ -980,7 +1025,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
             </Box>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p="8" position="relative">
+            <Box ml={{ base: 0, md: '280px' }} p={{ base: 6, md: 10 }} position="relative">
                 <Flex justify="space-between" align="center" mb={10}>
                     <HStack spacing={4}>
                         <IconButton

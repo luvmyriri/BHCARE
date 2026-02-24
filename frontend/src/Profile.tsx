@@ -60,10 +60,14 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
   // Password Visibility State
   const [showPass, setShowPass] = useState(false);
 
+  // Password Error State
+  const [currentPasswordError, setCurrentPasswordError] = useState(false);
+
   const [form, setForm] = useState({
     first_name: '',
     middle_name: '',
     last_name: '',
+    suffix: '',
     date_of_birth: '',
     gender: '',
     contact_number: '+63',
@@ -82,6 +86,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
     zip_code: '',
 
     // Password Fields
+    current_password: '',
     password: '',
     confirm_password: ''
   });
@@ -97,6 +102,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
           first_name: data.first_name || '',
           middle_name: data.middle_name || '',
           last_name: data.last_name || '',
+          suffix: data.suffix || '',
           date_of_birth: data.date_of_birth || '',
           gender: data.gender || '',
           contact_number: data.contact_number || '+63',
@@ -139,6 +145,11 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
     }
 
     setForm((f) => ({ ...f, [k]: value }));
+
+    // Clear current password error when typing
+    if (k === 'current_password') {
+      setCurrentPasswordError(false);
+    }
   };
 
   const save = async () => {
@@ -149,9 +160,15 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
     }
 
     // Password Validation
-    if (form.password && form.password !== form.confirm_password) {
-      toast({ title: 'Passwords do not match', status: 'error' });
-      return;
+    if (form.password) {
+      if (!form.current_password) {
+        toast({ title: 'Current password required', description: 'Please enter your current password to change it.', status: 'error' });
+        return;
+      }
+      if (form.password !== form.confirm_password) {
+        toast({ title: 'Passwords do not match', status: 'error' });
+        return;
+      }
     }
 
     setLoading(true);
@@ -159,7 +176,10 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
       if (!user?.id) throw new Error("No user ID");
 
       const payload = { ...form };
-      if (!payload.password) delete (payload as any).password; // Don't send empty password
+      if (!payload.password) {
+        delete (payload as any).password; // Don't send empty password
+        delete (payload as any).current_password;
+      }
       delete (payload as any).confirm_password;
 
       const res = await fetch(`/user/${user.id}`, {
@@ -168,16 +188,39 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error('Update failed');
+      if (!res.ok) {
+        let errorMsg = 'Update failed';
+        try {
+          const errData = await res.json();
+          if (errData.error) errorMsg = errData.error;
+        } catch (err) {
+          // keep default error
+        }
+        throw new Error(errorMsg);
+      }
 
       const updated = { ...user, ...form };
+      delete (updated as any).password;
+      delete (updated as any).current_password;
+      delete (updated as any).confirm_password;
+
       localStorage.setItem('bh_user', JSON.stringify(updated));
       if (onUpdated) onUpdated(updated);
+
+      setForm(prev => ({
+        ...prev,
+        password: '',
+        current_password: '',
+        confirm_password: ''
+      }));
 
       toast({ title: 'Profile Updated', description: 'Your changes have been saved.', status: 'success', duration: 2000 });
       onClose();
     } catch (e: any) {
-      toast({ title: 'Error saving profile', status: 'error' });
+      if (e.message === 'Incorrect current password') {
+        setCurrentPasswordError(true);
+      }
+      toast({ title: 'Error saving profile', description: e.message, status: 'error' });
     } finally {
       setLoading(false);
     }
@@ -288,7 +331,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
             <Box flex={1} p={8}>
               <SectionHeader title="Personal Identity" icon={FiUser} />
               <VStack spacing={4} align="stretch">
-                <SimpleGrid columns={3} spacing={2}>
+                <SimpleGrid columns={4} spacing={2}>
                   <FormControl isRequired>
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">FIRST NAME</FormLabel>
                     <Input value={form.first_name} onChange={updateField('first_name')} bg="gray.100" isReadOnly />
@@ -300,6 +343,18 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
                   <FormControl isRequired>
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">LAST NAME</FormLabel>
                     <Input value={form.last_name} onChange={updateField('last_name')} bg="gray.100" isReadOnly />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">SUFFIX</FormLabel>
+                    <Select value={form.suffix} onChange={updateField('suffix')} bg="white">
+                      <option value="">None</option>
+                      <option value="Jr.">Jr.</option>
+                      <option value="Sr.">Sr.</option>
+                      <option value="II">II</option>
+                      <option value="III">III</option>
+                      <option value="IV">IV</option>
+                      <option value="V">V</option>
+                    </Select>
                   </FormControl>
                 </SimpleGrid>
                 <HStack>
@@ -322,12 +377,34 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
                 <SectionHeader title="Security Settings" icon={FiLock} />
                 <VStack spacing={4} align="stretch" bg="gray.50" p={4} borderRadius="md" border="1px dashed" borderColor="gray.300">
                   <FormControl>
+                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">CURRENT PASSWORD</FormLabel>
+                    <InputGroup>
+                      <Input
+                        type={showPass ? "text" : "password"}
+                        value={form.current_password}
+                        onChange={updateField('current_password')}
+                        autoComplete="new-password"
+                        bg="white"
+                        borderColor={currentPasswordError ? "red.400" : "inherit"}
+                        _hover={{ borderColor: currentPasswordError ? "red.500" : "gray.300" }}
+                        placeholder="Required if changing password"
+                      />
+                      <InputRightElement width="4.5rem">
+                        <Button h="1.75rem" size="sm" onClick={() => setShowPass(!showPass)} variant="ghost">
+                          {showPass ? <FiEyeOff /> : <FiEye />}
+                        </Button>
+                      </InputRightElement>
+                    </InputGroup>
+                  </FormControl>
+
+                  <FormControl>
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">NEW PASSWORD</FormLabel>
                     <InputGroup>
                       <Input
                         type={showPass ? "text" : "password"}
                         value={form.password}
                         onChange={updateField('password')}
+                        autoComplete="new-password"
                         bg="white"
                         placeholder="Leave blank to keep current"
                       />
@@ -346,6 +423,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
                       placeholder="Re-type new password"
                       value={form.confirm_password}
                       onChange={updateField('confirm_password')}
+                      autoComplete="new-password"
                       bg="white"
                       isDisabled={!form.password}
                       borderColor={form.confirm_password && form.password !== form.confirm_password ? "red.300" : "inherit"}

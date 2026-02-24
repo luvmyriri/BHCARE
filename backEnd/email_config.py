@@ -112,3 +112,41 @@ def send_password_reset_email(mail, recipient_email, reset_token):
     
     mail.send(msg)
 
+
+def send_registration_success_email(mail, recipient_email, first_name):
+    """Send a welcome confirmation email upon successful registration"""
+    
+    msg = Message(
+        subject="Welcome to BHCare Health Center!",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+                    
+                    <h2 style="color: #2c5282; text-align: center;">Registration Successful</h2>
+                    
+                    <p>Hello <strong>{first_name}</strong>,</p>
+                    
+                    <p>Welcome to BHCare! Your patient account has been successfully created. You can now log into the portal to access your medical records, book appointments, and engage with our health services directly.</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="http://localhost:5173" style="display: inline-block; padding: 12px 24px; background: #38b2ac; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">Access Your Portal</a>
+                    </div>
+                    
+                    <p>If you have any questions or require immediate medical assistance, please do not hesitate to contact or visit the health center.</p>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+    
+    mail.send(msg)

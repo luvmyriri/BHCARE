@@ -1,5 +1,6 @@
 import { useState, FC, ReactNode, InputHTMLAttributes, SelectHTMLAttributes, FormEvent, ChangeEvent, useEffect } from 'react';
 import { useLanguage } from './contexts/LanguageContext';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 
 type Option = { code: string; name: string };
 type ConfidenceMap = Record<string, number>;
@@ -129,6 +130,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [suffix, setSuffix] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
   const [contact, setContact] = useState('+63');
@@ -639,6 +641,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       if (fields.first_name) setFirstName(fields.first_name);
       if (fields.middle_name) setMiddleName(fields.middle_name);
       if (fields.last_name) setLastName(fields.last_name);
+      if (fields.suffix) setSuffix(fields.suffix);
       if (fields.dob) setDob(fields.dob);
       if (fields.gender) setGender(fields.gender);
       if (fields.contact) setContact(formatPHPhone(fields.contact));
@@ -759,6 +762,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
     formData.append('first_name', firstName);
     formData.append('middle_name', middleName);
     formData.append('last_name', lastName);
+    formData.append('suffix', suffix);
     formData.append('dob', dob);
     formData.append('gender', gender);
     formData.append('contact', contact);
@@ -805,7 +809,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         <div style={{
           flex: '0 0 50%',
           background: 'linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)',
-          padding: '40px',
+          padding: '48px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -867,7 +871,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         {/* RIGHT SIDE - DYNAMIC CONTENT */}
         <div className="form-scroll" style={{
           flex: '1',
-          padding: '40px',
+          padding: '48px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-start',
@@ -892,8 +896,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   alignItems: 'center',
                   background: '#f7fafc',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
                   transition: 'all 0.2s'
                 }}>
                   <span style={{ fontSize: '16px', marginRight: '12px', opacity: 0.5 }}>✉️</span>
@@ -932,8 +936,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     autoComplete="current-password"
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
                   />
-                  <button type="button" onClick={() => setLoginPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#38b2ac', fontWeight: 700, textTransform: 'uppercase' }}>
-                    {loginPwVisible ? 'HIDE' : 'SHOW'}
+                  <button type="button" onClick={() => setLoginPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: '#718096' }}>
+                    {loginPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
                   </button>
                 </div>
               </div>
@@ -1295,109 +1299,107 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   <div style={{ marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📝 Personal Details</h3>
 
-                    <div className="auth-form-row">
-                      <Input
-                        label="First Name"
-                        icon="👤"
-                        placeholder="Juan"
-                        value={firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value.replace(/[0-9]/g, ''), setFirstName)}
-                        onBlur={() => validateField('firstName', firstName)}
-                        confidence={confidence.first_name}
-                        invalid={errors.firstName}
-                        required
-                      />
-                      <Input
-                        label="Last Name"
-                        icon="👤"
-                        placeholder="Dela Cruz"
-                        value={lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value.replace(/[0-9]/g, ''), setLastName)}
-                        onBlur={() => validateField('lastName', lastName)}
-                        confidence={confidence.last_name}
-                        invalid={errors.lastName}
-                        required
-                      />
-                    </div>
-                    <div className="auth-form-row">
-                      <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value.replace(/[0-9]/g, '')))} />
-                      <Input
-                        label={t.dob}
-                        icon="📅"
-                        type="date"
-                        confidence={confidence.dob}
-                        value={dob}
-                        onChange={(e) => handleInputChange('dob', e.target.value, setDob)}
-                        onBlur={() => validateField('dob', dob)}
-                        invalid={errors.dob}
-                        required
-                      />
-                    </div>
+                    <Input
+                      label="First Name"
+                      icon="👤"
+                      placeholder="Juan"
+                      value={firstName}
+                      onChange={(e) => handleInputChange('firstName', e.target.value.replace(/[0-9]/g, ''), setFirstName)}
+                      onBlur={() => validateField('firstName', firstName)}
+                      confidence={confidence.first_name}
+                      invalid={errors.firstName}
+                      required
+                    />
+                    <Input
+                      label="Last Name"
+                      icon="👤"
+                      placeholder="Dela Cruz"
+                      value={lastName}
+                      onChange={(e) => handleInputChange('lastName', e.target.value.replace(/[0-9]/g, ''), setLastName)}
+                      onBlur={() => validateField('lastName', lastName)}
+                      confidence={confidence.last_name}
+                      invalid={errors.lastName}
+                      required
+                    />
 
-                    <div className="auth-form-row">
-                      <Select
-                        label={t.gender}
-                        icon="⚧"
-                        confidence={confidence.gender}
-                        options={[
-                          { code: 'Male', name: t.male },
-                          { code: 'Female', name: t.female },
-                          { code: 'Other', name: t.other }
-                        ]}
-                        value={gender}
-                        onChange={(e) => setGender(e.target.value)}
-                        required
-                      />
-                      <Input
-                        label="PhilHealth ID (Optional)"
-                        icon="🆔"
-                        value={philhealthId}
-                        onChange={(e) => setPhilhealthId(formatPhilHealthId(e.target.value))}
-                        placeholder="XX-XXXXXXXXX-X"
-                      />
-                    </div>
+                    <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value.replace(/[0-9]/g, '')))} />
+                    <Select
+                      label="Suffix (Optional)"
+                      icon="👤"
+                      confidence={confidence.suffix}
+                      options={[
+                        { code: 'Jr.', name: 'Jr.' },
+                        { code: 'Sr.', name: 'Sr.' },
+                        { code: 'II', name: 'II' },
+                        { code: 'III', name: 'III' },
+                        { code: 'IV', name: 'IV' },
+                        { code: 'V', name: 'V' }
+                      ]}
+                      value={suffix}
+                      onChange={(e) => setSuffix(e.target.value)}
+                    />
+                    <Input
+                      label={t.dob}
+                      icon="📅"
+                      type="date"
+                      confidence={confidence.dob}
+                      value={dob}
+                      onChange={(e) => handleInputChange('dob', e.target.value, setDob)}
+                      onBlur={() => validateField('dob', dob)}
+                      invalid={errors.dob}
+                      required
+                    />
+                    <Select
+                      label={t.gender}
+                      icon="⚧"
+                      confidence={confidence.gender}
+                      options={[
+                        { code: 'Male', name: t.male },
+                        { code: 'Female', name: t.female },
+                        { code: 'Other', name: t.other }
+                      ]}
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      required
+                    />
 
-                    <div className="auth-form-row">
-                      <Input label={t.contact} icon="📱" type="tel" inputMode="numeric" maxLength={11} placeholder="09XXXXXXXXX" value={contact} onChange={(e) => { const digits = e.target.value.replace(/\D/g, '').slice(0, 11); handleInputChange('contact', digits, setContact); }} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
-                      <Input
-                        label="Email Address"
-                        icon="✉️"
-                        type="email"
-                        placeholder="juan.delacruz@gmail.com"
-                        value={email}
-                        onChange={(e) => handleInputChange('email', e.target.value, setEmail)}
-                        onBlur={() => validateField('email', email)}
-                        confidence={confidence.email}
-                        invalid={errors.email}
-                        required
-                      />
-                    </div>
+                    <Input
+                      label="PhilHealth ID (Optional)"
+                      icon="🆔"
+                      value={philhealthId}
+                      onChange={(e) => setPhilhealthId(formatPhilHealthId(e.target.value))}
+                      placeholder="XX-XXXXXXXXX-X"
+                    />
+
+                    <Input label={t.contact} icon="📱" type="tel" inputMode="numeric" maxLength={11} placeholder="09XXXXXXXXX" value={contact} onChange={(e) => { const digits = e.target.value.replace(/\D/g, '').slice(0, 11); handleInputChange('contact', digits, setContact); }} onBlur={() => validateField('contact', contact)} confidence={confidence.phone} invalid={errors.contact} required />
+
+                    <Input
+                      label="Email Address"
+                      icon="✉️"
+                      type="email"
+                      placeholder="juan.delacruz@gmail.com"
+                      value={email}
+                      onChange={(e) => handleInputChange('email', e.target.value, setEmail)}
+                      onBlur={() => validateField('email', email)}
+                      confidence={confidence.email}
+                      invalid={errors.email}
+                      required
+                    />
 
                     <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', marginTop: '24px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Address Details</h3>
-                    <div className="auth-form-row">
-                      <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => handleInputChange('province', e.target.value, setProvince)} onBlur={() => validateField('province', province)} invalid={errors.province} required />
-                      <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => handleInputChange('city', e.target.value, setCity)} onBlur={() => validateField('city', city)} invalid={errors.city} required />
-                    </div>
+                    <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => handleInputChange('province', e.target.value, setProvince)} onBlur={() => validateField('province', province)} invalid={errors.province} required />
+                    <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => handleInputChange('city', e.target.value, setCity)} onBlur={() => validateField('city', city)} invalid={errors.city} required />
 
-                    <div className="auth-form-row">
-                      <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => handleInputChange('barangay', e.target.value, setBarangay)} onBlur={() => validateField('barangay', barangay)} invalid={errors.barangay} required />
-                      <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
-                    </div>
+                    <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => handleInputChange('barangay', e.target.value, setBarangay)} onBlur={() => validateField('barangay', barangay)} invalid={errors.barangay} required />
+                    <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
 
-                    <div className="auth-form-row">
-                      <Input label="Block" icon="📍" confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
-                      <Input label="Lot" icon="📍" confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
-                    </div>
+                    <Input label="Block" icon="📍" confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
+                    <Input label="Lot" icon="📍" confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
 
-                    <div className="auth-form-row">
-                      <Input label="Street" icon="🛣️" confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
-                      <Input label="Village / Subdivision" icon="🏘️" confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
-                    </div>
+                    <Input label="Street" icon="🛣️" confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
+                    <Input label="Village / Subdivision" icon="🏘️" confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
 
-                    <div className="auth-form-row">
-                      <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} type="tel" maxLength={4} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setZipCode(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="1400" />
-
-                    </div>
+                    <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} type="tel" maxLength={4} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setZipCode(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="1400" />
 
                     <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
                       <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>{t.createPw}</label>
@@ -1406,9 +1408,9 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         alignItems: 'center',
                         background: '#f7fafc',
                         border: errors.password ? '2px solid #e53e3e' : '1px solid #e2e8f0',
-                        borderRadius: '10px',
-                        padding: '10px 12px',
-                        marginBottom: '12px',
+                        borderRadius: '12px',
+                        padding: '12px 16px',
+                        marginBottom: '16px',
                         position: 'relative'
                       }}>
                         <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
@@ -1422,7 +1424,9 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                           required
                           style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
                         />
-                        <button type="button" onClick={() => setRegisterPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '10px', color: '#4299e1', fontWeight: 700 }}>{registerPwVisible ? 'HIDE' : 'SHOW'}</button>
+                        <button type="button" onClick={() => setRegisterPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#718096', padding: '4px' }}>
+                          {registerPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                        </button>
 
                         {passwordFocused && (
                           <div style={{
@@ -1479,8 +1483,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         alignItems: 'center',
                         background: '#f7fafc',
                         border: errors.confirmPassword ? '2px solid #e53e3e' : '1px solid #e2e8f0',
-                        borderRadius: '10px',
-                        padding: '10px 12px'
+                        borderRadius: '12px',
+                        padding: '12px 16px'
                       }}>
                         <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
                         <input
@@ -1492,12 +1496,13 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                           required
                           style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
                         />
-                        <span
+                        <button
+                          type="button"
                           onClick={() => setConfirmPwVisible(!confirmPwVisible)}
-                          style={{ cursor: 'pointer', fontSize: '16px', marginLeft: '8px', userSelect: 'none' }}
+                          style={{ cursor: 'pointer', background: 'transparent', border: 'none', padding: '4px', color: '#718096', marginLeft: '8px' }}
                         >
-                          {confirmPwVisible ? '👁️' : '🙈'}
-                        </span>
+                          {confirmPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                        </button>
                       </div>
 
 
@@ -1505,10 +1510,10 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7' }}>{error}</div>}
 
                       <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                        <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '12px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '13px' }}>
+                        <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '14px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '14px' }}>
                           ← Back
                         </button>
-                        <button className="auth-button" style={{ margin: 0, flex: 2, height: '44px', fontSize: '14px', background: '#38b2ac', boxShadow: '0 4px 12px rgba(56, 178, 172, 0.3)' }} disabled={loading}>
+                        <button className="auth-button" style={{ margin: 0, flex: 2, height: '48px', fontSize: '15px', background: '#38b2ac', boxShadow: '0 4px 12px rgba(56, 178, 172, 0.3)' }} disabled={loading}>
                           {loading ? 'Submitting...' : t.submit}
                         </button>
                       </div>
@@ -1870,7 +1875,9 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       required
                       style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
                     />
-                    <button type="button" onClick={() => setResetPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '10px', color: '#4299e1', fontWeight: 700 }}>{resetPwVisible ? 'HIDE' : 'SHOW'}</button>
+                    <button type="button" onClick={() => setResetPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: '#718096' }}>
+                      {resetPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                    </button>
 
                     {resetPwFocused && (
                       <div style={{
@@ -1943,12 +1950,13 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       required
                       style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
                     />
-                    <span
+                    <button
+                      type="button"
                       onClick={() => setResetConfirmPwVisible(!resetConfirmPwVisible)}
-                      style={{ cursor: 'pointer', fontSize: '16px', marginLeft: '8px', userSelect: 'none' }}
+                      style={{ cursor: 'pointer', background: 'transparent', border: 'none', padding: '4px', color: '#718096', marginLeft: '8px' }}
                     >
-                      {resetConfirmPwVisible ? '👁️' : '🙈'}
-                    </span>
+                      {resetConfirmPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                    </button>
                   </div>
                 </div>
 

@@ -5,11 +5,13 @@ from psycopg2 import sql
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
 from database import get_db_connection
+import random
+import string
 from flask_bcrypt import Bcrypt
 import os
 from dotenv import load_dotenv
 import requests
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import io
 import re
 from datetime import datetime, date
@@ -19,7 +21,8 @@ from email_config import (
     store_reset_token,
     validate_reset_token,
     invalidate_reset_token,
-    send_password_reset_email
+    send_password_reset_email,
+    send_registration_success_email
 )
 
 load_dotenv()
@@ -38,6 +41,21 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def generate_patient_number(year: int, existing_numbers: set = None) -> str:
+    """Generate a unique patient number: YYYY-LLLDDD (3 uppercase letters + 3 digits)."""
+    if existing_numbers is None:
+        existing_numbers = set()
+    for _ in range(1000):  # safety limit
+        letters = ''.join(random.choices(string.ascii_uppercase, k=3))
+        digits = ''.join(random.choices(string.digits, k=3))
+        pn = f"{year}-{letters}{digits}"
+        if pn not in existing_numbers:
+            return pn
+    # Fallback: extend length
+    extras = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
+    return f"{year}-{extras}{''.join(random.choices(string.digits, k=4))}"
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -81,20 +99,24 @@ def preprocess_image(image_bytes):
     if img.mode != 'RGB':
         img = img.convert('RGB')
     
-    # Resize if too large (max 2000px width)
-    if img.width > 2000:
-        ratio = 2000 / img.width
-        img = img.resize((2000, int(img.height * ratio)), Image.Resampling.LANCZOS)
+    # 1. Scale image to optimal OCR size (1500px - 2000px width)
+    target_width = 1800
+    if img.width != target_width:
+        ratio = target_width / img.width
+        img = img.resize((target_width, int(img.height * ratio)), Image.Resampling.LANCZOS)
     
-    # Enhance contrast
+    # 2. Normalize lighting/contrast
+    img = ImageOps.autocontrast(img, cutoff=1)
+    
+    # 3. Enhance local contrast
     enhancer = ImageEnhance.Contrast(img)
-    img = enhancer.enhance(1.5)
+    img = enhancer.enhance(1.8)  # Increased from 1.5
     
-    # Enhance sharpness
+    # 4. Enhance sharpness
     enhancer = ImageEnhance.Sharpness(img)
-    img = enhancer.enhance(2.0)
+    img = enhancer.enhance(2.5)  # Increased from 2.0
     
-    # Convert to grayscale and apply threshold
+    # 5. Convert to grayscale (remove strict binarization to prevent erasing text in varying lighting)
     img = img.convert('L')
     
     # Save to bytes
@@ -170,6 +192,7 @@ class PHIDParser:
             'first_name': None,
             'middle_name': None,
             'last_name': None,
+            'suffix': None,
             'dob': None,
             'gender': None,
             'phone': None,
@@ -200,6 +223,7 @@ class PHIDParser:
         
         # 1. Extract Names
         self._extract_names(lines)
+        self._extract_suffix_from_names()
         
         # 2. Extract DOB
         self._extract_dob(clean_text)
@@ -273,7 +297,10 @@ class PHIDParser:
 
     def _extract_philhealth_id(self, text):
         """Extract PhilHealth ID (Format: XX-XXXXXXXXX-X)"""
-        # Look for 12 digits potentially with dashes
+        # Look for 12 digits potentially with dashes or common OCR errors (O for 0, I/l for 1)
+        # Normalize O/o to 0, I/i/l to 1 for this specific field
+        normalized_text = text.upper().replace('O', '0').replace('I', '1').replace('L', '1')
+        
         patterns = [
             r'(\d{2})[- ]?(\d{9})[- ]?(\d{1})', # 12 digits: XX-XXXXXXXXX-X
             r'(\d{12})', # raw 12 digits
@@ -281,7 +308,7 @@ class PHIDParser:
         ]
         
         for p in patterns:
-            match = re.search(p, text.upper())
+            match = re.search(p, normalized_text)
             if match:
                 if len(match.groups()) == 3:
                     val = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
@@ -308,11 +335,15 @@ class PHIDParser:
 
     def _extract_names(self, lines):
         """Extract names with broader header and label detection for all PH IDs"""
-        # Strategy 1: Combined header (e.g. UMID, SSS, PRC)
+        # Strategy 1: Combined header (e.g. UMID, SSS, PRC, DL)
         header_idx = None
         for i, line in enumerate(lines):
             ul = line.upper()
-            if 'LAST NAME' in ul and 'FIRST NAME' in ul:
+            has_last = 'LAST' in ul or 'SURNAME' in ul
+            has_first = 'FIRST' in ul or 'GIVEN' in ul
+            has_middle = 'MIDDLE' in ul
+            
+            if (has_last and has_first) or (has_last and has_middle) or (has_last and i + 1 < len(lines) and ',' in lines[i+1]):
                 header_idx = i
                 break
         
@@ -334,6 +365,22 @@ class PHIDParser:
                         middle, conf_m = FieldValidator.validate_name(' '.join(rest[1:]))
                         self.fields['middle_name'] = middle
                         self.confidence['middle_name'] = conf_m
+                return
+            else:
+                # OCR missed the comma (e.g. "ESTIOKO GREGORY JR REYES")
+                parts = data_line.split()
+                if len(parts) >= 1:
+                    last, conf_l = FieldValidator.validate_name(parts[0])
+                    self.fields['last_name'] = last
+                    self.confidence['last_name'] = conf_l
+                if len(parts) >= 2:
+                    first, conf_f = FieldValidator.validate_name(parts[1])
+                    self.fields['first_name'] = first
+                    self.confidence['first_name'] = conf_f
+                if len(parts) > 2:
+                    middle, conf_m = FieldValidator.validate_name(' '.join(parts[2:]))
+                    self.fields['middle_name'] = middle
+                    self.confidence['middle_name'] = conf_m
                 return
 
         # Strategy 2: Individual labels (Generalized for all cards)
@@ -383,6 +430,76 @@ class PHIDParser:
                     if val and not self.fields['middle_name']:
                         self.fields['middle_name'] = val
                         self.confidence['middle_name'] = conf
+        
+        # Strategy 3: Unlabeled PhilHealth ID Format Fallback (e.g. LAST NAME, FIRST NAME MIDDLE NAME)
+        if self.fields['id_type'] == 'PhilHealth ID' and not self.fields.get('last_name'):
+            # Looking for a line with a comma (LAST_NAME, FIRST MODIFIER) right after the header/id
+            for i, line in enumerate(lines):
+                 if ',' in line and len(line) > 5 and 'PHILHEALTH' not in line.upper():
+                     parts = [p.strip() for p in line.split(',', 1)]
+                     
+                     # Extract Last Name (before the comma)
+                     last, conf_l = FieldValidator.validate_name(parts[0])
+                     if last:
+                         self.fields['last_name'] = last
+                         self.confidence['last_name'] = conf_l
+                         
+                     # Extract First and Middle Names (after the comma)
+                     if len(parts) > 1:
+                         rest = parts[1].split()
+                         if len(rest) >= 1:
+                             # The first word after the comma is definitely part of the first name
+                             first_parts = [rest[0]]
+                             middle_parts = []
+                             
+                             # Simple heuristic: last word is usually the middle name, middle words are first name
+                             if len(rest) == 2:
+                                 # (First, Middle)
+                                 first, conf_f = FieldValidator.validate_name(rest[0])
+                                 self.fields['first_name'] = first
+                                 self.confidence['first_name'] = conf_f
+                                 
+                                 middle, conf_m = FieldValidator.validate_name(rest[1])
+                                 self.fields['middle_name'] = middle
+                                 self.confidence['middle_name'] = conf_m
+                             elif len(rest) > 2:
+                                 # Multiple first names (e.g. Juan De La Cruz)
+                                 # Assume the last word is the middle name
+                                 middle, conf_m = FieldValidator.validate_name(rest[-1])
+                                 self.fields['middle_name'] = middle
+                                 self.confidence['middle_name'] = conf_m
+                                 
+                                 first, conf_f = FieldValidator.validate_name(' '.join(rest[:-1]))
+                                 self.fields['first_name'] = first
+                                 self.confidence['first_name'] = conf_f
+                     print(f"[NAMES] Extracted via PhilHealth rules: {self.fields['first_name']} {self.fields['middle_name']} {self.fields['last_name']}")
+                     return
+    def _extract_suffix_from_names(self):
+        """Extract suffix from names if present (e.g., Jr, Sr, III)"""
+        valid_suffixes_map = {
+            'JR': 'Jr.', 'SR': 'Sr.', 'II': 'II', 'III': 'III', 'IV': 'IV', 'V': 'V'
+        }
+        for field in ['last_name', 'first_name', 'middle_name']:
+            val = self.fields.get(field)
+            if val:
+                parts = val.split()
+                new_parts = []
+                extracted = None
+                for part in parts:
+                    clean_part = re.sub(r'[^A-Z]', '', part.upper())
+                    if clean_part in valid_suffixes_map and not self.fields.get('suffix'):
+                        extracted = valid_suffixes_map[clean_part]
+                        self.fields['suffix'] = extracted
+                        self.confidence['suffix'] = self.confidence.get(field, 0.9)
+                    else:
+                        new_parts.append(part)
+                
+                if extracted and len(new_parts) != len(parts):
+                    if new_parts:
+                        self.fields[field] = ' '.join(new_parts)
+                    else:
+                        self.fields[field] = None
+                    print(f"[SUFFIX] Extracted {extracted} from {field}. Main is now '{self.fields[field]}'")
     
     def _extract_dob(self, text):
         """Extract date of birth with smart filtering to avoid issuance/expiry dates"""
@@ -514,8 +631,13 @@ class PHIDParser:
         gender, conf = FieldValidator.validate_gender(text)
         if gender:
             self.fields['gender'] = gender
-            self.confidence['gender'] = conf * 0.7  # Lower confidence without label
-            print(f"[GENDER] Found without label: {gender}")
+            # If it's a PhilHealth ID and we found M/F without a label, it's very likely correct
+            if self.fields.get('id_type') == 'PhilHealth ID':
+                 self.confidence['gender'] = 0.90
+                 print(f"[GENDER] Found without label (PhilHealth Confident): {gender}")
+            else:
+                 self.confidence['gender'] = conf * 0.7  # Lower confidence without label
+                 print(f"[GENDER] Found without label: {gender}")
     
     def _extract_phone(self, text):
         """Extract phone number (mobile or landline)"""
@@ -552,14 +674,15 @@ class PHIDParser:
                     print(f"[PHONE] Found via label: {phone}")
                     return
         
-        # Strategy 2: Mobile patterns
+        # Strategy 2: Mobile patterns (Accounting for OCR errors 0/O, 1/I)
+        normalized_text_phone = upper_text.replace('O', '0').replace('I', '1').replace('L', '1')
         mobile_patterns = [
             r'\b(09[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',
             r'\b(\+639[0-9]{2})[\s-]?([0-9]{3})[\s-]?([0-9]{4})\b',
         ]
         
         for pattern in mobile_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, normalized_text_phone)
             if match:
                 phone = ''.join(match.groups()).replace(' ', '').replace('-', '')
                 self.fields['contact'] = phone
@@ -718,19 +841,23 @@ class PHIDParser:
                      self.fields['street_name'] = cand.title()
                      self.confidence['street_name'] = 0.85
                      print(f"[ADDRESS] Street (Fallback): {self.fields['street_name']}")
+                     
         # House Number
         house_patterns = [
-            r'(?:HOUSE|H)[\.\s]*NO\.?[\s#]*([A-Z0-9\-]+)',
-            r'^#\s*([A-Z0-9\-]+)',
-            r'^\b(\d+[A-Z]?)\b\s+(?=[A-Z])'
+            r'\b(?:HOUSE|HS)[\.\s]*NO\.?[\s#]*([0-9A-Z\-]+)\b',
+            r'\bNO\.?\s*([0-9]+[A-Z\-]*)\b', # Requires at least one digit
+            r'^#\s*([0-9A-Z\-]+)', # Starting with #
+            r'^\b([0-9]{1,4}[A-Z]?)\b\s+(?=[A-Z])' # Starting with a number
         ]
         for pattern in house_patterns:
             match = re.search(pattern, upper_addr)
             if match:
-                self.fields['house_number'] = match.group(1)
-                self.confidence['house_number'] = 0.95
-                print(f"[ADDRESS] House No: {self.fields['house_number']}")
-                break
+                val = match.group(1).strip()
+                if len(val) <= 6: # sanity check
+                    self.fields['house_number'] = val
+                    self.confidence['house_number'] = 0.95
+                    print(f"[ADDRESS] House No: {self.fields['house_number']}")
+                    break
 
         # Contextual House No (before Street)
         if not self.fields.get('house_number') and self.fields.get('street_name'):
@@ -741,6 +868,7 @@ class PHIDParser:
                  if num_match:
                      self.fields['house_number'] = num_match.group(1)
                      self.confidence['house_number'] = 0.85
+                     print(f"[ADDRESS] Contextual House No: {self.fields['house_number']}")
              except: pass
 
         # Subdivision/Village
@@ -834,6 +962,14 @@ def ocr_dual():
         combined_text = front_text + "\n" + back_text # Combine and Parse
         parser = PHIDParser()
         print(f"\n--- COMBINED OCR TEXT ---\n{combined_text}\n------------------------\n")
+        
+        # Write to file for easier debugging
+        try:
+            with open("ocr_last_run.txt", "w", encoding="utf-8") as f:
+                f.write(combined_text)
+        except Exception as e:
+            print(f"Failed to write OCR debug log: {e}")
+            
         fields, confidence = parser.parse(combined_text)
         
         print("=== EXTRACTED FIELDS ===")
@@ -910,7 +1046,7 @@ def login():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, role, status FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, role, status, suffix, patient_number FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
@@ -950,7 +1086,9 @@ def login():
             "zip_code": user[18],
             "full_address": user[19],
             "role": user[20],
-            "status": user[21]
+            "status": user[21],
+            "suffix": user[22],
+            "patient_number": user[23]
         }
         
         
@@ -988,12 +1126,20 @@ def register():
         subdivision = data.get('subdivision', '')
         zip_code = data.get('zip_code', '')
         full_address = data.get('full_address', '')
+        suffix = data.get('suffix', '')
         
         if not all([email, password, first_name, last_name, dob, gender, contact, barangay, city, province]):
             return jsonify({"error": "Missing required fields"}), 400
         
         conn = get_db()
         cur = conn.cursor()
+
+        # Check for duplicate email explicitly
+        cur.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Email already exists"}), 409
 
         # Check for duplicate patient record (Name + DOB)
         cur.execute("""
@@ -1010,22 +1156,36 @@ def register():
 
         hashed = bcrypt.generate_password_hash(password).decode('utf-8')
         
+        # Generate unique patient number
+        from datetime import datetime
+        year = datetime.now().year
+        # Fetch existing patient numbers to avoid collision
+        cur.execute("SELECT patient_number FROM users WHERE patient_number IS NOT NULL")
+        taken = {row[0] for row in cur.fetchall()}
+        patient_number = generate_patient_number(year, taken)
+
         cur.execute("""
             INSERT INTO users (email, password_hash, first_name, middle_name, last_name, 
                               date_of_birth, gender, contact_number, philhealth_id, barangay, city, province,
                               house_number, block_number, lot_number, street_name, subdivision, 
-                              zip_code, full_address)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                              zip_code, full_address, suffix, patient_number)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """, (email, hashed, first_name, middle_name, last_name, dob, gender, contact, philhealth_id, barangay, city, province,
-              house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address))
+              house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, suffix, patient_number))
         
         user_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
         conn.close()
         
-        return jsonify({"id": user_id, "message": "Registration successful"}), 201
+        # Fire off the Welcome Email asynchronously or inline
+        try:
+            send_registration_success_email(mail, email, first_name)
+        except Exception as e:
+            print(f"Failed to send welcome email to {email}: {e}")
+        
+        return jsonify({"id": user_id, "patient_number": patient_number, "message": "Registration successful"}), 201
         
     except psycopg2.IntegrityError:
         return jsonify({"error": "Email already exists"}), 409
@@ -1117,14 +1277,14 @@ def update_user(user_id):
             'first_name', 'middle_name', 'last_name', 'date_of_birth', 
             'gender', 'contact_number', 'philhealth_id', 
             'barangay', 'city', 'province', 'email', 'role',
-            'house_number', 'block_number', 'lot_number', 'street_name', 'subdivision', 'zip_code', 'status'
+            'house_number', 'block_number', 'lot_number', 'street_name', 'subdivision', 'zip_code', 'status', 'suffix'
         ]
         
         # Fields that should be NULL instead of empty string
         nullable_fields = ['date_of_birth', 'middle_name', 'philhealth_id', 'email',
                           'house_number', 'block_number', 'lot_number', 'street_name', 
                           'subdivision', 'zip_code', 'barangay', 'city', 'province',
-                          'contact_number']
+                          'contact_number', 'suffix']
         
         for key in allowed_fields:
             if key in data:
@@ -1137,6 +1297,16 @@ def update_user(user_id):
         
         # Handle Password Change separately
         if 'password' in data and data['password']:
+            current_password = data.get('current_password')
+            if not current_password:
+                return jsonify({"error": "Current password is required to change password"}), 400
+                
+            # Verify current password
+            cur.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+            user_record = cur.fetchone()
+            if not user_record or not bcrypt.check_password_hash(user_record[0], current_password):
+                return jsonify({"error": "Incorrect current password"}), 401
+
             hashed = bcrypt.generate_password_hash(data['password']).decode('utf-8')
             fields.append("password_hash = %s")
             values.append(hashed)
@@ -1206,9 +1376,9 @@ def get_all_users():
         # Select relevant fields, excluding sensitive auth data
         query = """
             SELECT 
-                id, first_name, last_name, email, 
+                id, patient_number, first_name, last_name, email, 
                 contact_number, gender, date_of_birth,
-                barangay, city, role, created_at, status
+                barangay, city, role, created_at, status, suffix
             FROM users 
             ORDER BY created_at DESC
         """
@@ -1528,12 +1698,19 @@ def create_medical_staff():
             conn.close()
             return jsonify({"error": "Email already registered"}), 409
             
+        # Generate unique patient number for staff member
+        from datetime import datetime
+        year = datetime.now().year
+        cur.execute("SELECT patient_number FROM users WHERE patient_number IS NOT NULL")
+        taken = {row[0] for row in cur.fetchall()}
+        patient_number = generate_patient_number(year, taken)
+
         # 1. Insert into Users Table
         cur.execute("""
-            INSERT INTO users (email, password_hash, first_name, last_name, role, contact_number, date_of_birth, gender, full_address, barangay, city, province)
-            VALUES (%s, %s, %s, %s, %s, %s, '1980-01-01', 'Female', 'Brgy 174 Health Center', 'Brgy 174', 'Caloocan', 'Metro Manila')
+            INSERT INTO users (email, password_hash, first_name, last_name, role, contact_number, date_of_birth, gender, full_address, barangay, city, province, patient_number)
+            VALUES (%s, %s, %s, %s, %s, %s, '1980-01-01', 'Female', 'Brgy 174 Health Center', 'Brgy 174', 'Caloocan', 'Metro Manila', %s)
             RETURNING id
-        """, (email, hashed, first_name, last_name, role, contact))
+        """, (email, hashed, first_name, last_name, role, contact, patient_number))
         
         new_user_id = cur.fetchone()[0]
         
@@ -1547,7 +1724,7 @@ def create_medical_staff():
         cur.close()
         conn.close()
         
-        return jsonify({"message": "Staff account created successfully", "id": new_user_id}), 201
+        return jsonify({"message": "Staff account created successfully", "id": new_user_id, "patient_number": patient_number}), 201
         
     except Exception as e:
         print(f"Error creating medical staff: {e}")
@@ -1582,7 +1759,7 @@ def get_doctor_patients():
         # Let's try an enhanced query with LEFT JOIN to get last visit
         query_enhanced = """
             SELECT 
-                u.id, u.first_name, u.last_name, u.contact_number, 
+                u.id, u.patient_number, u.first_name, u.last_name, u.contact_number, 
                 u.gender, u.date_of_birth,
                 MAX(a.appointment_date) as last_visit
             FROM users u
@@ -1707,6 +1884,109 @@ def get_patient_history(user_id):
         print(f"Error fetching patient history: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/patients/<int:user_id>/bmi-history", methods=["GET", "POST"])
+def manage_bmi_history(user_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        if request.method == "POST":
+            data = request.json
+            weight = data.get('weight')
+            height = data.get('height')
+            bmi = data.get('bmi')
+            unit_system = data.get('unit_system', 'metric')
+            
+            if weight is None or height is None or bmi is None:
+                return jsonify({'error': 'Missing required fields'}), 400
+                
+            cur.execute("""
+                INSERT INTO bmi_logs (user_id, weight, height, bmi, unit_system)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id, created_at
+            """, (user_id, weight, height, bmi, unit_system))
+            
+            result = cur.fetchone()
+            conn.commit()
+            return jsonify({'message': 'BMI log saved successfully', 'id': result['id']}), 201
+            
+        elif request.method == "GET":
+            cur.execute("""
+                SELECT id, weight, height, bmi, unit_system, created_at
+                FROM bmi_logs
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+            """, (user_id,))
+            logs = cur.fetchall()
+            
+            # Convert datetime to string
+            logs_list = []
+            for log in logs:
+                l = dict(log)
+                if l.get('created_at'):
+                    l['created_at'] = l['created_at'].strftime('%Y-%m-%d %H:%M')
+                logs_list.append(l)
+                
+            return jsonify(logs_list), 200
+            
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"Error managing BMI history: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
+
+@app.route("/api/patients/<int:user_id>/bp-history", methods=["GET", "POST"])
+def manage_bp_history(user_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        if request.method == "POST":
+            data = request.json
+            systolic = data.get('systolic')
+            diastolic = data.get('diastolic')
+            
+            if systolic is None or diastolic is None:
+                return jsonify({'error': 'Missing required fields'}), 400
+                
+            cur.execute("""
+                INSERT INTO bp_logs (user_id, systolic, diastolic)
+                VALUES (%s, %s, %s)
+                RETURNING id, created_at
+            """, (user_id, systolic, diastolic))
+            
+            result = cur.fetchone()
+            conn.commit()
+            return jsonify({'message': 'BP log saved successfully', 'id': result['id']}), 201
+            
+        elif request.method == "GET":
+            cur.execute("""
+                SELECT id, systolic, diastolic, created_at
+                FROM bp_logs
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+            """, (user_id,))
+            logs = cur.fetchall()
+            
+            # Convert datetime to string
+            logs_list = []
+            for log in logs:
+                l = dict(log)
+                if l.get('created_at'):
+                    l['created_at'] = l['created_at'].strftime('%Y-%m-%d %H:%M')
+                logs_list.append(l)
+                
+            return jsonify(logs_list), 200
+            
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"Error managing BP history: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
 
 @app.route("/api/doctor/medical-records", methods=["GET"])
 def get_all_medical_records():
@@ -1830,7 +2110,7 @@ def get_admin_activities():
             })
 
         # Recent Users (using ID as proxy for recency)
-        cur.execute("SELECT first_name, last_name, role, id, email FROM users ORDER BY id DESC LIMIT 3")
+        cur.execute("SELECT first_name, last_name, role, id, email, patient_number FROM users ORDER BY id DESC LIMIT 3")
         user_recs = cur.fetchall()
         for u in user_recs:
             activities.append({
@@ -1839,7 +2119,7 @@ def get_admin_activities():
                 "action": f"New user registered as {u['role']}",
                 "time": "Recently", # simplified
                 "type": "USER",
-                "details": f"Email: {u.get('email', 'N/A')} | Role: {u['role']} | User ID: {u['id']}",
+                "details": f"Email: {u.get('email', 'N/A')} | Role: {u['role']} | Patient ID: {u.get('patient_number') or 'N/A'}",
                 "sort_key": f"9999-{u['id']}" # forceful float to top if simplified
             })
 

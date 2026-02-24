@@ -5,7 +5,6 @@ import {
     VStack,
     Icon,
     Text,
-    Avatar,
     Heading,
     HStack,
     Divider,
@@ -88,7 +87,7 @@ const PageHero = ({ title, description, badge }: any) => (
     </Box>
 );
 
-const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ user, onLogout }) => {
+const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout }) => {
     const [activeTab, setActiveTab] = useState('queue');
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
     const [queue, setQueue] = useState<any[]>([]);

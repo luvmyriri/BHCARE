@@ -100,8 +100,8 @@ const NavItem = ({ icon, children, active, onClick }: any) => {
 const StatCard = ({ label, value, icon, color, onClick }: any) => (
     <Box
         bg="white"
-        p={{ base: 4, md: 6 }}
-        borderRadius="2xl"
+        p={{ base: 6, md: 8 }}
+        borderRadius="3xl"
         boxShadow="sm"
         border="1px solid"
         borderColor="gray.100"
@@ -130,7 +130,7 @@ const StatCard = ({ label, value, icon, color, onClick }: any) => (
 const PageHero = ({ title, description, badge }: any) => (
     <Box
         bg="linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)"
-        p={{ base: 6, md: 10 }}
+        p={{ base: 8, md: 12 }}
         borderRadius={{ base: "2xl", md: "3xl" }}
         color="white"
         boxShadow="xl"
@@ -315,14 +315,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
         switch (activeTab) {
             case 'overview':
                 return (
-                    <VStack align="stretch" spacing={8}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge={t.overallHealth.toUpperCase()}
                             title={t.welcomeUser.replace('{name}', user?.first_name || 'Patient')}
                             description={t.healthPriority}
                         />
 
-                        <SimpleGrid columns={{ base: 1, sm: 2 }} gap={6}>
+                        <SimpleGrid columns={{ base: 1, sm: 2 }} gap={8}>
                             <StatCard label={t.upcomingAppointments} value={appointments.length.toString()} icon={FiCalendar} color="teal" onClick={() => handleCardClick('appointments')} />
                             <StatCard label={t.healthRecords} value={medicalHistory.length.toString()} icon={FiFileText} color="orange" onClick={() => handleCardClick('records')} />
                         </SimpleGrid>
@@ -376,12 +376,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             title={t.bookNewAppointment.split(' ').slice(0, 2).join(' ') + ' & ' + t.appointments}
                             description={t.scheduleConsultation}
                         />
-                        <VStack spacing={8} align="stretch">
-                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+                        <VStack spacing={10} align="stretch">
+                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
                                 <Box
-                                    p={8}
+                                    p={10}
                                     bg="white"
-                                    borderRadius="2xl"
+                                    borderRadius="3xl"
                                     border="2px solid"
                                     borderColor="teal.200"
                                     cursor="pointer"
@@ -428,9 +428,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 </Box>
 
                                 <Box
-                                    p={8}
+                                    p={10}
                                     bg="white"
-                                    borderRadius="2xl"
+                                    borderRadius="3xl"
                                     border="2px solid"
                                     borderColor="teal.200"
                                     cursor="pointer"
@@ -477,7 +477,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 </Box>
                             </SimpleGrid>
 
-                            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+                            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
                                 <Box p={6} bg="teal.50" borderRadius="xl" border="1px solid" borderColor="teal.100">
                                     <HStack spacing={3} mb={2}>
                                         <Text fontSize="2xl">⏰</Text>
@@ -528,7 +528,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 );
             case 'records':
                 return (
-                    <VStack align="stretch" spacing={6}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge={t.healthRecords.toUpperCase()}
                             title="Medical Logs & Results"
@@ -536,7 +536,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                         />
 
                         <Flex gap={4} direction={{ base: 'column', lg: 'row' }}>
-                            <Box flex="2" bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Box flex="2" bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                                 <Heading size="md" color="teal.800" mb={6}>My Medical History</Heading>
                                 <Box overflowX="auto">
                                     <Table variant="simple">
@@ -574,7 +574,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 </Box>
                             </Box>
 
-                            <Box flex="1" bg="teal.50" p={6} borderRadius="2xl" border="1px solid" borderColor="teal.100">
+                            <Box flex="1" bg="teal.50" p={8} borderRadius="3xl" border="1px solid" borderColor="teal.100">
                                 <VStack align="start" spacing={4}>
                                     <Heading size="md" color="teal.800">Request Documents</Heading>
                                     <Text fontSize="sm" color="teal.700">
@@ -597,13 +597,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 );
             case 'health-tools':
                 return (
-                    <VStack align="stretch" spacing={6}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge={t.healthTools.toUpperCase()}
                             title={t.interactiveCalculators}
                             description={t.monitorHealth}
                         />
-                        <HealthCalculators />
+                        <HealthCalculators user={user} />
                     </VStack>
                 );
             default:
@@ -660,7 +660,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
             </Box>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p={{ base: 4, sm: 6, md: 8 }} position="relative">
+            <Box ml={{ base: 0, md: '280px' }} p={{ base: 6, sm: 8, md: 10 }} position="relative">
                 <Flex
                     justify="space-between"
                     align={{ base: "start", sm: "center" }}

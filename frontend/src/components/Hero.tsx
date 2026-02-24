@@ -10,28 +10,9 @@ import {
     Icon,
     SimpleGrid,
     Badge,
-    HStack,
-    useBreakpointValue,
 } from '@chakra-ui/react';
-import { motion } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
-import HealthCenterStatus from './HealthCenterStatus';
 import './Hero.css';
-
-// Illustrations/Icons for Highlights
-const DocumentIcon = (props: any) => (
-    <Icon viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-    </Icon>
-);
-
-const CheckCircleIcon = (props: any) => (
-    <Icon viewBox="0 0 24 24" fill="currentColor" {...props}>
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-    </Icon>
-);
-
-
 
 const LocationIcon = (props: any) => (
     <Icon viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -52,11 +33,6 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
     // Responsive values for floating elements with granular control and clamp() for smooth scaling
 
 
-    const readinessTop = useBreakpointValue({ base: '30%', md: '35%', lg: '40%', xl: '45%' });
-    const readinessLeft = useBreakpointValue({ base: '2%', md: '-10%', lg: '-15%', xl: '-5%' });
-
-    const digitizedBottom = useBreakpointValue({ base: '2%', md: '5%', lg: '10%', xl: '15%' });
-    const digitizedLeft = useBreakpointValue({ base: '2%', md: '-2%', lg: '0%', xl: '10%' });
 
     return (
         <Box
@@ -123,10 +99,6 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
                             <Text fontSize={{ base: "1rem", lg: "1.25rem" }} color="gray.600" maxW="lg" mx={{ base: 'auto', lg: 0 }} lineHeight="1.8" mb={8}>
                                 {t.heroSubtitle}
                             </Text>
-
-                            <Box maxW="sm" mx={{ base: 'auto', lg: 0 }} mb={10}>
-                                <HealthCenterStatus />
-                            </Box>
                         </Box>
 
                         {/* NEW BUTTONS: REGISTER & LOGIN */}
@@ -194,62 +166,7 @@ const Hero: React.FC<HeroProps> = ({ onRegisterClick, onLoginClick }) => {
 
 
 
-                        {/* POPUP 2: READINESS (Left/Middle) */}
-                        <motion.div
-                            initial={{ x: -50, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            transition={{ delay: 0.7, duration: 0.8 }}
-                            style={{ position: 'absolute', top: readinessTop, left: readinessLeft, zIndex: 2 }}
-                        >
-                            <Box
-                                bg="rgba(255, 255, 255, 0.85)"
-                                backdropFilter="blur(20px)"
-                                border="1px solid rgba(255, 255, 255, 0.6)"
-                                p={4}
-                                borderRadius="2xl"
-                                boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.1)"
-                                maxW={{ base: "150px", md: "200px", lg: "220px" }}
-                            >
-                                <HStack spacing={3} mb={1}>
-                                    <Box bg="teal.100" p={2} borderRadius="full" color="teal.500">
-                                        <CheckCircleIcon boxSize={4} />
-                                    </Box>
-                                    <Text fontWeight="bold" fontSize={{ base: "xs", md: "sm" }} color="gray.700">100% Readiness</Text>
-                                </HStack>
-                                <Text fontSize={{ base: "10px", md: "xs" }} color="gray.500" pl={1}>
-                                    Fully equipped for emergency response and maternity care.
-                                </Text>
-                            </Box>
-                        </motion.div>
 
-                        {/* POPUP 3: DOCUMENTATION (Bottom Left) */}
-                        <motion.div
-                            initial={{ y: 50, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.9, duration: 0.8 }}
-                            style={{ position: 'absolute', bottom: digitizedBottom, left: digitizedLeft, zIndex: 2 }}
-                        >
-                            <Box
-                                bg="rgba(255, 255, 255, 0.85)"
-                                backdropFilter="blur(20px)"
-                                border="1px solid rgba(255, 255, 255, 0.8)"
-                                p={3}
-                                borderRadius="xl"
-                                boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.1)"
-                                display="flex"
-                                alignItems="center"
-                                gap={3}
-                                maxW={{ base: "160px", md: "auto" }}
-                            >
-                                <Box bg="blue.50" p={2} borderRadius="lg" color="blue.500">
-                                    <DocumentIcon boxSize={5} />
-                                </Box>
-                                <Box>
-                                    <Text fontWeight="bold" fontSize="xs" color="gray.800">Digitized Records</Text>
-                                    <Text fontSize="10px" color="gray.500">Paperless System</Text>
-                                </Box>
-                            </Box>
-                        </motion.div>
                     </Box>
 
                 </SimpleGrid>

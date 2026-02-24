@@ -34,6 +34,8 @@ import {
     Select,
     useToast,
     Input,
+    InputGroup,
+    InputLeftElement,
     FormControl,
     FormLabel,
 } from '@chakra-ui/react';
@@ -43,12 +45,12 @@ import {
     FiCalendar,
     FiLogOut,
     FiActivity,
-    FiSettings,
     FiBarChart2,
     FiShield,
     FiMap,
     FiAlertTriangle,
-    FiMenu
+    FiMenu,
+    FiSearch
 } from 'react-icons/fi';
 import {
     SimpleGrid,
@@ -110,8 +112,8 @@ const NavItem = ({ icon, children, active, onClick }: any) => {
 const AdminStatCard = ({ label, value, icon, color, onClick }: any) => (
     <Box
         bg="white"
-        p={6}
-        borderRadius="2xl"
+        p={8}
+        borderRadius="3xl"
         boxShadow="sm"
         border="1px solid"
         borderColor="gray.100"
@@ -141,7 +143,7 @@ const AdminStatCard = ({ label, value, icon, color, onClick }: any) => (
 const PageHero = ({ title, description, badge }: any) => (
     <Box
         bg="linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)"
-        p={{ base: 6, md: 10 }}
+        p={{ base: 8, md: 12 }}
         borderRadius={{ base: "2xl", md: "3xl" }}
         color="white"
         boxShadow="xl"
@@ -181,6 +183,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const [users, setUsers] = useState<any[]>([]);
     const [medicalStaff, setMedicalStaff] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<any[]>([]);
+
+    // Search and Sort State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortOrder, setSortOrder] = useState('name-asc');
+    const [staffSearchQuery, setStaffSearchQuery] = useState('');
+    const [staffSortOrder, setStaffSortOrder] = useState('name-asc');
+    const [aptSearchQuery, setAptSearchQuery] = useState('');
+    const [aptSortOrder, setAptSortOrder] = useState('time-asc');
 
     // User Management State
     const [editUser, setEditUser] = useState<any>(null);
@@ -223,6 +233,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     // Analytics State
     const [analyticsData, setAnalyticsData] = useState<any>(null);
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+    // Auto-refresh State
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
     const handleViewActivity = (activity: any) => {
         setSelectedActivity(activity);
     };
@@ -338,20 +353,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         }
     }, [activeTab]);
 
-    // Initial Data Fetch
+    // Fetch Activities
+    const fetchActivities = async () => {
+        try {
+            const r = await fetch('/api/admin/activities');
+            const data = await r.json();
+            if (Array.isArray(data)) setRecentActivities(data);
+        } catch {
+            // keep existing data on network error
+        }
+    };
+
+    // Refresh all live data
+    const refreshAll = async (showSpinner = false) => {
+        if (showSpinner) setIsRefreshing(true);
+        await Promise.all([
+            fetchUsers(),
+            fetchMedicalStaff(),
+            fetchAppointments(),
+            fetchSystemStats(),
+            fetchActivities(),
+        ]);
+        setLastUpdated(new Date());
+        if (showSpinner) setIsRefreshing(false);
+    };
+
+    // Initial load + 30-second polling interval
     React.useEffect(() => {
-        fetchUsers();
-        fetchMedicalStaff();
-        fetchAppointments();
-        fetchSystemStats();
-        fetch('/api/admin/activities')
-            .then(r => r.json())
-            .then(data => { if (Array.isArray(data)) setRecentActivities(data); })
-            .catch(() => setRecentActivities([
-                { user: 'System', action: 'Backup Completed', time: 'Today, 03:00 AM', type: 'COMPLETED' },
-                { user: 'Dr. Santos', action: 'Logged In', time: 'Today, 07:45 AM', type: 'NEW' },
-                { user: 'Nurse Joyce', action: 'Updated Inventory', time: 'Yesterday, 05:30 PM', type: 'UPDATE' }
-            ]));
+        refreshAll(true);
+        const interval = setInterval(() => refreshAll(false), 30000);
+        return () => clearInterval(interval);
     }, []);
 
     const handleAddStaff = async () => {
@@ -534,17 +565,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </ModalBody>
                     </>
                 );
-            case 'appointments':
+            case 'appointments': {
+                const filteredAppointments = appointments.filter(a =>
+                    (a.first_name ? `${a.first_name} ${a.last_name}` : 'Walk-in').toLowerCase().includes(aptSearchQuery.toLowerCase()) ||
+                    (a.service_type || '').toLowerCase().includes(aptSearchQuery.toLowerCase())
+                ).sort((a, b) => {
+                    if (aptSortOrder === 'time-asc') return (a.appointment_time || '').localeCompare(b.appointment_time || '');
+                    if (aptSortOrder === 'time-desc') return (b.appointment_time || '').localeCompare(a.appointment_time || '');
+                    return 0;
+                });
+
                 return (
                     <>
-                        <ModalHeader>Today's Appointments</ModalHeader>
+                        <ModalHeader>
+                            <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
+                                <Text>Today's Appointments</Text>
+                                <HStack>
+                                    <InputGroup w={{ base: "full", md: "200px" }} size="sm">
+                                        <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                        <Input placeholder="Search patient..." value={aptSearchQuery} onChange={(e) => setAptSearchQuery(e.target.value)} />
+                                    </InputGroup>
+                                    <Select w="150px" size="sm" value={aptSortOrder} onChange={(e) => setAptSortOrder(e.target.value)}>
+                                        <option value="time-asc">Earliest First</option>
+                                        <option value="time-desc">Latest First</option>
+                                    </Select>
+                                </HStack>
+                            </Flex>
+                        </ModalHeader>
                         <ModalBody>
                             <Box overflowX="auto">
                                 <Table variant="simple" size="sm">
                                     <Thead><Tr><Th>Time</Th><Th>Patient</Th><Th>Type</Th></Tr></Thead>
                                     <Tbody>
-                                        {appointments.length > 0 ? (
-                                            appointments.map((apt: any) => (
+                                        {filteredAppointments.length > 0 ? (
+                                            filteredAppointments.map((apt: any) => (
                                                 <Tr key={apt.id}>
                                                     <Td>{apt.appointment_time || 'N/A'}</Td>
                                                     <Td>{apt.first_name ? `${apt.first_name} ${apt.last_name}` : 'Walk-in'}</Td>
@@ -559,12 +613,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             </Box>
                             <Box mt={4}>
                                 <Text fontSize="sm" color="gray.500" fontStyle="italic">
-                                    Showing {appointments.length} appointment{appointments.length !== 1 ? 's' : ''}
+                                    Showing {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
                                 </Text>
                             </Box>
                         </ModalBody>
                     </>
                 );
+            }
             case 'system':
                 return (
                     <>
@@ -706,14 +761,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         switch (activeTab) {
             case 'overview':
                 return (
-                    <VStack align="stretch" spacing={8}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="ADMIN CONTROL"
                             title={`Welcome, ${user?.first_name || 'Administrator'} 🛡️`}
                             description="Complete system oversight and management. Monitor all health center operations, user activities, and system performance in real-time."
                         />
 
-                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={6}>
+                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={8}>
                             <AdminStatCard
                                 label="Total Users"
                                 value={stats.total_users}
@@ -725,10 +780,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             <AdminStatCard label="Today's Appointments" value={stats.todays_appointments} icon={FiCalendar} color="blue" onClick={() => handleCardClick('appointments')} />
                         </SimpleGrid>
 
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" align="center" mb={6}>
-                                <Heading size="md" color="teal.800">Recent System Activities</Heading>
-                                <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiBarChart2 />}>View All Logs</Button>
+                                <HStack spacing={3}>
+                                    <Heading size="md" color="teal.800">Recent System Activities</Heading>
+                                    <HStack spacing={1} align="center">
+                                        <Box
+                                            w="8px" h="8px" borderRadius="full" bg="green.400"
+                                            sx={{
+                                                animation: 'pulse-dot 2s infinite',
+                                                '@keyframes pulse-dot': {
+                                                    '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                                                    '50%': { opacity: 0.4, transform: 'scale(0.7)' },
+                                                },
+                                            }}
+                                        />
+                                        <Text fontSize="xs" color="green.500" fontWeight="600">LIVE</Text>
+                                    </HStack>
+                                </HStack>
+                                <HStack spacing={3}>
+                                    {lastUpdated && (
+                                        <Text fontSize="xs" color="gray.400">
+                                            Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                        </Text>
+                                    )}
+                                    <Button
+                                        size="sm" colorScheme="teal" variant="ghost"
+                                        leftIcon={isRefreshing ? <Spinner size="xs" /> : <FiActivity />}
+                                        onClick={() => refreshAll(true)}
+                                        isLoading={isRefreshing}
+                                        loadingText="Refreshing"
+                                    >
+                                        Refresh
+                                    </Button>
+                                    <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiBarChart2 />}>View All Logs</Button>
+                                </HStack>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
@@ -770,24 +856,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </Box>
                     </VStack>
                 );
-            case 'users':
+            case 'users': {
+                const filteredUsers = users.filter(u =>
+                    u.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    u.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+                ).sort((a, b) => {
+                    if (sortOrder === 'name-asc') return a.first_name.localeCompare(b.first_name);
+                    if (sortOrder === 'name-desc') return b.first_name.localeCompare(a.first_name);
+                    if (sortOrder === 'role') return a.role.localeCompare(b.role);
+                    if (sortOrder === 'date') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+                    return 0;
+                });
+
                 return (
-                    <VStack align="stretch">
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="USER MANAGEMENT"
                             title="System Users & Permissions"
                             description="Manage all user accounts, roles, and access permissions for doctors, staff, and patients."
                         />
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
-                            <Flex justify="space-between" align="center" mb={6}>
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Flex justify="space-between" align="center" mb={6} wrap="wrap" gap={4}>
                                 <Heading size="md" color="teal.800">Registered Users</Heading>
-                                <Button size="sm" colorScheme="orange" leftIcon={<FiActivity />} onClick={fetchUsers}>Refresh List</Button>
+                                <HStack>
+                                    <InputGroup w={{ base: "full", md: "250px" }}>
+                                        <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                        <Input placeholder="Search users..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                                    </InputGroup>
+                                    <Select w="150px" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                                        <option value="name-asc">Name (A-Z)</option>
+                                        <option value="name-desc">Name (Z-A)</option>
+                                        <option value="role">Role</option>
+                                        <option value="date">Date Joined</option>
+                                    </Select>
+                                    <Button size="sm" colorScheme="orange" leftIcon={<FiActivity />} onClick={fetchUsers}>Refresh List</Button>
+                                </HStack>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
                                     <Thead>
                                         <Tr>
-                                            <Th>ID</Th>
+                                            <Th>Patient ID</Th>
                                             <Th>Name</Th>
                                             <Th>Email</Th>
                                             <Th>Role</Th>
@@ -796,10 +906,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {users.length > 0 ? (
-                                            users.map((user) => (
+                                        {filteredUsers.length > 0 ? (
+                                            filteredUsers.map((user) => (
                                                 <Tr key={user.id}>
-                                                    <Td>#{user.id}</Td>
+                                                    <Td><code style={{ fontSize: '0.8em' }}>{user.patient_number || '—'}</code></Td>
                                                     <Td fontWeight="600">{user.first_name} {user.last_name}</Td>
                                                     <Td>{user.email}</Td>
                                                     <Td>
@@ -834,19 +944,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </Box>
                     </VStack>
                 );
-            case 'doctors':
+            }
+            case 'doctors': {
+                const filteredStaff = medicalStaff.filter(s =>
+                    s.first_name.toLowerCase().includes(staffSearchQuery.toLowerCase()) ||
+                    s.last_name.toLowerCase().includes(staffSearchQuery.toLowerCase())
+                ).sort((a, b) => {
+                    if (staffSortOrder === 'name-asc') return a.first_name.localeCompare(b.first_name);
+                    if (staffSortOrder === 'name-desc') return b.first_name.localeCompare(a.first_name);
+                    if (staffSortOrder === 'role') return (a.specialization || a.role).localeCompare(b.specialization || b.role);
+                    return 0;
+                });
+
                 return (
-                    <VStack align="stretch">
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="MEDICAL STAFF"
                             title="Doctor & Staff Registry"
                             description="View and manage all medical professionals, their schedules, and performance metrics."
                         />
 
-                        <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
-                            <Flex justify="space-between" align="center" mb={6}>
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Flex justify="space-between" align="center" mb={6} wrap="wrap" gap={4}>
                                 <Heading size="md" color="teal.800">Medical Professionals</Heading>
-                                <Button size="sm" colorScheme="teal" leftIcon={<FiUsers />} onClick={onAddStaffOpen}>Add New Staff</Button>
+                                <HStack>
+                                    <InputGroup w={{ base: "full", md: "250px" }}>
+                                        <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                        <Input placeholder="Search staff..." value={staffSearchQuery} onChange={(e) => setStaffSearchQuery(e.target.value)} />
+                                    </InputGroup>
+                                    <Select w="150px" value={staffSortOrder} onChange={(e) => setStaffSortOrder(e.target.value)}>
+                                        <option value="name-asc">Name (A-Z)</option>
+                                        <option value="name-desc">Name (Z-A)</option>
+                                        <option value="role">Role</option>
+                                    </Select>
+                                    <Button size="sm" colorScheme="teal" leftIcon={<FiUsers />} onClick={onAddStaffOpen}>Add New Staff</Button>
+                                </HStack>
                             </Flex>
 
                             <Box overflowX="auto">
@@ -862,15 +994,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {medicalStaff.length > 0 ? (
-                                            medicalStaff.map((staff) => (
+                                        {filteredStaff.length > 0 ? (
+                                            filteredStaff.map((staff) => (
                                                 <Tr key={staff.id}>
                                                     <Td>
                                                         <HStack>
                                                             <Avatar size="sm" name={`${staff.first_name} ${staff.last_name}`} />
                                                             <VStack align="start" spacing={0}>
                                                                 <Text fontWeight="600">{staff.first_name} {staff.last_name}</Text>
-                                                                <Text fontSize="xs" color="gray.500">ID: {staff.id}</Text>
                                                             </VStack>
                                                         </HStack>
                                                     </Td>
@@ -913,6 +1044,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </Box>
                     </VStack>
                 );
+            }
             case 'analytics': {
                 // ── computed helpers ──────────────────────────────────
                 const pct = (a: number, b: number) =>
@@ -938,7 +1070,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 const dengueTotal: number = analyticsData?.dengue_total ?? 0;
 
                 return (
-                    <VStack align="stretch" spacing={8}>
+                    <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="FHSIS REPORTING"
                             title="Field Health Services Information System"
@@ -954,10 +1086,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         {/* Summary Cards */}
                         {!analyticsLoading && (
                             <>
-                                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
+                                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8}>
                                     {/* Prenatal */}
                                     <Box
-                                        bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderLeft="4px solid" borderColor="teal.500"
+                                        bg="white" p={8} borderRadius="3xl" boxShadow="sm" borderLeft="4px solid" borderColor="teal.500"
                                         cursor="pointer" transition="all 0.2s" _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
                                         onClick={() => { setSelectedCard('prenatal'); onOpen(); }}
                                     >
@@ -979,7 +1111,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
                                     {/* Immunization */}
                                     <Box
-                                        bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderLeft="4px solid" borderColor="orange.500"
+                                        bg="white" p={8} borderRadius="3xl" boxShadow="sm" borderLeft="4px solid" borderColor="orange.500"
                                         cursor="pointer" transition="all 0.2s" _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
                                         onClick={() => { setSelectedCard('immunization'); onOpen(); }}
                                     >
@@ -1000,7 +1132,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     </Box>
 
                                     {/* TB Treatment */}
-                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderLeft="4px solid" borderColor="blue.500">
+                                    <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" borderLeft="4px solid" borderColor="blue.500">
                                         <Stat>
                                             <StatLabel color="gray.500" fontSize="xs" fontWeight="bold" textTransform="uppercase">TB / DOTS Treatment Success</StatLabel>
                                             <StatNumber fontSize="3xl" color="blue.700">
@@ -1017,9 +1149,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     </Box>
                                 </SimpleGrid>
 
-                                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
+                                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={10}>
                                     {/* Morbidity Report */}
-                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm">
+                                    <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm">
                                         <Flex justify="space-between" align="center" mb={4}>
                                             <HStack>
                                                 <Icon as={FiAlertTriangle} color="red.500" />
@@ -1070,7 +1202,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     </Box>
 
                                     {/* Disease Heatmap */}
-                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm">
+                                    <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm">
                                         <Flex justify="space-between" align="center" mb={4}>
                                             <HStack>
                                                 <Icon as={FiMap} color="teal.500" />
@@ -1189,7 +1321,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             </Box>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p="8" position="relative">
+            <Box ml={{ base: 0, md: '280px' }} p={{ base: 6, md: 10 }} position="relative">
                 <Flex justify="space-between" align="center" mb={10}>
                     <HStack spacing={4}>
                         <IconButton
