@@ -5,6 +5,12 @@ import { FiEye, FiEyeOff } from 'react-icons/fi';
 type Option = { code: string; name: string };
 type ConfidenceMap = Record<string, number>;
 
+// PSGC Interfaces
+interface PSGCRegion { code: string; name: string; }
+interface PSGCProvince { code: string; name: string; isDistrict?: boolean; }
+interface PSGCCity { code: string; name: string; type: string; zip_code?: string; }
+interface PSGCBarangay { code: string; name: string; }
+
 const Input: FC<
   { label: string; icon: ReactNode; invalid?: boolean; confidence?: number } & InputHTMLAttributes<HTMLInputElement>
 > = ({ label, icon, invalid, confidence, ...props }) => (
@@ -122,6 +128,34 @@ const Select: FC<
 function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register' }) {
   const { t } = useLanguage();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [activePortal, setActivePortal] = useState<'patient' | 'staff' | 'admin' | 'superadmin'>('patient');
+  const [pendingUser, setPendingUser] = useState<any>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [changePwError, setChangePwError] = useState('');
+  const [changePwLoading, setChangePwLoading] = useState(false);
+
+  const handleForcedPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePwError('');
+    if (newPw.length < 8) { setChangePwError('Password must be at least 8 characters.'); return; }
+    if (newPw !== confirmPw) { setChangePwError('Passwords do not match.'); return; }
+    setChangePwLoading(true);
+    try {
+      const res = await fetch('/api/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: pendingUser.id, current_password: password, new_password: newPw }),
+      });
+      if (!res.ok) { const d = await res.json(); setChangePwError(d.error || 'Failed to change password.'); return; }
+      const updatedUser = { ...pendingUser, requires_password_change: false };
+      localStorage.setItem('bh_user', JSON.stringify(updatedUser));
+      setShowChangePassword(false);
+      if (typeof onLoginSuccess === 'function') onLoginSuccess(updatedUser);
+    } catch { setChangePwError('An error occurred. Please try again.'); }
+    finally { setChangePwLoading(false); }
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -147,6 +181,94 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const [subdivision, setSubdivision] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [fullAddress, setFullAddress] = useState('');
+
+  // PSGC Dropdown States
+  const [regions, setRegions] = useState<PSGCRegion[]>([]);
+  const [provinces, setProvinces] = useState<PSGCProvince[]>([]);
+  const [cities, setCities] = useState<PSGCCity[]>([]);
+  const [barangays, setBarangays] = useState<PSGCBarangay[]>([]);
+
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [selectedProvince, setSelectedProvince] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedBarangay, setSelectedBarangay] = useState('');
+  // and `city` and `province` states hold names, while the selected states hold codes
+
+  // Fetch Regions on mount
+  useEffect(() => {
+    fetch('https://psgc.cloud/api/regions')
+      .then(res => res.json())
+      .then(data => setRegions(data))
+      .catch(err => console.error('Failed to load regions', err));
+  }, []);
+
+  // Fetch Provinces on Region change
+  useEffect(() => {
+    if (!selectedRegion) {
+      setProvinces([]);
+      setSelectedProvince('');
+      setCities([]);
+      setSelectedCity('');
+      setBarangays([]);
+      setBarangay('');
+      return;
+    }
+
+    if (selectedRegion === '1300000000') {
+      // NCR special case
+      setProvinces([]);
+      setSelectedProvince('');
+
+      // Fetch cities directly for NCR
+      fetch(`https://psgc.cloud/api/regions/${selectedRegion}/cities-municipalities`)
+        .then(res => res.json())
+        .then(data => setCities(data))
+        .catch(err => console.error('Failed to load NCR cities', err));
+    } else {
+      fetch(`https://psgc.cloud/api/regions/${selectedRegion}/provinces`)
+        .then(res => res.json())
+        .then(data => setProvinces(data))
+        .catch(err => console.error('Failed to load provinces', err));
+    }
+  }, [selectedRegion]);
+
+  // Fetch Cities on Province change (Non-NCR)
+  useEffect(() => {
+    if (selectedRegion !== '1300000000') {
+      if (!selectedProvince) {
+        setCities([]);
+        setSelectedCity('');
+        setBarangays([]);
+        setBarangay('');
+        return;
+      }
+      fetch(`https://psgc.cloud/api/provinces/${selectedProvince}/cities-municipalities`)
+        .then(res => res.json())
+        .then(data => setCities(data))
+        .catch(err => console.error('Failed to load cities', err));
+    }
+  }, [selectedProvince, selectedRegion]);
+
+  // Fetch Barangays on City change
+  useEffect(() => {
+    if (!selectedCity) {
+      setBarangays([]);
+      setBarangay('');
+      // Removed setZipCode('') to prevent clearing user/OCR input during fast state updates
+      return;
+    }
+
+    // Auto populate zip code based on selected city only if it exists
+    const cityObj = cities.find(c => c.code === selectedCity);
+    if (cityObj?.zip_code) {
+      setZipCode(cityObj.zip_code);
+    }
+
+    fetch(`https://psgc.cloud/api/cities-municipalities/${selectedCity}/barangays`)
+      .then(res => res.json())
+      .then(data => setBarangays(data))
+      .catch(err => console.error('Failed to load barangays', err));
+  }, [selectedCity, cities]);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [registerPwVisible, setRegisterPwVisible] = useState(false);
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
@@ -168,6 +290,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const [ocrStatus, setOcrStatus] = useState('');
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [passwordCriteria, setPasswordCriteria] = useState({ length: false, upper: false, symbol: false });
+  const [selectedIdType, setSelectedIdType] = useState('');
 
   // Forgot Password Modal State
   const [forgotEmail, setForgotEmail] = useState('');
@@ -531,9 +654,40 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+      const resText = await res.clone().text();
+      console.log('Login Response:', res.status, res.statusText, resText);
       if (!res.ok) throw new Error('Invalid email or password');
       const data = await res.json();
       if (data.user) {
+        // --- ROLE VERIFICATION AGAINST ACTIVE PORTAL ---
+        const role = data.user.role || '';
+        const lowerRole = role.toLowerCase();
+
+        let isValidForPortal = false;
+
+        if (activePortal === 'superadmin') {
+          isValidForPortal = lowerRole === 'super admin';
+        } else if (activePortal === 'admin') {
+          isValidForPortal = lowerRole === 'admin' || lowerRole === 'administrator';
+        } else if (activePortal === 'staff') {
+          isValidForPortal = ['nurse', 'midwife', 'health worker', 'medical staff', 'doctor'].includes(lowerRole);
+        } else if (activePortal === 'patient') {
+          isValidForPortal = lowerRole === 'patient';
+        }
+
+        if (!isValidForPortal) {
+          setError(`Access Denied: Please use the correct login portal for your role.`);
+          setLoading(false);
+          return;
+        }
+
+        if (data.user.requires_password_change) {
+          setPendingUser(data.user);
+          setShowChangePassword(true);
+          setLoading(false);
+          return;
+        }
+
         localStorage.setItem('bh_user', JSON.stringify(data.user));
         if (typeof onLoginSuccess === 'function') onLoginSuccess(data.user);
       }
@@ -543,6 +697,15 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
 
   const handleFrontUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!selectedIdType) {
+      setError('Please select an ID Type from the dropdown before uploading.');
+      setOcrStatus('');
+      // Reset the file input so they can select the same file again after choosing a type
+      e.target.value = '';
+      return;
+    }
+    setError('');
+
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     setIdFront(file); setFrontPreview(URL.createObjectURL(file));
@@ -610,6 +773,10 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         console.log('[OCR] Back image compressed:', compressedBack.size, 'bytes');
       }
 
+      if (selectedIdType) {
+        formData.append('id_type', selectedIdType);
+      }
+
       console.log('[OCR] Sending to /ocr-dual endpoint...');
       setOcrStatus('Scanning ID (this may take 10-20 seconds)...');
 
@@ -649,18 +816,136 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       if (fields.email) setEmail(fields.email);
       if (fields.philhealth_id) setPhilhealthId(fields.philhealth_id);
 
-      // Auto-populate address details
-      if (fields.province_name) setProvince(fields.province_name);
-      else if (fields.province) setProvince(fields.province);
+      // --- PSGC Address Mapping ---
+      // We must resolve the extracted string names (e.g. "Caloocan" or "Barangay 174")
+      // into accurate PSGC api codes to auto-fill the <Select> cascading dropdowns.
+      const resolveAddress = async () => {
+        try {
+          // Special fallback logic: if City is Caloocan or NCR
+          const isNCR = fields.city?.toUpperCase().includes('CALOOCAN') || fields.region_name?.toUpperCase().includes('NCR');
 
-      // Auto-populate address fields directly
-      if (fields.province_name) setProvince(fields.province_name);
-      if (fields.city) setCity(fields.city);
+          let targetRegionCode = '';
 
-      if (fields.barangay) {
-        console.log('[OCR] Queueing barangay:', fields.barangay);
-        setBarangay(fields.barangay);
-      }
+          if (isNCR) {
+            const ncr = regions.find(r => r.code === '1300000000');
+            if (ncr) {
+              targetRegionCode = ncr.code;
+              setSelectedRegion(targetRegionCode);
+            }
+
+            // Fetch NCR Cities
+            if (targetRegionCode) {
+              const resCity = await fetch(`https://psgc.cloud/api/regions/${targetRegionCode}/cities-municipalities`);
+              const fetchedCities = await resCity.json();
+
+              if (fields.city) {
+                // Remove trailing tags like "City" or "City of"
+                const cleanCity = fields.city.toUpperCase().replace('CITY OF', '').replace('CITY', '').trim();
+                const cityMatch = fetchedCities.find((c: any) => c.name.toUpperCase().includes(cleanCity));
+
+                if (cityMatch) {
+                  setSelectedCity(cityMatch.code);
+                  handleInputChange('city', cityMatch.name, setCity);
+
+                  // Retain OCR zip code if populated, else use API
+                  if (!fields.zip_code && cityMatch.zip_code) {
+                    setZipCode(cityMatch.zip_code);
+                  }
+
+                  // Queue fetching Barangays
+                  const resBrgy = await fetch(`https://psgc.cloud/api/cities-municipalities/${cityMatch.code}/barangays`);
+                  const fetchedBrgys = await resBrgy.json();
+
+                  if (fields.barangay) {
+                    const cleanBrgy = fields.barangay.toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
+                    const brgyMatch = fetchedBrgys.find((b: any) => {
+                      const apiBrgy = b.name.toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
+                      return apiBrgy === cleanBrgy || apiBrgy.includes(cleanBrgy);
+                    });
+
+                    if (brgyMatch) {
+                      setSelectedBarangay(brgyMatch.code);
+                      handleInputChange('barangay', brgyMatch.name, setBarangay);
+                    } else {
+                      // Fallback string if code not found
+                      handleInputChange('barangay', fields.barangay, setBarangay);
+                    }
+                  }
+                }
+              }
+            }
+          } else if (fields.province || fields.province_name) {
+            // Non-NCR mapping
+            const provString = (fields.province_name || fields.province || '').toUpperCase();
+            if (!provString) return;
+
+            const resProv = await fetch('https://psgc.cloud/api/provinces');
+            const allProvinces = await resProv.json();
+
+            const cleanProv = provString.replace('PROVINCE OF ', '').trim();
+            const provMatch = allProvinces.find((p: any) => {
+              const apiName = p.name.toUpperCase();
+              return apiName === cleanProv || apiName.includes(cleanProv) || cleanProv.includes(apiName);
+            });
+
+            if (provMatch) {
+              targetRegionCode = provMatch.code.substring(0, 2) + '00000000';
+              setSelectedRegion(targetRegionCode);
+              setSelectedProvince(provMatch.code);
+              handleInputChange('province', provMatch.name, setProvince);
+
+              if (fields.city) {
+                const resCity = await fetch(`https://psgc.cloud/api/provinces/${provMatch.code}/cities-municipalities`);
+                const fetchedCities = await resCity.json();
+
+                const cleanCity = fields.city.toUpperCase().replace('CITY OF', '').replace('CITY', '').trim();
+                const cityMatch = fetchedCities.find((c: any) => {
+                  const apiName = c.name.toUpperCase().replace('CITY OF', '').replace('CITY', '').trim();
+                  return apiName === cleanCity || apiName.includes(cleanCity) || cleanCity.includes(apiName);
+                });
+
+                if (cityMatch) {
+                  setSelectedCity(cityMatch.code);
+                  handleInputChange('city', cityMatch.name, setCity);
+
+                  // Retain OCR zip code if populated, else use API
+                  if (!fields.zip_code && cityMatch.zip_code) {
+                    setZipCode(cityMatch.zip_code);
+                  }
+
+                  // Queue fetching Barangays
+                  const resBrgy = await fetch(`https://psgc.cloud/api/cities-municipalities/${cityMatch.code}/barangays`);
+                  const fetchedBrgys = await resBrgy.json();
+
+                  if (fields.barangay) {
+                    const cleanBrgy = fields.barangay.toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
+                    const brgyMatch = fetchedBrgys.find((b: any) => {
+                      const apiBrgy = b.name.toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
+                      return apiBrgy === cleanBrgy || apiBrgy.includes(cleanBrgy);
+                    });
+
+                    if (brgyMatch) {
+                      setSelectedBarangay(brgyMatch.code);
+                      handleInputChange('barangay', brgyMatch.name, setBarangay);
+                    } else {
+                      handleInputChange('barangay', fields.barangay, setBarangay);
+                    }
+                  }
+                }
+              }
+            } else {
+              // Basic non-NCR string filling fallback
+              handleInputChange('province', provString, setProvince);
+              if (fields.city) handleInputChange('city', fields.city, setCity);
+              if (fields.barangay) handleInputChange('barangay', fields.barangay, setBarangay);
+            }
+          }
+        } catch (e) {
+          console.error('[OCR] Address Auto-pop mapping failed:', e);
+        }
+      };
+
+      resolveAddress();
 
       // Auto-populate detailed street address fields
       if (fields.house_number) setHouseNumber(fields.house_number);
@@ -879,12 +1164,96 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         }}>
           {mode === 'login' ? (
             // LOGIN FORM
-            <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: '360px', margin: 'auto' }}>
-              <h2 className="auth-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px', color: '#1a202c' }}>
-                Sign In
+            <form onSubmit={handleLogin} autoComplete="off" style={{ width: '100%', maxWidth: '360px', margin: 'auto' }}>
+
+              {/* PORTAL SELECTOR */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setActivePortal('patient')}
+                  style={{
+                    flex: '1 1 45%',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    border: '1px solid',
+                    borderColor: activePortal === 'patient' ? '#38b2ac' : '#e2e8f0',
+                    background: activePortal === 'patient' ? '#e6fffa' : '#f7fafc',
+                    color: activePortal === 'patient' ? '#2c7a7b' : '#718096',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Patient
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePortal('staff')}
+                  style={{
+                    flex: '1 1 45%',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    border: '1px solid',
+                    borderColor: activePortal === 'staff' ? '#3182ce' : '#e2e8f0',
+                    background: activePortal === 'staff' ? '#ebf8ff' : '#f7fafc',
+                    color: activePortal === 'staff' ? '#2b6cb0' : '#718096',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Medical Staff
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePortal('admin')}
+                  style={{
+                    flex: '1 1 45%',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    border: '1px solid',
+                    borderColor: activePortal === 'admin' ? '#d69e2e' : '#e2e8f0',
+                    background: activePortal === 'admin' ? '#fffff0' : '#f7fafc',
+                    color: activePortal === 'admin' ? '#975a16' : '#718096',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePortal('superadmin')}
+                  style={{
+                    flex: '1 1 45%',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    border: '1px solid',
+                    borderColor: activePortal === 'superadmin' ? '#805ad5' : '#e2e8f0',
+                    background: activePortal === 'superadmin' ? '#faf5ff' : '#f7fafc',
+                    color: activePortal === 'superadmin' ? '#553c9a' : '#718096',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Super Admin
+                </button>
+              </div>
+
+              <h2 className="auth-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px', color: '#1a202c', textAlign: 'center' }}>
+                {activePortal === 'patient' && 'Patient Sign In'}
+                {activePortal === 'staff' && 'Staff Sign In'}
+                {activePortal === 'admin' && 'Admin Sign In'}
+                {activePortal === 'superadmin' && 'Super Admin Sign In'}
               </h2>
-              <p className="auth-subtitle" style={{ fontSize: '14px', marginBottom: '32px', color: '#718096' }}>
-                Sign in to your account
+              <p className="auth-subtitle" style={{ fontSize: '14px', marginBottom: '32px', color: '#718096', textAlign: 'center' }}>
+                Secure access to your health portal
               </p>
               {/* ... rest of login form ... */}
               <div style={{ marginBottom: '20px' }}>
@@ -907,7 +1276,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="juan.delacruz@gmail.com"
                     required
-                    autoComplete="email"
+                    autoComplete="off"
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
                   />
                 </div>
@@ -933,7 +1302,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
                   />
                   <button type="button" onClick={() => setLoginPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: '#718096' }}>
@@ -990,7 +1359,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
               }}>
                 New Patient?{' '}
                 <span
-                  onClick={() => { setMode('register'); resetFormFields(); }}
+                  onClick={() => { setMode('register'); resetFormFields(); setSelectedIdType(''); }}
                   style={{
                     color: '#ed8936',
                     fontWeight: 700,
@@ -1001,7 +1370,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   Guide Registration
                 </span>
               </p>
-            </form>
+            </form >
           ) : (
             // REGISTER FORM
             <form onSubmit={handleRegister} autoComplete="off" style={{ width: '100%', maxWidth: '800px', margin: 'auto' }}>
@@ -1029,8 +1398,28 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 // OCR UPLOAD SCREEN
                 <div style={{ maxWidth: '420px', margin: '0 auto', width: '100%' }}>
                   <p className="auth-subtitle" style={{ fontSize: '14px', marginBottom: '32px', color: '#718096', textAlign: 'center' }}>
-                    Upload your government ID to automatically fill all fields
+                    Select your ID Type and upload your government ID
                   </p>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <Select
+                      label="Select ID Type (Required)"
+                      icon="🪪"
+                      options={[
+                        { code: "Driver's License", name: "Driver's License" },
+                        { code: "PhilHealth ID", name: "PhilHealth ID" },
+                        { code: "National ID", name: "National ID (PhilSys)" },
+                        { code: "UMID", name: "UMID / SSS / GSIS" },
+                        { code: "Postal ID", name: "Postal ID" },
+                        { code: "Voter's ID", name: "Voter's ID" },
+                        { code: "PRC ID", name: "PRC ID" },
+                        { code: "TIN ID", name: "TIN ID" }
+                      ]}
+                      placeholder="Select an ID Type"
+                      value={selectedIdType}
+                      onChange={(e) => setSelectedIdType(e.target.value)}
+                    />
+                  </div>
 
                   <div style={{
                     border: '2px dashed #4299e1',
@@ -1040,7 +1429,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     background: 'rgba(235, 248, 255, 0.5)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
-                      <span style={{ fontSize: '20px' }}>🪪</span>
+                      <span style={{ fontSize: '20px' }}>📸</span>
                       <h3 style={{ color: '#2d3748', fontSize: '15px', fontWeight: 700, margin: 0 }}>
                         Automated Registration
                       </h3>
@@ -1049,7 +1438,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                       <div>
                         <p style={{ fontSize: '11px', fontWeight: 700, color: '#4a5568', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Front Side</p>
-                        <input type="file" id="front-upload" accept="image/*" onChange={handleFrontUpload} style={{ display: 'none' }} />
+                        <input type="file" id="front-upload" accept="image/*" onChange={handleFrontUpload} disabled={!selectedIdType} style={{ display: 'none' }} />
                         <div style={{
                           aspectRatio: '16/10',
                           width: '100%',
@@ -1067,11 +1456,12 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                               alignItems: 'center',
                               width: '100%',
                               height: '100%',
-                              cursor: 'pointer',
+                              cursor: selectedIdType ? 'pointer' : 'not-allowed',
                               fontSize: '11px',
                               color: '#718096',
                               fontWeight: 600,
                               textAlign: 'center',
+                              opacity: selectedIdType ? 1 : 0.5,
                               transition: 'all 0.2s'
                             }}>
                               <span style={{ fontSize: '20px', display: 'block', marginBottom: '2px' }}>📷</span>
@@ -1116,7 +1506,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                       <div>
                         <p style={{ fontSize: '11px', fontWeight: 700, color: '#4a5568', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Back Side</p>
-                        <input type="file" id="back-upload" accept="image/*" onChange={handleBackUpload} style={{ display: 'none' }} />
+                        <input type="file" id="back-upload" accept="image/*" onChange={handleBackUpload} disabled={!selectedIdType} style={{ display: 'none' }} />
                         <div style={{
                           aspectRatio: '16/10',
                           width: '100%',
@@ -1134,11 +1524,12 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                               alignItems: 'center',
                               width: '100%',
                               height: '100%',
-                              cursor: 'pointer',
+                              cursor: selectedIdType ? 'pointer' : 'not-allowed',
                               fontSize: '11px',
                               color: '#a0aec0',
                               fontWeight: 600,
                               textAlign: 'center',
+                              opacity: selectedIdType ? 1 : 0.5,
                               transition: 'all 0.2s'
                             }}>
                               <span style={{ fontSize: '20px', display: 'block', marginBottom: '2px' }}>📷</span>
@@ -1387,19 +1778,89 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     />
 
                     <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#2d3748', marginBottom: '12px', marginTop: '24px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Address Details</h3>
-                    <Input label="Province" icon="📍" confidence={confidence.province} value={province} onChange={(e) => handleInputChange('province', e.target.value, setProvince)} onBlur={() => validateField('province', province)} invalid={errors.province} required />
-                    <Input label="City" icon="🏙️" confidence={confidence.city} value={city} onChange={(e) => handleInputChange('city', e.target.value, setCity)} onBlur={() => validateField('city', city)} invalid={errors.city} required />
 
-                    <Input label="Barangay" icon="🏡" confidence={confidence.barangay} value={barangay} onChange={(e) => handleInputChange('barangay', e.target.value, setBarangay)} onBlur={() => validateField('barangay', barangay)} invalid={errors.barangay} required />
-                    <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
+                    <Select
+                      label="Region"
+                      icon="🗺️"
+                      options={regions.map(r => ({ code: r.code, name: r.name }))}
+                      value={selectedRegion}
+                      onChange={(e) => setSelectedRegion(e.target.value)}
+                      required
+                    />
+
+                    <Select
+                      label="Province"
+                      icon="📍"
+                      options={provinces.map(p => ({ code: p.code, name: p.name }))}
+                      value={selectedProvince}
+                      onChange={(e) => {
+                        setSelectedProvince(e.target.value);
+                        const provName = provinces.find(p => p.code === e.target.value)?.name || '';
+                        handleInputChange('province', provName, setProvince);
+                      }}
+                      disabled={selectedRegion === '1300000000' || provinces.length === 0}
+                      required={selectedRegion !== '1300000000'}
+                      placeholder={selectedRegion === '1300000000' ? "Metro Manila (NCR)" : "Select Province"}
+                    />
+
+                    <Select
+                      label="City / Municipality"
+                      icon="🏙️"
+                      options={cities.map(c => ({ code: c.code, name: c.name }))}
+                      value={selectedCity}
+                      onChange={(e) => {
+                        const code = e.target.value;
+                        setSelectedCity(code);
+                        const cityName = cities.find(c => c.code === code)?.name || '';
+                        handleInputChange('city', cityName, setCity);
+
+                        // Enforce Caloocan default Zip Code when city is selected
+                        if (cityName.toUpperCase().includes('CALOOCAN')) {
+                          setZipCode('1400');
+                        }
+                      }}
+                      disabled={cities.length === 0}
+                      required
+                    />
+
+                    <Select
+                      label="Barangay"
+                      icon="🏡"
+                      options={barangays.map(b => ({ code: b.code, name: b.name }))}
+                      value={selectedBarangay}
+                      onChange={(e) => {
+                        const code = e.target.value;
+                        setSelectedBarangay(code);
+                        const brgyName = barangays.find(b => b.code === code)?.name || '';
+                        handleInputChange('barangay', brgyName, setBarangay);
+
+                        // Enforce Caloocan Barangay 174 Zip code
+                        if (city.toUpperCase().includes('CALOOCAN')) {
+                          if (brgyName.includes('174')) {
+                            setZipCode('1423');
+                          } else {
+                            setZipCode('1400');
+                          }
+                        }
+                      }}
+                      disabled={barangays.length === 0}
+                      required
+                    />
+
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                      <div style={{ flex: 1 }}>
+                        <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} onChange={(e) => setZipCode(e.target.value.replace(/\D/g, '').slice(0, 4))} type="tel" maxLength={4} inputMode="numeric" placeholder="1400" />
+                      </div>
+                    </div>
 
                     <Input label="Block" icon="📍" confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
                     <Input label="Lot" icon="📍" confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
 
                     <Input label="Street" icon="🛣️" confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
                     <Input label="Village / Subdivision" icon="🏘️" confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
-
-                    <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} type="tel" maxLength={4} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setZipCode(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="1400" />
 
                     <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
                       <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>{t.createPw}</label>
@@ -1522,9 +1983,10 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 </div>
               )}
             </form>
-          )}
-        </div>
-      </div>
+          )
+          }
+        </div >
+      </div >
 
       {/* Image Zoom Overlay */}
       {
@@ -1607,397 +2069,460 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
 
       {/* MULTI-STEP RESET PASSWORD MODAL */}
-      {showResetModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            animation: 'fadeIn 0.2s ease'
-          }}
-        >
+      {
+        showResetModal && (
           <div
             style={{
-              background: 'white',
-              borderRadius: '24px',
-              padding: '40px',
-              maxWidth: '480px',
-              width: '90%',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              position: 'relative',
-              textAlign: 'center'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close Button */}
-            {!resetLoading && (
-              <button
-                onClick={closeResetModal}
-                style={{
-                  position: 'absolute',
-                  top: '20px',
-                  right: '20px',
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#A0AEC0',
-                  transition: 'color 0.2s'
-                }}
-              >
-                ×
-              </button>
-            )}
-
-            {/* Icon */}
-            <div style={{
-              width: '80px',
-              height: '80px',
-              background: '#E6FFFA',
-              borderRadius: '50%',
-              margin: '0 auto 24px',
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.75)',
+              backdropFilter: 'blur(8px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '40px',
-              color: '#38B2AC'
-            }}>
-              {resetStep === 'email' ? '🔒' : resetStep === 'verify' ? '🛡️' : '🔑'}
-            </div>
-
-            {/* --- STEP 1: EMAIL --- */}
-            {resetStep === 'email' && (
-              <form onSubmit={handleSendCode}>
-                <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
-                  Forgot Password?
-                </h2>
-                <p style={{ fontSize: '15px', color: '#718096', marginBottom: '32px' }}>
-                  Enter your email and we'll send you a verification code.
-                </p>
-
-                <div style={{ textAlign: 'left', marginBottom: '24px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A5568', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    EMAIL ADDRESS
-                  </label>
-                  <input
-                    type="email"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      borderRadius: '8px',
-                      border: '2px solid #E2E8F0',
-                      fontSize: '16px',
-                      color: '#1A202C',
-                      outline: 'none',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = '#38B2AC'}
-                    onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-                  />
-                </div>
-
-                {resetError && (
-                  <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
-                    ⚠️ {resetError}
-                  </div>
-                )}
-
+              zIndex: 99999,
+              animation: 'fadeIn 0.2s ease'
+            }}
+          >
+            <div
+              style={{
+                background: 'white',
+                borderRadius: '24px',
+                padding: '40px',
+                maxWidth: '480px',
+                width: '90%',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                position: 'relative',
+                textAlign: 'center'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              {!resetLoading && (
                 <button
-                  type="submit"
-                  disabled={resetLoading}
+                  onClick={closeResetModal}
                   style={{
-                    width: '100%',
-                    padding: '16px',
-                    background: '#38B2AC',
-                    color: 'white',
+                    position: 'absolute',
+                    top: '20px',
+                    right: '20px',
+                    background: 'transparent',
                     border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    cursor: resetLoading ? 'not-allowed' : 'pointer',
-                    opacity: resetLoading ? 0.7 : 1,
-                    transition: 'all 0.2s',
-                    boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)'
+                    fontSize: '24px',
+                    cursor: 'pointer',
+                    color: '#A0AEC0',
+                    transition: 'color 0.2s'
                   }}
                 >
-                  {resetLoading ? 'Sending Code...' : 'Send Code'}
+                  ×
                 </button>
-              </form>
-            )}
+              )}
 
-            {/* --- STEP 2: VERIFICATION CODE --- */}
-            {resetStep === 'verify' && (
-              <form onSubmit={handleVerifyCode}>
-                <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
-                  Verify Your Code
-                </h2>
-                <p style={{ fontSize: '15px', color: '#718096', marginBottom: '8px' }}>
-                  We have sent a code to your email
-                </p>
-                <p style={{ fontSize: '15px', fontWeight: 600, color: '#38B2AC', marginBottom: '32px' }}>
-                  {forgotEmail}
-                </p>
+              {/* Icon */}
+              <div style={{
+                width: '80px',
+                height: '80px',
+                background: '#E6FFFA',
+                borderRadius: '50%',
+                margin: '0 auto 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '40px',
+                color: '#38B2AC'
+              }}>
+                {resetStep === 'email' ? '🔒' : resetStep === 'verify' ? '🛡️' : '🔑'}
+              </div>
 
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
-                  {verificationCode.map((digit, idx) => (
+              {/* --- STEP 1: EMAIL --- */}
+              {resetStep === 'email' && (
+                <form onSubmit={handleSendCode}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
+                    Forgot Password?
+                  </h2>
+                  <p style={{ fontSize: '15px', color: '#718096', marginBottom: '32px' }}>
+                    Enter your email and we'll send you a verification code.
+                  </p>
+
+                  <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A5568', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      EMAIL ADDRESS
+                    </label>
                     <input
-                      key={idx}
-                      id={`code-${idx}`}
-                      type="text"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleCodeChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleCodeKeyDown(idx, e)}
-                      onPaste={(e) => {
-                        e.preventDefault();
-                        const pastedData = e.clipboardData.getData('text').slice(0, 6).split('');
-                        if (pastedData.length > 0) {
-                          const newCode = [...verificationCode];
-                          pastedData.forEach((char, i) => {
-                            if (idx + i < 6) newCode[idx + i] = char;
-                          });
-                          setVerificationCode(newCode);
-                          const nextIndex = Math.min(idx + pastedData.length, 5);
-                          document.getElementById(`code-${nextIndex}`)?.focus();
-                        }
-                      }}
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      required
                       style={{
-                        width: '48px',
-                        height: '56px',
+                        width: '100%',
+                        padding: '12px 16px',
                         borderRadius: '8px',
                         border: '2px solid #E2E8F0',
-                        fontSize: '24px',
-                        fontWeight: 700,
-                        textAlign: 'center',
-                        color: '#2D3748',
+                        fontSize: '16px',
+                        color: '#1A202C',
                         outline: 'none',
                         transition: 'border-color 0.2s'
                       }}
                       onFocus={(e) => e.target.style.borderColor = '#38B2AC'}
                       onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
                     />
-                  ))}
-                </div>
-
-                {resetError && (
-                  <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
-                    ⚠️ {resetError}
                   </div>
-                )}
-                {resetMessage && (
-                  <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
-                    ✅ {resetMessage}
-                  </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={resetLoading}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    background: '#38B2AC',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    cursor: resetLoading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)',
-                    marginBottom: '24px'
-                  }}
-                >
-                  {resetLoading ? 'Verifying...' : 'Verify'}
-                </button>
-
-                <div style={{ fontSize: '14px', color: '#718096' }}>
-                  Didn't receive code?{' '}
-                  {canResend ? (
-                    <button
-                      type="button"
-                      onClick={handleSendCode}
-                      style={{ background: 'none', border: 'none', color: '#3182CE', fontWeight: 700, cursor: 'pointer', padding: 0 }}
-                    >
-                      Resend
-                    </button>
-                  ) : (
-                    <span style={{ color: '#A0AEC0' }}>Resend in {timer}s</span>
+                  {resetError && (
+                    <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                      ⚠️ {resetError}
+                    </div>
                   )}
-                </div>
-              </form>
-            )}
 
-            {/* --- STEP 3: NEW PASSWORD --- */}
-            {resetStep === 'reset' && (
-              <form onSubmit={handleResetPassword}>
-                <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
-                  Reset Password
-                </h2>
-                <p style={{ fontSize: '15px', color: '#718096', marginBottom: '32px' }}>
-                  Create a new strong password for your account.
-                </p>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      background: '#38B2AC',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      fontWeight: 700,
+                      cursor: resetLoading ? 'not-allowed' : 'pointer',
+                      opacity: resetLoading ? 0.7 : 1,
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)'
+                    }}
+                  >
+                    {resetLoading ? 'Sending Code...' : 'Send Code'}
+                  </button>
+                </form>
+              )}
 
-                <div style={{ textAlign: 'left', marginBottom: '16px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>
-                    NEW PASSWORD
-                  </label>
-                  <div className={`auth-input${resetError && resetError.includes('Password') ? ' invalid' : ''}`} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    background: '#f7fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '10px 12px',
-                    marginBottom: '12px',
-                    position: 'relative'
-                  }}>
-                    <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
-                    <input
-                      type={resetPwVisible ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      onFocus={() => setResetPwFocused(true)}
-                      onBlur={() => setResetPwFocused(false)}
-                      placeholder="Enter new password"
-                      required
-                      style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
-                    />
-                    <button type="button" onClick={() => setResetPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: '#718096' }}>
-                      {resetPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
-                    </button>
+              {/* --- STEP 2: VERIFICATION CODE --- */}
+              {resetStep === 'verify' && (
+                <form onSubmit={handleVerifyCode}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
+                    Verify Your Code
+                  </h2>
+                  <p style={{ fontSize: '15px', color: '#718096', marginBottom: '8px' }}>
+                    We have sent a code to your email
+                  </p>
+                  <p style={{ fontSize: '15px', fontWeight: 600, color: '#38B2AC', marginBottom: '32px' }}>
+                    {forgotEmail}
+                  </p>
 
-                    {resetPwFocused && (
-                      <div style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: '100%',
-                        width: '100%',
-                        marginTop: '8px',
-                        background: '#2d3748',
-                        color: 'white',
-                        padding: '10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        zIndex: 100,
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                      }}>
-                        <div style={{ marginBottom: '4px', fontWeight: 'bold', borderBottom: '1px solid #4a5568', paddingBottom: '4px' }}>Password Requirements:</div>
-                        <ul style={{ paddingLeft: '16px', margin: 0, listStyleType: 'disc' }}>
-                          <li style={{ marginBottom: '2px', color: resetPasswordCriteria.length ? '#68d391' : 'white' }}>At least 8 characters</li>
-                          <li style={{ marginBottom: '2px', color: resetPasswordCriteria.upper ? '#68d391' : 'white' }}>At least one uppercase letter</li>
-                          <li style={{ color: resetPasswordCriteria.symbol ? '#68d391' : 'white' }}>At least one special character</li>
-                        </ul>
-                        <div style={{
-                          position: 'absolute',
-                          top: '-4px',
-                          left: '20px',
-                          width: '8px',
-                          height: '8px',
-                          background: '#2d3748',
-                          transform: 'rotate(45deg)'
-                        }}></div>
-                      </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
+                    {verificationCode.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        id={`code-${idx}`}
+                        type="text"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleCodeChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleCodeKeyDown(idx, e)}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pastedData = e.clipboardData.getData('text').slice(0, 6).split('');
+                          if (pastedData.length > 0) {
+                            const newCode = [...verificationCode];
+                            pastedData.forEach((char, i) => {
+                              if (idx + i < 6) newCode[idx + i] = char;
+                            });
+                            setVerificationCode(newCode);
+                            const nextIndex = Math.min(idx + pastedData.length, 5);
+                            document.getElementById(`code-${nextIndex}`)?.focus();
+                          }
+                        }}
+                        style={{
+                          width: '48px',
+                          height: '56px',
+                          borderRadius: '8px',
+                          border: '2px solid #E2E8F0',
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          textAlign: 'center',
+                          color: '#2D3748',
+                          outline: 'none',
+                          transition: 'border-color 0.2s'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#38B2AC'}
+                        onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                      />
+                    ))}
+                  </div>
+
+                  {resetError && (
+                    <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                      ⚠️ {resetError}
+                    </div>
+                  )}
+                  {resetMessage && (
+                    <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                      ✅ {resetMessage}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      background: '#38B2AC',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      fontWeight: 700,
+                      cursor: resetLoading ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)',
+                      marginBottom: '24px'
+                    }}
+                  >
+                    {resetLoading ? 'Verifying...' : 'Verify'}
+                  </button>
+
+                  <div style={{ fontSize: '14px', color: '#718096' }}>
+                    Didn't receive code?{' '}
+                    {canResend ? (
+                      <button
+                        type="button"
+                        onClick={handleSendCode}
+                        style={{ background: 'none', border: 'none', color: '#3182CE', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                      >
+                        Resend
+                      </button>
+                    ) : (
+                      <span style={{ color: '#A0AEC0' }}>Resend in {timer}s</span>
                     )}
                   </div>
+                </form>
+              )}
 
-                  {/* Password Criteria Checklist */}
-                  <div style={{ fontSize: '11px', color: '#718096', marginBottom: '20px', paddingLeft: '4px' }}>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      <span style={{ color: resetPasswordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                        {resetPasswordCriteria.length ? '✓' : '○'} 8+ Chars
-                      </span>
-                      <span style={{ color: resetPasswordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                        {resetPasswordCriteria.upper ? '✓' : '○'} Upper (A-Z)
-                      </span>
-                      <span style={{ color: resetPasswordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                        {resetPasswordCriteria.symbol ? '✓' : '○'} Symbol (-_+ =)
-                      </span>
+              {/* --- STEP 3: NEW PASSWORD --- */}
+              {resetStep === 'reset' && (
+                <form onSubmit={handleResetPassword}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#2D3748' }}>
+                    Reset Password
+                  </h2>
+                  <p style={{ fontSize: '15px', color: '#718096', marginBottom: '32px' }}>
+                    Create a new strong password for your account.
+                  </p>
+
+                  <div style={{ textAlign: 'left', marginBottom: '16px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>
+                      NEW PASSWORD
+                    </label>
+                    <div className={`auth-input${resetError && resetError.includes('Password') ? ' invalid' : ''}`} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#f7fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      marginBottom: '12px',
+                      position: 'relative'
+                    }}>
+                      <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                      <input
+                        type={resetPwVisible ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        onFocus={() => setResetPwFocused(true)}
+                        onBlur={() => setResetPwFocused(false)}
+                        placeholder="Enter new password"
+                        required
+                        style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
+                      />
+                      <button type="button" onClick={() => setResetPwVisible(v => !v)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: '#718096' }}>
+                        {resetPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                      </button>
+
+                      {resetPwFocused && (
+                        <div style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: '100%',
+                          width: '100%',
+                          marginTop: '8px',
+                          background: '#2d3748',
+                          color: 'white',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          zIndex: 100,
+                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                        }}>
+                          <div style={{ marginBottom: '4px', fontWeight: 'bold', borderBottom: '1px solid #4a5568', paddingBottom: '4px' }}>Password Requirements:</div>
+                          <ul style={{ paddingLeft: '16px', margin: 0, listStyleType: 'disc' }}>
+                            <li style={{ marginBottom: '2px', color: resetPasswordCriteria.length ? '#68d391' : 'white' }}>At least 8 characters</li>
+                            <li style={{ marginBottom: '2px', color: resetPasswordCriteria.upper ? '#68d391' : 'white' }}>At least one uppercase letter</li>
+                            <li style={{ color: resetPasswordCriteria.symbol ? '#68d391' : 'white' }}>At least one special character</li>
+                          </ul>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-4px',
+                            left: '20px',
+                            width: '8px',
+                            height: '8px',
+                            background: '#2d3748',
+                            transform: 'rotate(45deg)'
+                          }}></div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Password Criteria Checklist */}
+                    <div style={{ fontSize: '11px', color: '#718096', marginBottom: '20px', paddingLeft: '4px' }}>
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ color: resetPasswordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                          {resetPasswordCriteria.length ? '✓' : '○'} 8+ Chars
+                        </span>
+                        <span style={{ color: resetPasswordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                          {resetPasswordCriteria.upper ? '✓' : '○'} Upper (A-Z)
+                        </span>
+                        <span style={{ color: resetPasswordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
+                          {resetPasswordCriteria.symbol ? '✓' : '○'} Symbol (-_+ =)
+                        </span>
+                      </div>
                     </div>
                   </div>
+
+                  <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>
+                      CONFIRM PASSWORD
+                    </label>
+                    <div className="auth-input" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#f7fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '10px 12px'
+                    }}>
+                      <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                      <input
+                        type={resetConfirmPwVisible ? 'text' : 'password'}
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        required
+                        style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setResetConfirmPwVisible(!resetConfirmPwVisible)}
+                        style={{ cursor: 'pointer', background: 'transparent', border: 'none', padding: '4px', color: '#718096', marginLeft: '8px' }}
+                      >
+                        {resetConfirmPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {resetError && (
+                    <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                      ⚠️ {resetError}
+                    </div>
+                  )}
+                  {resetMessage && (
+                    <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
+                      ✅ {resetMessage}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      background: '#38B2AC',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      fontWeight: 700,
+                      cursor: resetLoading ? 'not-allowed' : 'pointer',
+                      opacity: resetLoading ? 0.7 : 1,
+                      transition: 'all 0.2s',
+                      boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)'
+                    }}
+                  >
+                    {resetLoading ? 'Resetting...' : 'Reset Password'}
+                  </button>
+                </form>
+              )}
+
+            </div>
+          </div>
+        )
+      }
+
+      {showChangePassword && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '40px', maxWidth: '440px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ fontSize: '40px', marginBottom: '8px' }}>🔐</div>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1a202c', margin: '0 0 8px' }}>Set Your New Password</h2>
+              <p style={{ fontSize: '14px', color: '#718096', margin: 0 }}>
+                For security, you must change your temporary password before continuing.
+              </p>
+            </div>
+            <form onSubmit={handleForcedPasswordChange}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  required
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  placeholder="Re-enter your new password"
+                  required
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+              {changePwError && (
+                <div style={{ background: '#FFF5F5', color: '#C53030', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', fontWeight: 600 }}>
+                  ⚠️ {changePwError}
                 </div>
-
-                <div style={{ textAlign: 'left', marginBottom: '24px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>
-                    CONFIRM PASSWORD
-                  </label>
-                  <div className="auth-input" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    background: '#f7fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '10px 12px'
-                  }}>
-                    <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
-                    <input
-                      type={resetConfirmPwVisible ? 'text' : 'password'}
-                      value={confirmNewPassword}
-                      onChange={(e) => setConfirmNewPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                      required
-                      style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '13px' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setResetConfirmPwVisible(!resetConfirmPwVisible)}
-                      style={{ cursor: 'pointer', background: 'transparent', border: 'none', padding: '4px', color: '#718096', marginLeft: '8px' }}
-                    >
-                      {resetConfirmPwVisible ? <FiEyeOff size={16} /> : <FiEye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                {resetError && (
-                  <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
-                    ⚠️ {resetError}
-                  </div>
-                )}
-                {resetMessage && (
-                  <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
-                    ✅ {resetMessage}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={resetLoading}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    background: '#38B2AC',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    cursor: resetLoading ? 'not-allowed' : 'pointer',
-                    opacity: resetLoading ? 0.7 : 1,
-                    transition: 'all 0.2s',
-                    boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)'
-                  }}
-                >
-                  {resetLoading ? 'Resetting...' : 'Reset Password'}
-                </button>
-              </form>
-            )}
-
+              )}
+              <button
+                type="submit"
+                disabled={changePwLoading}
+                style={{
+                  width: '100%', padding: '12px', background: changePwLoading ? '#81e6d9' : '#38b2ac', color: 'white',
+                  border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 700,
+                  cursor: changePwLoading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 6px rgba(56, 178, 172, 0.3)'
+                }}
+              >
+                {changePwLoading ? 'Changing Password...' : 'Change Password & Continue'}
+              </button>
+            </form>
           </div>
         </div>
       )}
-
     </>
   );
 }

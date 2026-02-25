@@ -682,7 +682,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 {activeTab.replace('-', ' ')}
                             </Heading>
                             <Text color="gray.400" fontSize={{ base: "xs", md: "sm" }}>
-                                Healthcare Dashboard v4.0
+                                Patient Dashboard
                             </Text>
                         </VStack>
                     </HStack>

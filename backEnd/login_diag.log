@@ -1,18 +1,18 @@
 User ID: 2
 Email: genetabios13@gmail.com
-Hash: $2b$12$Iu.XGLcw2gH8CTsWJ6lyBe7w7yAnMOI3gvTwLupWd3liFg6w65uBK
+Hash: $2b$12$vwvH8Qql6YbeWKvpmOFS3ed.QPa7HXFCtV36IUOdNiSEUPnaG4mpi
 Hash type: <class 'str'>
 Hash len: 60
 
-Fresh hash: $2b$12$Uw.QQEaiBaBdvTtt/dsTeupAaMJQCQ2tjIYZlUXkkcuDnlF1wP1NG
+Fresh hash: $2b$12$mPfTZvVXlGc6483XPsK0N.vqTouRn51ThHDM9oHoDMatf2cJ8336C
 Fresh verify: True
 
 --- flask_bcrypt check ---
-  [MATCH] BHCare2026!
+  [FAIL] BHCare2026!
   [FAIL] tempPC123!
   [FAIL] bhcare123
 
 --- raw bcrypt check ---
-  [MATCH] BHCare2026!
+  [FAIL] BHCare2026!
   [FAIL] tempPC123!
   [FAIL] bhcare123

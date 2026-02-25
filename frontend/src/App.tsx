@@ -103,7 +103,9 @@ function App() {
 
   // If logged in, show the appropriate Dashboard hub
   if (user) {
-    if (user.role === 'admin' || user.role === 'Administrator') {
+    const roleLower = (user.role || '').toLowerCase();
+
+    if (['admin', 'administrator', 'super admin', 'superadmin'].includes(roleLower)) {
       return (
         <ErrorBoundary>
           <AdminDashboard

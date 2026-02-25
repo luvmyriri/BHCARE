@@ -1,0 +1,12 @@
+
+--- Testing DL Address Parser ---
+Extracted Fields:
+full_address: Height(m) 1.75 2680, MAGNOLIA, BARANGAY 174, CALOOCAN
+house_number: 2680
+street_name: Magnolia
+subdivision: None
+barangay: Barangay 174
+city: Caloocan City
+province: 133900000
+zip_code: 1423
+region: 130000000

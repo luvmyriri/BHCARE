@@ -345,6 +345,21 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         onOpen();
     };
 
+    // Helper to format User IDs consistently
+    const formatUserId = (id: number | string, role: string, createdAt?: string) => {
+        if (!id) return '—';
+        let prefix = 'PT'; // Default Patient
+        const roleLower = (role || '').toLowerCase();
+        if (roleLower.includes('doctor')) prefix = 'DR';
+        else if (roleLower.includes('super admin') || roleLower.includes('superadmin')) prefix = 'SA';
+        else if (roleLower.includes('medic') || roleLower.includes('staff')) prefix = 'MS';
+        else if (roleLower.includes('admin')) prefix = 'AD';
+
+        const year = createdAt ? new Date(createdAt).getFullYear() : new Date().getFullYear();
+        const paddedId = String(id).padStart(3, '0');
+        return `${prefix}${year}${paddedId}`;
+    };
+
     const renderModalContent = () => {
         switch (selectedCard) {
             case 'soap-form':
@@ -355,7 +370,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             doctorEmail={user?.email}
                             onSuccess={() => {
                                 onClose();
-                                // Optional: Refresh data or show success toast (handled in form)
+                                setActiveTab('records'); // Redirect to Medical History records
                             }}
                             onCancel={onClose}
                         />
@@ -452,7 +467,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                         <ModalBody>
                             <Box overflowX="auto">
                                 <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Patient</Th><Th>Test</Th><Th>Status</Th></Tr></Thead>
+                                    <Thead><Tr><Th>Patient</Th><Th>Test</Th><Th>Status</Th><Th>Action</Th></Tr></Thead>
                                     <Tbody>
                                         {labResults.length > 0 ? (
                                             labResults.map((lab: any) => (
@@ -464,11 +479,25 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                             {lab.status}
                                                         </Badge>
                                                     </Td>
+                                                    <Td>
+                                                        <Button size="xs" colorScheme="blue" onClick={async () => {
+                                                            try {
+                                                                await fetch(`/api/lab-results/${lab.id}/complete`, { method: 'PUT' });
+                                                                setLabResults(prev => prev.filter(l => l.id !== lab.id));
+                                                            } catch (err) {
+                                                                console.error("Failed to complete lab result", err);
+                                                            }
+                                                            onClose(); // Close the Labs modal
+                                                            handleOpenSoap(lab.patient_id); // Open SOAP modal
+                                                        }}>
+                                                            Done
+                                                        </Button>
+                                                    </Td>
                                                 </Tr>
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={3} textAlign="center" color="gray.500">No pending results</Td>
+                                                <Td colSpan={4} textAlign="center" color="gray.500">No pending results</Td>
                                             </Tr>
                                         )}
                                     </Tbody>
@@ -609,7 +638,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                         </Badge>
                                                     </Td>
                                                     <Td>
-                                                        <Button size="xs" colorScheme="teal" variant="ghost">View Details</Button>
+                                                        <Button size="xs" colorScheme="teal" variant="ghost" onClick={() => handleViewHistory(p.user_id)}>View Details</Button>
                                                         <Button size="xs" colorScheme="blue" ml={2} onClick={() => handleOpenSoap(p.user_id)}>SOAP</Button>
                                                     </Td>
                                                 </Tr>
@@ -696,7 +725,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                 return 0;
                                             }).map(p => (
                                                 <Tr key={p.id}>
-                                                    <Td fontWeight="bold" color="teal.600">{p.p_id}</Td>
+                                                    <Td fontWeight="bold" color="teal.600">{formatUserId(p.id, 'Patient', p.created_at)}</Td>
                                                     <Td fontWeight="600">{p.first_name} {p.last_name}</Td>
                                                     <Td>{p.age} / {p.gender}</Td>
                                                     <Td>{p.contact_number}</Td>

@@ -22,7 +22,8 @@ from email_config import (
     validate_reset_token,
     invalidate_reset_token,
     send_password_reset_email,
-    send_registration_success_email
+    send_registration_success_email,
+    send_staff_creation_email
 )
 
 load_dotenv()
@@ -99,8 +100,8 @@ def preprocess_image(image_bytes):
     if img.mode != 'RGB':
         img = img.convert('RGB')
     
-    # 1. Scale image to optimal OCR size (1500px - 2000px width)
-    target_width = 1800
+    # 1. Scale image to optimal OCR size (large enough to read, but strict < 1MB limit for OCR.space)
+    target_width = 1400
     if img.width != target_width:
         ratio = target_width / img.width
         img = img.resize((target_width, int(img.height * ratio)), Image.Resampling.LANCZOS)
@@ -110,18 +111,22 @@ def preprocess_image(image_bytes):
     
     # 3. Enhance local contrast
     enhancer = ImageEnhance.Contrast(img)
-    img = enhancer.enhance(1.8)  # Increased from 1.5
+    img = enhancer.enhance(1.5)  # Reverted to 1.5 to prevent noise
     
     # 4. Enhance sharpness
     enhancer = ImageEnhance.Sharpness(img)
-    img = enhancer.enhance(2.5)  # Increased from 2.0
+    img = enhancer.enhance(1.8)  # Reverted slightly from 2.5 to prevent artifacts
     
-    # 5. Convert to grayscale (remove strict binarization to prevent erasing text in varying lighting)
+    # 5. Convert to grayscale
     img = img.convert('L')
     
-    # Save to bytes
+    # Save to bytes (quality 85 to ensure 1400px image stays under 1000KB)
     output = io.BytesIO()
-    img.save(output, format='JPEG', quality=95)
+    img.save(output, format='JPEG', quality=85)
+    
+    size_kb = len(output.getvalue()) / 1024
+    print(f"[OCR PREPROCESSOR] Final image width: {img.width}px, File size: {size_kb:.1f} KB")
+    
     return output.getvalue()
 
 # ============= FIELD VALIDATORS =============
@@ -187,7 +192,8 @@ class FieldValidator:
 
 # ============= ADVANCED OCR PARSER =============
 class PHIDParser:
-    def __init__(self):
+    def __init__(self, expected_id_type=None):
+        self.expected_id_type = expected_id_type
         self.fields = {
             'first_name': None,
             'middle_name': None,
@@ -199,7 +205,7 @@ class PHIDParser:
             'contact': None, # Match registration form key
             'address': None,
             'city': None,
-            'id_type': 'Government ID',
+            'id_type': expected_id_type if expected_id_type else 'Government ID',
             'crn': None,
             'email': None,
             'region': None,
@@ -250,6 +256,11 @@ class PHIDParser:
     
     def _identify_id_type(self, text):
         """Detect the type of Philippine ID from OCR text"""
+        if self.expected_id_type:
+             print(f"[ID TYPE] Using user-selected type: {self.expected_id_type}")
+             self.fields['id_type'] = self.expected_id_type
+             return
+             
         ul = text.upper()
         if 'POSTAL' in ul: self.fields['id_type'] = 'Postal ID'
         elif any(k in ul for k in ['SOCIAL SECURITY', ' SSS ']): self.fields['id_type'] = 'SSS ID'
@@ -259,7 +270,7 @@ class PHIDParser:
         elif 'VOTER' in ul: self.fields['id_type'] = 'Voter\'s ID'
         elif 'PHILHEALTH' in ul: self.fields['id_type'] = 'PhilHealth ID'
         elif 'DRIVER' in ul and 'LICENSE' in ul: self.fields['id_type'] = 'Driver\'s License'
-        print(f"[ID TYPE] Identified as: {self.fields['id_type']}")
+        print(f"[ID TYPE] Auto-identified as: {self.fields['id_type']}")
 
     def _extract_crn(self, text):
         """Extract CRN or ID Number"""
@@ -335,6 +346,73 @@ class PHIDParser:
 
     def _extract_names(self, lines):
         """Extract names with broader header and label detection for all PH IDs"""
+        
+        # NATIONAL ID SPECIFIC LOGIC (Top Priority, no header labels)
+        if self.fields.get('id_type') == "National ID":
+             # Find "National ID" or "Republika" line
+             start_idx = -1
+             for i, line in enumerate(lines):
+                 if any(k in line.upper() for k in ['NATIONAL ID', 'PHILID', 'REPUBLIKA']):
+                     start_idx = i
+             
+             if start_idx != -1:
+                 # Names are usually the next 3 lines
+                 idx = start_idx + 1
+                 if idx < len(lines):
+                     last, _ = FieldValidator.validate_name(lines[idx])
+                     self.fields['last_name'] = last
+                     self.confidence['last_name'] = 0.90
+                 
+                 idx += 1
+                 if idx < len(lines):
+                     first, _ = FieldValidator.validate_name(lines[idx])
+                     self.fields['first_name'] = first
+                     self.confidence['first_name'] = 0.90
+                 
+                 idx += 1
+                 if idx < len(lines) and 'SEX' not in lines[idx].upper() and 'DATE' not in lines[idx].upper():
+                     middle, _ = FieldValidator.validate_name(lines[idx])
+                     self.fields['middle_name'] = middle
+                     self.confidence['middle_name'] = 0.90
+                 
+                 print(f"[NAMES] Extracted via National ID rules: {self.fields['first_name']} {self.fields['middle_name']} {self.fields['last_name']}")
+                 return
+                 
+        # TIN ID SPECIFIC LOGIC
+        if self.fields.get('id_type') == "TIN ID":
+             for i, line in enumerate(lines):
+                 if re.match(r'^TIN\s*:?\s*\d{3}', line.upper().strip()):
+                     # Name is typically the line right above the TIN number
+                     if i > 0:
+                         name_line = lines[i-1].strip()
+                         # Format is usually: Last Name, First Name Middle Name
+                         if ',' in name_line:
+                             parts = [p.strip() for p in name_line.split(',', 1)]
+                             self.fields['last_name'], _ = FieldValidator.validate_name(parts[0])
+                             self.confidence['last_name'] = 0.90
+                             
+                             if len(parts) > 1:
+                                 rest = parts[1].split()
+                                 if len(rest) > 1:
+                                     self.fields['first_name'], _ = FieldValidator.validate_name(' '.join(rest[:-1]))
+                                     self.fields['middle_name'], _ = FieldValidator.validate_name(rest[-1])
+                                 elif len(rest) == 1:
+                                     self.fields['first_name'], _ = FieldValidator.validate_name(rest[0])
+                                 self.confidence['first_name'] = 0.90
+                                 self.confidence['middle_name'] = 0.90
+                         else:
+                             # Fallback if comma is missed
+                             parts = name_line.split()
+                             if len(parts) >= 1:
+                                 self.fields['last_name'], _ = FieldValidator.validate_name(parts[0])
+                             if len(parts) >= 2:
+                                 self.fields['first_name'], _ = FieldValidator.validate_name(parts[1])
+                             if len(parts) > 2:
+                                 self.fields['middle_name'], _ = FieldValidator.validate_name(' '.join(parts[2:]))
+                     
+                     print(f"[NAMES] Extracted via TIN ID rules: {self.fields.get('first_name')} {self.fields.get('middle_name')} {self.fields.get('last_name')}")
+                     return
+
         # Strategy 1: Combined header (e.g. UMID, SSS, PRC, DL)
         header_idx = None
         for i, line in enumerate(lines):
@@ -349,6 +427,33 @@ class PHIDParser:
         
         if header_idx is not None and header_idx + 1 < len(lines):
             data_line = lines[header_idx + 1]
+            
+            # DRIVER'S LICENSE SPECIFIC LOGIC (Format: SALVACION, LANCE ALDRIC CUREG)
+            if self.fields.get('id_type') == "Driver's License" and ',' in data_line:
+                parts = [p.strip() for p in data_line.split(',', 1)]
+                last, conf_l = FieldValidator.validate_name(parts[0])
+                self.fields['last_name'] = last
+                self.confidence['last_name'] = 0.95
+                
+                if len(parts) > 1:
+                     rest = parts[1].strip().split()
+                     # In DL, the last word is almost always the middle name (unless there's a suffix, which we handle later)
+                     if len(rest) > 1:
+                          middle, conf_m = FieldValidator.validate_name(rest[-1])
+                          self.fields['middle_name'] = middle
+                          self.confidence['middle_name'] = 0.90
+                          
+                          first, conf_f = FieldValidator.validate_name(' '.join(rest[:-1]))
+                          self.fields['first_name'] = first
+                          self.confidence['first_name'] = 0.90
+                     elif len(rest) == 1:
+                          first, conf_f = FieldValidator.validate_name(rest[0])
+                          self.fields['first_name'] = first
+                          self.confidence['first_name'] = 0.90
+                print(f"[NAMES] Extracted via Driver's License rules: {self.fields['first_name']} {self.fields['middle_name']} {self.fields['last_name']}")
+                return
+                
+
             if ',' in data_line:
                 parts = [p.strip() for p in data_line.split(',', 1)]
                 last, conf_l = FieldValidator.validate_name(parts[0])
@@ -710,6 +815,65 @@ class PHIDParser:
         """Extract address components with enhanced multi-line support and Caloocan detection"""
         upper_text = text.upper()
         
+        # PHILHEALTH SPECIFIC LOGIC
+        if self.fields.get('id_type') == 'PhilHealth ID':
+            # In PhilHealth, the address is typically 1-2 lines after the Date of Birth/Gender line.
+            addr_start_idx = -1
+            for i, line in enumerate(lines):
+                 ul = line.upper()
+                 dob_val = self.fields.get('dob')
+                 if dob_val and str(dob_val[:4]) in ul: # The year is in the line
+                     addr_start_idx = i
+                 elif 'MALE' in ul or 'FEMALE' in ul:
+                     addr_start_idx = i
+            
+            if addr_start_idx != -1:
+                 candidates = []
+                 for j in range(1, 4):
+                     if addr_start_idx + j < len(lines):
+                         l = lines[addr_start_idx + j].strip()
+                         # Stop if we hit a PhilHealth Number or noise
+                         if re.match(r'^[\d\s-]+$', l) and len(re.sub(r'[^\d]', '', l)) >= 10:
+                             break
+                         if len(l) < 4:
+                             break
+                         candidates.append(l)
+                 
+                 if candidates:
+                     full_addr = " ".join(candidates)
+                     self.fields['full_address'] = full_addr
+                     self.confidence['full_address'] = 0.90
+                     print(f"[ADDRESS] Extracted PhilHealth block: {full_addr}")
+                     self._parse_address_components(full_addr)
+                     return
+
+        # TIN ID SPECIFIC LOGIC
+        if self.fields.get('id_type') == 'TIN ID':
+            tin_idx = -1
+            for i, line in enumerate(lines):
+                if re.match(r'^TIN\s*:?\s*\d{3}', line.upper().strip()):
+                    tin_idx = i
+                    break
+            
+            if tin_idx != -1:
+                candidates = []
+                for j in range(1, 4):
+                    if tin_idx + j < len(lines):
+                        l = lines[tin_idx + j].strip()
+                        # Stop if we hit Date of Birth or Issue Date
+                        if 'DATE' in l.upper() or 'BIRTH' in l.upper() or 'ISSUE' in l.upper() or 'SIGNATURE' in l.upper():
+                            break
+                        if len(l) > 3:
+                            candidates.append(l)
+                
+                if candidates:
+                    full_addr = " ".join(candidates)
+                    self.fields['full_address'] = full_addr
+                    self.confidence['full_address'] = 0.90
+                    print(f"[ADDRESS] Extracted TIN ID block: {full_addr}")
+                    self._parse_address_components(full_addr)
+                    return
+
         caloocan_indicators = ['CALOOCAN', 'KALOOKAN', 'KALOOCAN']
         is_caloocan = any(indicator in upper_text for indicator in caloocan_indicators)
         
@@ -759,7 +923,10 @@ class PHIDParser:
             for j in range(1, 4):
                 if addr_line_idx + j < len(lines):
                     l = lines[addr_line_idx + j].strip()
-                    if len(l) > 3 and not any(k in l.upper() for k in ['ID NO', 'DATE OF']):
+                    # Stop merging if we hit these labels which indicate the end of the address block
+                    if any(k in l.upper() for k in ['ID NO', 'DATE OF', 'LICENSE NO', 'EXPIRATION', 'AGENCY CODE']):
+                        break
+                    if len(l) > 3:
                         candidates.append(l)
             
             if candidates:
@@ -793,6 +960,17 @@ class PHIDParser:
         # Always attempt parsing from full text if components still missing
         if not any(self.fields.get(f) for f in ['house_number', 'street_name', 'subdivision']):
              self._parse_address_components(text)
+             
+        # Post-process Caloocan ZIP Code
+        if self.fields.get('city') == 'Caloocan City':
+            ext_zip = self.fields.get('zip_code', '')
+            if not ext_zip.isdigit() or not (1400 <= int(ext_zip) <= 1428):
+                if self.fields.get('barangay') == 'Barangay 174':
+                    self.fields['zip_code'] = '1423'
+                else:
+                    self.fields['zip_code'] = '1400'
+                self.confidence['zip_code'] = 0.95
+                print(f"[ADDRESS] Adjusted Caloocan ZIP: {self.fields['zip_code']}")
     
     def _parse_address_components(self, address_text):
         """Parse detailed address components from full address string"""
@@ -809,11 +987,12 @@ class PHIDParser:
                 break
         
         # Lot Number
-        lot_patterns = [r'LOT\.?\s*#?\s*(\d+)', r'\bL\.?\s*-?\s*(\d+)']
+        lot_patterns = [r'\b(?:LOT|LT|L)[\.\s#\-]*([0-9]+[A-Z]?|[A-Z])\b', r'\bLOT\s+([0-9A-Z\-]+)\b']
         for pattern in lot_patterns:
             match = re.search(pattern, upper_addr)
             if match:
-                self.fields['lot_number'] = f"Lot {match.group(1)}"
+                val = match.group(1).replace('B', '8').replace('O', '0') if len(match.group(1)) == 1 else match.group(1)
+                self.fields['lot_number'] = f"Lot {val}"
                 self.confidence['lot_number'] = 0.95
                 print(f"[ADDRESS] Lot No: {self.fields['lot_number']}")
                 break
@@ -863,8 +1042,8 @@ class PHIDParser:
         if not self.fields.get('house_number') and self.fields.get('street_name'):
              street_upper = self.fields['street_name'].upper()
              try:
-                 pre = upper_addr.split(street_upper)[0].strip()
-                 num_match = re.search(r'#?(\d+[A-Z]?)$', pre)
+                 pre = upper_addr.split(street_upper)[0].strip().rstrip(',')
+                 num_match = re.search(r'#?(\d+[A-Z]?)\s*$', pre)
                  if num_match:
                      self.fields['house_number'] = num_match.group(1)
                      self.confidence['house_number'] = 0.85
@@ -873,7 +1052,7 @@ class PHIDParser:
 
         # Subdivision/Village
         subdiv_patterns = [
-            r'([A-Z0-9][A-Z0-9\s]+?)\s+(HOMES|VILLAGE|SUBDIVISION|VILLAS|HEIGHTS|ESTATES|RESIDENCES)',
+            r'([A-Z0-9][A-Z0-9\s]+?)\s+(HOMES|VILLAGE|VILL\.?|SUBDIVISION|SUBD\.?|VILLAS|HEIGHTS|ESTATES|RESIDENCES)',
             r'(NORTHVILLE\s*[A-Z0-9\s]*)' # National ID specific
         ]
         for pattern in subdiv_patterns:
@@ -887,11 +1066,82 @@ class PHIDParser:
                     break
         
         # ZIP Code
-        zip_match = re.search(r'\b(1[0-9]{3})\b', upper_addr) # Philippine ZIP starts with 1 in NCR
+        zip_match = re.search(r'\b([0-9]{4})\b', upper_addr) # Philippine ZIP codes are 4 digits
         if zip_match:
             self.fields['zip_code'] = zip_match.group(1)
             self.confidence['zip_code'] = 0.95
             print(f"[ADDRESS] ZIP: {self.fields['zip_code']}")
+
+        # Heuristic City, Province, Barangay Extraction for Non-Caloocan
+        if not self.fields.get('city'):
+            # Pre-check for explicit NCR cities like Caloocan to avoid them being mapped as Province
+            if 'CALOOCAN' in upper_addr:
+                self.fields['city'] = 'Caloocan City'
+                self.confidence['city'] = 0.95
+                
+                # Assign NCR defaults
+                self.fields['region'] = '130000000'
+                self.fields['region_name'] = 'National Capital Region (NCR)'
+                self.fields['province'] = '133900000' 
+                self.fields['province_name'] = 'Metro Manila'
+                self.fields['city_code'] = '137404000'
+                
+                # Re-clean up any leftover heuristcs
+                cleaned_str = re.sub(r'CALOOCAN\s*CITY?|CALOOCAN\b', '', upper_addr).strip(' ,')
+                parts = [p.strip() for p in cleaned_str.split(',') if p.strip()]
+                if len(parts) >= 1:
+                    # Last remaining part is likely the Barangay
+                    brgy_str = parts[-1]
+                    if len(brgy_str) > 3 and not re.match(r'^\d+$', brgy_str):
+                        self.fields['barangay'] = brgy_str.title()
+                        self.confidence['barangay'] = 0.70
+                return
+            # Pre-process upper_addr to replace " - 1234" or " 1234" at the end with ", 1234"
+            # This handles cases where ZIP is separated by a dash (common in PhilHealth) or just space
+            normalized_addr = re.sub(r'[\s\-]+(\d{4})\b', r', \1', upper_addr)
+            parts = [p.strip() for p in normalized_addr.split(',') if p.strip()]
+            
+            if len(parts) >= 2:
+                # Find the index of the part containing the ZIP code or use the last part
+                zip_part_idx = len(parts) - 1
+                for i, p in enumerate(parts):
+                    if re.search(r'\b\d{4}\b', p):
+                        zip_part_idx = i
+                        break
+                
+                # Province is usually the part right before or containing the ZIP code
+                prov_str = ""
+                
+                # If ZIP is in its own part (like "BULACAN, 3023" -> parts: "BULACAN", "3023")
+                if re.match(r'^\d{4}$', parts[zip_part_idx].strip()):
+                    prov_idx = zip_part_idx - 1
+                else:
+                    prov_idx = zip_part_idx
+                
+                if prov_idx >= 0:
+                    prov_str = re.sub(r'\b\d{4}\b', '', parts[prov_idx]).strip()
+                    # Clean up random characters that might be left over
+                    prov_str = re.sub(r'[^A-Z\s]', '', prov_str).strip()
+                    if len(prov_str) > 3:
+                        self.fields['province'] = prov_str.title()
+                        self.confidence['province'] = 0.80
+                        print(f"[ADDRESS] Province (Heuristic): {self.fields['province']}")
+                    
+                    city_idx = prov_idx - 1
+                    if city_idx >= 0:
+                        city_str = parts[city_idx].strip()
+                        if len(city_str) > 3:
+                            self.fields['city'] = city_str.title()
+                            self.confidence['city'] = 0.80
+                            print(f"[ADDRESS] City/Muni (Heuristic): {self.fields['city']}")
+                        
+                        brgy_idx = city_idx - 1
+                        if brgy_idx >= 0 and not self.fields.get('barangay'):
+                            brgy_str = parts[brgy_idx].strip()
+                            if len(brgy_str) > 3:
+                                self.fields['barangay'] = brgy_str.title()
+                                self.confidence['barangay'] = 0.70
+                                print(f"[ADDRESS] Barangay (Heuristic): {self.fields['barangay']}")
 
 
 
@@ -904,6 +1154,7 @@ def ocr_dual():
         files = request.files
         front = files.get('front')
         back = files.get('back')
+        id_type_from_request = request.form.get('id_type')
         
         if not front:
             return jsonify({"error": "Front image required"}), 400
@@ -960,12 +1211,13 @@ def ocr_dual():
         
         # Parse combined text
         combined_text = front_text + "\n" + back_text # Combine and Parse
-        parser = PHIDParser()
-        print(f"\n--- COMBINED OCR TEXT ---\n{combined_text}\n------------------------\n")
+        parser = PHIDParser(expected_id_type=id_type_from_request)
+        print(f"\n--- COMBINED OCR TEXT (Type: {id_type_from_request}) ---\n{combined_text}\n------------------------\n")
         
         # Write to file for easier debugging
         try:
             with open("ocr_last_run.txt", "w", encoding="utf-8") as f:
+                f.write(f"EXPECTED ID TYPE: {id_type_from_request}\n")
                 f.write(combined_text)
         except Exception as e:
             print(f"Failed to write OCR debug log: {e}")
@@ -1046,7 +1298,7 @@ def login():
     try:
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, role, status, suffix, patient_number FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        cur.execute("SELECT id, email, password_hash, first_name, last_name, middle_name, date_of_birth, gender, contact_number, philhealth_id, barangay, city, province, house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, role, status, suffix, patient_number, requires_password_change FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
@@ -1088,7 +1340,8 @@ def login():
             "role": user[20],
             "status": user[21],
             "suffix": user[22],
-            "patient_number": user[23]
+            "patient_number": user[23],
+            "requires_password_change": user[24]
         }
         
         
@@ -1671,11 +1924,14 @@ def create_medical_staff():
     try:
         data = request.json
         email = data.get('email')
-        password = data.get('password')
         first_name = data.get('first_name')
         last_name = data.get('last_name')
         role = data.get('role')
         contact = data.get('contact_number', '')
+        
+        # Auto-generate a 10-character secure temporary password
+        import secrets
+        password = secrets.token_hex(5)
         
         # New specialized fields
         prc_license = data.get('prc_license_number', '')
@@ -1683,7 +1939,7 @@ def create_medical_staff():
         schedule = data.get('schedule', '')
         clinic_room = data.get('clinic_room', '')
         
-        if not all([email, password, first_name, last_name, role]):
+        if not all([email, first_name, last_name, role]):
             return jsonify({"error": "Missing required fields"}), 400
             
         hashed = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -1707,8 +1963,8 @@ def create_medical_staff():
 
         # 1. Insert into Users Table
         cur.execute("""
-            INSERT INTO users (email, password_hash, first_name, last_name, role, contact_number, date_of_birth, gender, full_address, barangay, city, province, patient_number)
-            VALUES (%s, %s, %s, %s, %s, %s, '1980-01-01', 'Female', 'Brgy 174 Health Center', 'Brgy 174', 'Caloocan', 'Metro Manila', %s)
+            INSERT INTO users (email, password_hash, first_name, last_name, role, contact_number, date_of_birth, gender, full_address, barangay, city, province, patient_number, requires_password_change)
+            VALUES (%s, %s, %s, %s, %s, %s, '1980-01-01', 'Female', 'Brgy 174 Health Center', 'Brgy 174', 'Caloocan', 'Metro Manila', %s, TRUE)
             RETURNING id
         """, (email, hashed, first_name, last_name, role, contact, patient_number))
         
@@ -1723,6 +1979,12 @@ def create_medical_staff():
         conn.commit()
         cur.close()
         conn.close()
+        
+        # Send the auto-generated password via email
+        try:
+            send_staff_creation_email(mail, email, first_name, role, password)
+        except Exception as e:
+            print(f"Failed to send staff creation email to {email}: {e}")
         
         return jsonify({"message": "Staff account created successfully", "id": new_user_id, "patient_number": patient_number}), 201
         
@@ -2569,6 +2831,82 @@ def restock_inventory_item():
         return jsonify({"message": "Item restocked successfully", "new_quantity": new_quantity, "status": new_status}), 200
     except Exception as e:
         print(f"Error restocking inventory item: {e}")
+        return jsonify({"error": str(e)}), 500
+
+import time
+resend_cooldowns = {}
+
+@app.route("/api/admin/medical-staff/<int:staff_id>/resend-password", methods=["POST"])
+def resend_staff_password(staff_id):
+    try:
+        current_time = time.time()
+        last_sent = resend_cooldowns.get(staff_id, 0)
+        
+        if current_time - last_sent < 60:
+            return jsonify({"error": "Please wait 60 seconds before resending credentials."}), 429
+            
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT email, first_name, role FROM users WHERE id=%s", (staff_id,))
+        user = cur.fetchone()
+        
+        if not user:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "User not found"}), 404
+            
+        email, first_name, role = user
+        import secrets
+        password = secrets.token_hex(5)
+        hashed = bcrypt.generate_password_hash(password).decode('utf-8')
+        
+        cur.execute("UPDATE users SET password_hash=%s, requires_password_change=TRUE WHERE id=%s", (hashed, staff_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        try:
+            send_staff_creation_email(mail, email, first_name, role, password)
+            resend_cooldowns[staff_id] = current_time
+            return jsonify({"message": "Credentials resent successfully"}), 200
+        except Exception as e:
+            print(f"Failed to resend staff password email to {email}: {e}")
+            return jsonify({"error": "Failed to send email"}), 500
+            
+    except Exception as e:
+        print(f"Error resending password: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/change-password", methods=["POST"])
+def change_password():
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not all([user_id, current_password, new_password]):
+            return jsonify({"error": "Missing fields"}), 400
+            
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT password_hash FROM users WHERE id=%s", (user_id,))
+        user = cur.fetchone()
+        
+        if not user or not bcrypt.check_password_hash(user[0], current_password):
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid current password"}), 401
+            
+        new_hashed = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        cur.execute("UPDATE users SET password_hash=%s, requires_password_change=FALSE WHERE id=%s", (new_hashed, user_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"message": "Password changed successfully"}), 200
+    except Exception as e:
+        print(f"Error changing password: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

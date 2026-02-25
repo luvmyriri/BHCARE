@@ -1,0 +1,10 @@
+
+--- Testing PhilHealth Address Parser ---
+Extracted Address Info:
+full_address: VETTALEA HIGHLAND HOMES LOT 1 PHASE 3 BLOCK 6 BULATOK PAGADIAN CITY, ZAMBOANGA DEL SUR - 7016
+street_name: None
+subdivision: Vettalea Highland
+barangay: None
+city: Vettalea Highland Homes Lot 1 Phase 3 Block 6 Bulatok Pagadian City
+province: Zamboanga Del Sur
+zip_code: 7016

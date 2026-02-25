@@ -1,0 +1,18 @@
+
+--- Testing TIN ID Parser ---
+Extracted Fields:
+first_name: Mia
+middle_name: None
+last_name: Dela Cruz
+dob: 1994-09-04
+full_address: 28 Payapa St. Bagong Diwa Sto. Cristobal, Caloocan City
+house_number: 28
+block_number: None
+lot_number: None
+street_name: 28 Payapa
+subdivision: None
+barangay: 28 Payapa St. Bagong Diwa Sto. Cristobal
+city: Caloocan City
+province: 133900000
+zip_code: None
+region: 130000000

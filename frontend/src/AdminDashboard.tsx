@@ -258,6 +258,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     });
 
     const toast = useToast();
+    const [resendCooldowns, setResendCooldowns] = React.useState<Record<number, number>>({});
+
+    const handleResendCredentials = async (staffId: number) => {
+        const now = Date.now();
+        const lastSent = resendCooldowns[staffId] || 0;
+        const secondsLeft = Math.ceil((60000 - (now - lastSent)) / 1000);
+        if (now - lastSent < 60000) {
+            toast({ title: 'Please wait', description: `Resend available in ${secondsLeft}s`, status: 'warning', duration: 3000 });
+            return;
+        }
+        try {
+            const res = await fetch(`/api/admin/medical-staff/${staffId}/resend-password`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                setResendCooldowns(prev => ({ ...prev, [staffId]: now }));
+                toast({ title: 'Credentials Resent', description: 'A new temporary password has been emailed.', status: 'success', duration: 3000 });
+            } else if (res.status === 429) {
+                toast({ title: 'Cooldown Active', description: data.error, status: 'warning', duration: 4000 });
+            } else {
+                toast({ title: 'Error', description: data.error || 'Failed to resend credentials.', status: 'error', duration: 4000 });
+            }
+        } catch (err) {
+            toast({ title: 'Error', description: 'Failed to resend credentials.', status: 'error', duration: 4000 });
+        }
+    };
 
     // Fetch Users
     const fetchUsers = async () => {
@@ -869,6 +894,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     return 0;
                 });
 
+                // Helper to format User IDs by role
+                const formatUserId = (id: number | string, role: string, createdAt: string) => {
+                    if (!id) return '—';
+                    let prefix = 'PT'; // Default Patient
+                    const roleLower = (role || '').toLowerCase();
+                    if (roleLower.includes('doctor')) prefix = 'DR';
+                    else if (roleLower.includes('super admin') || roleLower.includes('superadmin')) prefix = 'SA';
+                    else if (roleLower.includes('medic') || roleLower.includes('staff')) prefix = 'MS';
+                    else if (roleLower.includes('admin')) prefix = 'AD';
+
+                    const year = createdAt ? new Date(createdAt).getFullYear() : new Date().getFullYear();
+                    const paddedId = String(id).padStart(3, '0');
+                    return `${prefix}${year}${paddedId}`;
+                };
+
                 return (
                     <VStack align="stretch" spacing={10}>
                         <PageHero
@@ -897,7 +937,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 <Table variant="simple">
                                     <Thead>
                                         <Tr>
-                                            <Th>Patient ID</Th>
+                                            <Th>User ID</Th>
                                             <Th>Name</Th>
                                             <Th>Email</Th>
                                             <Th>Role</Th>
@@ -909,12 +949,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         {filteredUsers.length > 0 ? (
                                             filteredUsers.map((user) => (
                                                 <Tr key={user.id}>
-                                                    <Td><code style={{ fontSize: '0.8em' }}>{user.patient_number || '—'}</code></Td>
+                                                    <Td><code style={{ fontSize: '0.8em', background: '#f7fafc', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', color: '#4a5568', fontWeight: 600 }}>{formatUserId(user.id, user.role, user.created_at)}</code></Td>
                                                     <Td fontWeight="600">{user.first_name} {user.last_name}</Td>
                                                     <Td>{user.email}</Td>
                                                     <Td>
-                                                        <Badge colorScheme={user.role === 'Administrator' ? 'red' : user.role === 'Medical Staff' ? 'blue' : 'green'}>
-                                                            {user.role}
+                                                        <Badge colorScheme={(user.role || '').toLowerCase().includes('admin') ? 'red' : (user.role || '').toLowerCase().includes('medic') || (user.role || '').toLowerCase().includes('staff') ? 'blue' : (user.role || '').toLowerCase().includes('doctor') ? 'purple' : 'green'}>
+                                                            {(user.role || 'Patient').toLowerCase().includes('admin') ? 'Administrator' : user.role}
                                                         </Badge>
                                                     </Td>
                                                     <Td>{user.created_at || 'N/A'}</Td>
@@ -977,7 +1017,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         <option value="name-desc">Name (Z-A)</option>
                                         <option value="role">Role</option>
                                     </Select>
-                                    <Button size="sm" colorScheme="teal" leftIcon={<FiUsers />} onClick={onAddStaffOpen}>Add New Staff</Button>
+                                    {(user?.role || '').toLowerCase().includes('super') && (
+                                        <Button size="sm" colorScheme="teal" leftIcon={<FiUsers />} onClick={onAddStaffOpen}>Add New Staff</Button>
+                                    )}
                                 </HStack>
                             </Flex>
 
@@ -1029,7 +1071,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                         <Badge variant="subtle" colorScheme="green">Active</Badge>
                                                     </Td>
                                                     <Td>
-                                                        <Button size="xs" variant="ghost" onClick={() => handleEditClick(staff)}>Edit</Button>
+                                                        <HStack spacing={1}>
+                                                            <Button size="xs" variant="ghost" onClick={() => handleEditClick(staff)}>Edit</Button>
+                                                            <Button size="xs" variant="ghost" colorScheme="orange" onClick={() => handleResendCredentials(staff.id)}>Resend</Button>
+                                                        </HStack>
                                                     </Td>
                                                 </Tr>
                                             ))
@@ -1637,16 +1682,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     />
                                 </FormControl>
                             </HStack>
-                            <Divider />
-
-                            <FormControl>
-                                <FormLabel>Temporary Password</FormLabel>
-                                <Input
-                                    value={newStaff.password}
-                                    onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
-                                />
-                                <Text fontSize="xs" color="gray.500" mt={1}>Default: bhcare.staff</Text>
-                            </FormControl>
                         </VStack>
                     </ModalBody>
                     <ModalFooter>

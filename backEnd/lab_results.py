@@ -73,3 +73,34 @@ def create_lab_result():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@lab_results_bp.route('/api/lab-results/<int:result_id>/complete', methods=['PUT'])
+def complete_lab_result(result_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        cursor.execute("""
+            UPDATE lab_results 
+            SET status = 'completed', completed_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            RETURNING *
+        """, (result_id,))
+        
+        updated_result = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        if not updated_result:
+            return jsonify({"error": "Lab result not found"}), 404
+            
+        if updated_result['requested_at']:
+            updated_result['requested_at'] = updated_result['requested_at'].isoformat()
+        if updated_result['completed_at']:
+            updated_result['completed_at'] = updated_result['completed_at'].isoformat()
+            
+        return jsonify(dict(updated_result)), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

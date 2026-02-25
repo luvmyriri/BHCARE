@@ -1,0 +1,14 @@
+
+--- Testing DL Address Parser (Multiline) ---
+Extracted Fields:
+full_address: B11 LtB TAAL ST, MT VIEW SUBD, MUZON, CITY OF SAN JOSE DEL MONTE, BULACAN, 3023
+house_number: None
+block_number: Block 11
+lot_number: Lot 8
+street_name: B11 Ltb Taal
+subdivision: Mt View
+barangay: Muzon
+city: City Of San Jose Del Monte
+province: Bulacan
+zip_code: 3023
+region: None

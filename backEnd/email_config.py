@@ -150,3 +150,49 @@ def send_registration_success_email(mail, recipient_email, first_name):
     )
     
     mail.send(msg)
+
+def send_staff_creation_email(mail, recipient_email, first_name, role, temporary_password):
+    """Send an email with the auto-generated temporary password to new medical staff/doctors"""
+    
+    msg = Message(
+        subject="Welcome to BHCare - Your Staff Account Credentials",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+                    
+                    <h2 style="color: #2c5282; text-align: center;">Account Created Successfully</h2>
+                    
+                    <p>Hello <strong>{first_name}</strong>,</p>
+                    
+                    <p>An administrator has created a <strong>{role}</strong> account for you. Welcome to the team!</p>
+                    
+                    <p>Please use the following temporary password to log into your account:</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <span style="display: inline-block; padding: 15px 30px; background: #f0f4f8; color: #2c5282; border: 2px solid #38b2ac; border-radius: 8px; font-weight: bold; font-size: 24px; letter-spacing: 2px;">{temporary_password}</span>
+                    </div>
+                    
+                    <p style="text-align: center; color: #d69e2e; font-size: 14px;"><strong>We strongly recommend changing your password immediately after logging in.</strong></p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="http://localhost:5173" style="display: inline-block; padding: 12px 24px; background: #38b2ac; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">Access the Portal</a>
+                    </div>
+                    
+                    <p>When logging in, make sure to select the <strong>Medical Staff</strong> portal.</p>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+    
+    mail.send(msg)
