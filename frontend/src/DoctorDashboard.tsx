@@ -50,6 +50,7 @@ import {
     FiMenu,
     FiUser,
     FiSearch,
+    FiFileText,
 } from 'react-icons/fi';
 
 interface DoctorDashboardProps {
@@ -257,7 +258,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
     // Data State
     const [patientsQueue, setPatientsQueue] = useState<any[]>([]);
     const [patients, setPatients] = useState<any[]>([]); // New state for registry
-    const [labResults, setLabResults] = useState<any[]>([]);
+    const [documentRequests, setDocumentRequests] = useState<any[]>([]);
     const [inventory, setInventory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -310,11 +311,11 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     setMedicalRecords(histData);
                 }
 
-                // Fetch Lab Results
-                const labsRes = await fetch('/api/lab-results?status=pending');
-                if (labsRes.ok) {
-                    const labsData = await labsRes.json();
-                    setLabResults(labsData);
+                // Fetch Document Requests
+                const docsRes = await fetch('/api/documents/pending');
+                if (docsRes.ok) {
+                    const docsData = await docsRes.json();
+                    setDocumentRequests(docsData);
                 }
 
                 // Fetch Inventory
@@ -379,179 +380,232 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
             case 'patients':
                 return (
                     <>
-                        <ModalHeader>Patients Today Queue</ModalHeader>
-                        <ModalBody>
-                            <Box overflowX="auto">
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiUsers} boxSize={6} />
+                                <Text>Patients Today Queue</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
                                 <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Time</Th><Th>Patient</Th><Th>Status</Th><Th>Action</Th></Tr></Thead>
+                                    <Thead bg="gray.50">
+                                        <Tr>
+                                            <Th py={4} color="gray.600">Time</Th>
+                                            <Th py={4} color="gray.600">Patient</Th>
+                                            <Th py={4} color="gray.600">Status</Th>
+                                            <Th py={4} color="gray.600">Action</Th>
+                                        </Tr>
+                                    </Thead>
                                     <Tbody>
-                                        {patientsQueue.map((p) => (
-                                            <Tr key={p.id}>
-                                                <Td>{p.appointment_time}</Td>
-                                                <Td>{p.first_name} {p.last_name}</Td>
-                                                <Td><Badge colorScheme="orange">{p.status}</Badge></Td>
-                                                <Td>
-                                                    <Button size="xs" colorScheme="teal" onClick={() => handleOpenSoap(p.user_id)}>SOAP</Button>
-                                                </Td>
-                                            </Tr>
-                                        ))}
-                                    </Tbody>
-                                </Table>
-                            </Box>
-                        </ModalBody>
-                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
-                    </>
-                );
-            case 'consultations':
-                return (
-                    <>
-                        <ModalHeader>Completed Consultations</ModalHeader>
-                        <ModalBody>
-                            <Box overflowX="auto">
-                                <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Time</Th><Th>Patient</Th><Th>Diagnosis</Th></Tr></Thead>
-                                    <Tbody>
-                                        {patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').length > 0 ? (
-                                            patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').map(p => (
-                                                <Tr key={p.id}>
+                                        {patientsQueue.length > 0 ? (
+                                            patientsQueue.map((p) => (
+                                                <Tr key={p.id} _hover={{ bg: "gray.50", transition: "0.2s" }}>
                                                     <Td>{p.appointment_time}</Td>
-                                                    <Td>{p.first_name} {p.last_name}</Td>
-                                                    <Td>{p.diagnosis || 'N/A'}</Td>
-                                                </Tr>
-                                            ))
-                                        ) : (
-                                            <Tr>
-                                                <Td colSpan={3} textAlign="center" color="gray.500">No completed consultations yet.</Td>
-                                            </Tr>
-                                        )}
-                                    </Tbody>
-                                </Table>
-                            </Box>
-                        </ModalBody>
-                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
-                    </>
-                );
-            case 'critical':
-                return (
-                    <>
-                        <ModalHeader>Critical & High Priority Cases</ModalHeader>
-                        <ModalBody>
-                            <Box overflowX="auto">
-                                <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Patient</Th><Th>Priority</Th><Th>Status</Th></Tr></Thead>
-                                    <Tbody>
-                                        {patientsQueue.filter(p => p.priority === 'critical' || p.priority === 'high').length > 0 ? (
-                                            patientsQueue.filter(p => p.priority === 'critical' || p.priority === 'high').map(p => (
-                                                <Tr key={p.id}>
-                                                    <Td>{p.first_name} {p.last_name}</Td>
-                                                    <Td><Badge colorScheme="red">{p.priority}</Badge></Td>
-                                                    <Td>{p.status}</Td>
-                                                </Tr>
-                                            ))
-                                        ) : (
-                                            <Tr>
-                                                <Td colSpan={3} textAlign="center" color="gray.500">No critical cases flagged for today.</Td>
-                                            </Tr>
-                                        )}
-                                    </Tbody>
-                                </Table>
-                            </Box>
-                        </ModalBody>
-                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
-                    </>
-                );
-            case 'labs':
-                return (
-                    <>
-                        <ModalHeader>Pending Laboratory Results</ModalHeader>
-                        <ModalBody>
-                            <Box overflowX="auto">
-                                <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Patient</Th><Th>Test</Th><Th>Status</Th><Th>Action</Th></Tr></Thead>
-                                    <Tbody>
-                                        {labResults.length > 0 ? (
-                                            labResults.map((lab: any) => (
-                                                <Tr key={lab.id}>
-                                                    <Td>{lab.first_name} {lab.last_name}</Td>
-                                                    <Td>{lab.test_type}</Td>
+                                                    <Td fontWeight="700" color="teal.700">{p.first_name} {p.last_name}</Td>
                                                     <Td>
-                                                        <Badge colorScheme={lab.status === 'completed' ? 'green' : lab.status === 'processing' ? 'yellow' : 'gray'}>
-                                                            {lab.status}
+                                                        <Badge colorScheme={p.status === 'consulting' ? 'green' : p.status === 'waiting' ? 'orange' : 'gray'} px={3} py={1} borderRadius="full">
+                                                            {p.status}
                                                         </Badge>
                                                     </Td>
                                                     <Td>
-                                                        <Button size="xs" colorScheme="blue" onClick={async () => {
-                                                            try {
-                                                                await fetch(`/api/lab-results/${lab.id}/complete`, { method: 'PUT' });
-                                                                setLabResults(prev => prev.filter(l => l.id !== lab.id));
-                                                            } catch (err) {
-                                                                console.error("Failed to complete lab result", err);
-                                                            }
-                                                            onClose(); // Close the Labs modal
-                                                            handleOpenSoap(lab.patient_id); // Open SOAP modal
-                                                        }}>
-                                                            Done
+                                                        <Button size="sm" colorScheme="teal" onClick={() => handleOpenSoap(p.user_id)} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>
+                                                            SOAP
                                                         </Button>
                                                     </Td>
                                                 </Tr>
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={4} textAlign="center" color="gray.500">No pending results</Td>
+                                                <Td colSpan={4} py={10}>
+                                                    <VStack color="gray.400" spacing={3}>
+                                                        <Icon as={FiUsers} boxSize={12} color="gray.300" />
+                                                        <Text fontSize="md" fontWeight="500">No patients in the queue for today.</Text>
+                                                    </VStack>
+                                                </Td>
                                             </Tr>
                                         )}
                                     </Tbody>
                                 </Table>
                             </Box>
                         </ModalBody>
-                        <ModalFooter><Button colorScheme="teal" onClick={onClose}>Close</Button></ModalFooter>
+                        <ModalFooter bg="gray.50" borderTopWidth="1px">
+                            <Button colorScheme="teal" variant="ghost" onClick={onClose}>Close</Button>
+                        </ModalFooter>
+                    </>
+                );
+            case 'consultations':
+                return (
+                    <>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiClipboard} boxSize={6} />
+                                <Text>Completed Consultations</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                <Table variant="simple" size="sm">
+                                    <Thead bg="gray.50">
+                                        <Tr>
+                                            <Th py={4} color="gray.600">Time</Th>
+                                            <Th py={4} color="gray.600">Patient</Th>
+                                            <Th py={4} color="gray.600">Diagnosis</Th>
+                                        </Tr>
+                                    </Thead>
+                                    <Tbody>
+                                        {patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').length > 0 ? (
+                                            patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').map(p => (
+                                                <Tr key={p.id} _hover={{ bg: "gray.50", transition: "0.2s" }}>
+                                                    <Td>{p.appointment_time}</Td>
+                                                    <Td fontWeight="700" color="teal.700">{p.first_name} {p.last_name}</Td>
+                                                    <Td>
+                                                        <Text fontSize="sm" color="gray.700">{p.diagnosis || 'N/A'}</Text>
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={3} py={10}>
+                                                    <VStack color="gray.400" spacing={3}>
+                                                        <Icon as={FiClipboard} boxSize={12} color="gray.300" />
+                                                        <Text fontSize="md" fontWeight="500">No completed consultations yet.</Text>
+                                                    </VStack>
+                                                </Td>
+                                            </Tr>
+                                        )}
+                                    </Tbody>
+                                </Table>
+                            </Box>
+                        </ModalBody>
+                        <ModalFooter bg="gray.50" borderTopWidth="1px">
+                            <Button colorScheme="teal" variant="ghost" onClick={onClose}>Close</Button>
+                        </ModalFooter>
+                    </>
+                );
+
+            case 'docs':
+                return (
+                    <>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiFileText} boxSize={6} />
+                                <Text>Pending Document Requests</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                <Table variant="simple" size="sm">
+                                    <Thead bg="gray.50">
+                                        <Tr>
+                                            <Th py={4} color="gray.600">Date Req</Th>
+                                            <Th py={4} color="gray.600">Patient Info</Th>
+                                            <Th py={4} color="gray.600">Document Type</Th>
+                                            <Th py={4} color="gray.600">Evaluation Details</Th>
+                                            <Th py={4} color="gray.600">Action</Th>
+                                        </Tr>
+                                    </Thead>
+                                    <Tbody>
+                                        {documentRequests.length > 0 ? (
+                                            documentRequests.map((doc: any) => (
+                                                <Tr key={doc.id} _hover={{ bg: "gray.50", transition: "0.2s" }}>
+                                                    <Td>{doc.created_at}</Td>
+                                                    <Td fontWeight="700" color="teal.700">{doc.first_name} {doc.last_name}</Td>
+                                                    <Td>
+                                                        <Badge colorScheme={doc.document_type.includes('Clearance') ? 'orange' : 'purple'} px={3} py={1} borderRadius="full">
+                                                            {doc.document_type}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td>
+                                                        <VStack align="start" spacing={1} maxW="250px">
+                                                            <Text fontSize="xs" fontWeight="bold" color="gray.600">Reason: <Text as="span" fontWeight="normal" color="gray.900">{doc.reason || 'N/A'}</Text></Text>
+                                                            <Text fontSize="xs" fontWeight="bold" color="gray.600">Condition: <Text as="span" fontWeight="normal" color="gray.900">{doc.sickness || 'N/A'}</Text></Text>
+                                                        </VStack>
+                                                    </Td>
+                                                    <Td>
+                                                        <Button size="sm" colorScheme="blue" leftIcon={<Icon as={FiClipboard} />} onClick={async () => {
+                                                            try {
+                                                                await fetch(`/api/documents/${doc.id}/complete`, { method: 'PUT' });
+                                                                setDocumentRequests(prev => prev.filter(d => d.id !== doc.id));
+                                                            } catch (err) {
+                                                                console.error("Failed to complete document request", err);
+                                                            }
+                                                        }}
+                                                            _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}
+                                                        >
+                                                            Mark as Done
+                                                        </Button>
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={5} py={10}>
+                                                    <VStack color="gray.400" spacing={3}>
+                                                        <Icon as={FiFileText} boxSize={12} color="gray.300" />
+                                                        <Text fontSize="md" fontWeight="500">No pending document requests at the moment.</Text>
+                                                    </VStack>
+                                                </Td>
+                                            </Tr>
+                                        )}
+                                    </Tbody>
+                                </Table>
+                            </Box>
+                        </ModalBody>
+                        <ModalFooter bg="gray.50" borderTopWidth="1px">
+                            <Button colorScheme="teal" variant="ghost" onClick={onClose} mr={3}>Close</Button>
+                        </ModalFooter>
                     </>
                 );
             case 'history-view':
                 return (
                     <>
-                        <ModalHeader>Medical History: {selectedHistory?.patient?.first_name} {selectedHistory?.patient?.last_name}</ModalHeader>
-                        <ModalBody>
-                            <VStack align="stretch" spacing={4}>
-                                <Box p={4} bg="gray.50" borderRadius="md">
-                                    <Heading size="sm" mb={2}>Patient Profile</Heading>
-                                    <Text fontSize="sm"><b>ID:</b> {selectedHistory?.patient?.p_id}</Text>
-                                    <Text fontSize="sm"><b>Age/Gender:</b> {selectedHistory?.patient?.age} / {selectedHistory?.patient?.gender}</Text>
-                                    <Text fontSize="sm"><b>Contact:</b> {selectedHistory?.patient?.contact_number}</Text>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiClipboard} boxSize={6} />
+                                <Text>Medical History: {selectedHistory?.patient?.first_name} {selectedHistory?.patient?.last_name}</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            <VStack align="stretch" spacing={6}>
+                                <Box p={5} bg="blue.50" borderRadius="xl" border="1px solid" borderColor="blue.100">
+                                    <Heading size="sm" mb={3} color="blue.800">Patient Profile</Heading>
+                                    <SimpleGrid columns={2} spacing={2}>
+                                        <Text fontSize="sm"><Text as="span" fontWeight="800">ID:</Text> {selectedHistory?.patient?.p_id}</Text>
+                                        <Text fontSize="sm"><Text as="span" fontWeight="800">Age/Gender:</Text> {selectedHistory?.patient?.age} / {selectedHistory?.patient?.gender}</Text>
+                                        <Text fontSize="sm"><Text as="span" fontWeight="800">Contact:</Text> {selectedHistory?.patient?.contact_number}</Text>
+                                    </SimpleGrid>
                                 </Box>
 
-                                <Divider />
-                                <Heading size="md" color="teal.800">Clinical Notes</Heading>
+                                <Heading size="md" color="teal.800" mt={2}>Clinical Notes</Heading>
 
                                 {selectedHistory?.records && selectedHistory.records.length > 0 ? (
-                                    selectedHistory.records.map((record: any, index: number) => (
-                                        <Box key={index} p={4} borderWidth="1px" borderRadius="lg" borderColor="gray.200">
-                                            <Flex justify="space-between" mb={2}>
-                                                <Text fontWeight="bold" color="teal.600">{record.created_at}</Text>
-                                                <Badge colorScheme="purple">{record.doctor_name || 'Medical Officer'}</Badge>
-                                            </Flex>
-                                            <VStack align="start" spacing={1} pl={2} borderLeft="2px solid" borderColor="teal.100">
-                                                <Text fontSize="sm"><b>S:</b> {record.subjective}</Text>
-                                                <Text fontSize="sm"><b>O:</b> {record.objective}</Text>
-                                                <Text fontSize="sm"><b>A:</b> {record.assessment}</Text>
-                                                <Text fontSize="sm"><b>P:</b> {record.plan}</Text>
-                                            </VStack>
-                                        </Box>
-                                    ))
+                                    <VStack spacing={4} align="stretch">
+                                        {selectedHistory.records.map((record: any, index: number) => (
+                                            <Box key={index} p={5} bg="white" borderWidth="1px" borderRadius="xl" borderColor="gray.200" boxShadow="sm" _hover={{ boxShadow: 'md', borderColor: 'teal.200', transition: '0.2s' }}>
+                                                <Flex justify="space-between" align="center" mb={4}>
+                                                    <Text fontWeight="bold" fontSize="sm" color="teal.600">{record.created_at}</Text>
+                                                    <Badge colorScheme="purple" borderRadius="full" px={3} py={1}>{record.doctor_name || 'Medical Officer'}</Badge>
+                                                </Flex>
+                                                <VStack align="start" spacing={2} pl={4} borderLeft="3px solid" borderColor="teal.200">
+                                                    <Text fontSize="sm"><Text as="span" fontWeight="800" color="gray.700">S:</Text> {record.subjective}</Text>
+                                                    <Text fontSize="sm"><Text as="span" fontWeight="800" color="gray.700">O:</Text> {record.objective}</Text>
+                                                    <Text fontSize="sm"><Text as="span" fontWeight="800" color="gray.700">A:</Text> {record.assessment}</Text>
+                                                    <Text fontSize="sm"><Text as="span" fontWeight="800" color="gray.700">P:</Text> {record.plan}</Text>
+                                                </VStack>
+                                            </Box>
+                                        ))}
+                                    </VStack>
                                 ) : (
-                                    <Text color="gray.500" fontStyle="italic">No medical records found for this patient.</Text>
+                                    <Box py={8} textAlign="center">
+                                        <Text color="gray.500" fontStyle="italic">No medical records found for this patient.</Text>
+                                    </Box>
                                 )}
                             </VStack>
                         </ModalBody>
-                        <ModalFooter>
-                            <Button colorScheme="teal" mr={3} onClick={onClose}>
+                        <ModalFooter bg="gray.50" borderTopWidth="1px">
+                            <Button colorScheme="teal" onClick={onClose}>
                                 Close
-                            </Button>
-                            <Button variant="ghost" onClick={() => {
-                                onClose();
-                                handleOpenSoap(selectedHistory?.patient?.user_id || selectedHistory?.patient?.id);
-                            }}>
-                                Add New SOAP Note
                             </Button>
                         </ModalFooter>
                     </>
@@ -586,7 +640,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             description={`You have ${patientsQueue.length} appointments scheduled for today. ${patientsQueue.filter(p => p.status === 'waiting' || p.status === 'pending').length} patients are currently in the waiting area.`}
                         />
 
-                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={8}>
+                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={8}>
                             <DoctorStatCard label="Patients Today" value={patientsQueue.length || "0"} icon={FiUsers} color="teal" onClick={() => handleCardClick('patients')} />
                             <DoctorStatCard
                                 label="Consultations Done"
@@ -595,14 +649,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                 color="orange"
                                 onClick={() => handleCardClick('consultations')}
                             />
-                            <DoctorStatCard
-                                label="Critical Cases"
-                                value={patientsQueue.filter(p => p.priority === 'critical' || p.priority === 'high').length.toString()}
-                                icon={FiActivity}
-                                color="red"
-                                onClick={() => handleCardClick('critical')}
-                            />
-                            <DoctorStatCard label="Pending Lab Results" value={labResults.length || "0"} icon={FiBox} color="orange" onClick={() => handleCardClick('labs')} />
+                            <DoctorStatCard label="Pending Document Requests" value={documentRequests.length || "0"} icon={FiFileText} color="orange" onClick={() => handleCardClick('docs')} />
                         </SimpleGrid>
 
                         <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
@@ -757,20 +804,67 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             description="Manage your clinic availability and view upcoming appointments in a detailed calendar view."
                         />
                         <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
-                            <Flex justify="space-between" mb={6}>
-                                <Heading size="md" color="teal.800">My Schedule & Assignment</Heading>
+                            <Flex justify="space-between" align="center" mb={6}>
+                                <Heading size="md" color="teal.800">Health Center Schedule</Heading>
+                                <Badge colorScheme="teal" variant="subtle" px={3} py={1} borderRadius="full" fontSize="xs">
+                                    Brgy. 174 Health Center
+                                </Badge>
                             </Flex>
-                            <VStack align="start" spacing={4}>
-                                <Box p={4} bg="teal.50" borderRadius="xl" w="full">
-                                    <Heading size="sm" color="teal.700" mb={2}>Assigned Clinic Room</Heading>
-                                    <Text fontSize="lg" fontWeight="bold">{user?.clinic_room || 'Not Assigned'}</Text>
+
+                            {/* Schedule Table */}
+                            <Box overflowX="auto">
+                                <Box as="table" w="full" style={{ borderCollapse: 'collapse' }}>
+                                    <Box as="thead">
+                                        <Box as="tr" bg="teal.50">
+                                            <Box as="th" p={3} textAlign="left" fontSize="xs" fontWeight="bold" color="teal.700" textTransform="uppercase" letterSpacing="wide" borderBottom="2px solid" borderColor="teal.100">
+                                                Service
+                                            </Box>
+                                            <Box as="th" p={3} textAlign="left" fontSize="xs" fontWeight="bold" color="teal.700" textTransform="uppercase" letterSpacing="wide" borderBottom="2px solid" borderColor="teal.100">
+                                                Days
+                                            </Box>
+                                            <Box as="th" p={3} textAlign="left" fontSize="xs" fontWeight="bold" color="teal.700" textTransform="uppercase" letterSpacing="wide" borderBottom="2px solid" borderColor="teal.100">
+                                                Hours
+                                            </Box>
+                                            <Box as="th" p={3} textAlign="left" fontSize="xs" fontWeight="bold" color="teal.700" textTransform="uppercase" letterSpacing="wide" borderBottom="2px solid" borderColor="teal.100">
+                                                Status
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                    <Box as="tbody">
+                                        {[
+                                            { service: "General Consultation", days: "Mon – Fri", hours: "8:00 AM – 5:00 PM" },
+                                            { service: "Dental Care", days: "Mon, Wed, Fri", hours: "8:00 AM – 5:00 PM" },
+                                            { service: "Prenatal / Maternal", days: "Mon, Wed", hours: "8:00 AM – 12:00 PM" },
+                                            { service: "Immunization", days: "Tue, Thu", hours: "8:00 AM – 12:00 PM" },
+                                            { service: "Family Planning", days: "Tue, Thu", hours: "1:00 PM – 5:00 PM" },
+                                            { service: "TB / DOTS", days: "Mon – Fri", hours: "1:00 PM – 3:00 PM" },
+                                            { service: "Nutrition Counseling", days: "Wed, Fri", hours: "8:00 AM – 12:00 PM" },
+                                            { service: "Cervical Cancer Screening", days: "First Fri of the month", hours: "8:00 AM – 12:00 PM" },
+                                        ].map((row, i) => (
+                                            <Box as="tr" key={i} _hover={{ bg: 'gray.50' }} transition="background 0.15s">
+                                                <Box as="td" p={3} borderBottom="1px solid" borderColor="gray.100">
+                                                    <Text fontWeight="semibold" fontSize="sm" color="gray.800">{row.service}</Text>
+                                                </Box>
+                                                <Box as="td" p={3} borderBottom="1px solid" borderColor="gray.100">
+                                                    <Text fontSize="sm" color="gray.600">{row.days}</Text>
+                                                </Box>
+                                                <Box as="td" p={3} borderBottom="1px solid" borderColor="gray.100">
+                                                    <Text fontSize="sm" color="gray.600">{row.hours}</Text>
+                                                </Box>
+                                                <Box as="td" p={3} borderBottom="1px solid" borderColor="gray.100">
+                                                    <Badge colorScheme="teal" variant="subtle" fontSize="xs">Open</Badge>
+                                                </Box>
+                                            </Box>
+                                        ))}
+                                    </Box>
                                 </Box>
-                                <Box p={4} bg="orange.50" borderRadius="xl" w="full">
-                                    <Heading size="sm" color="orange.700" mb={2}>Weekly Schedule</Heading>
-                                    <Text fontSize="lg" fontWeight="bold">{user?.schedule || 'No Schedule Available'}</Text>
-                                    <Text fontSize="sm" color="gray.600" mt={1}>Please contact administration for schedule changes.</Text>
-                                </Box>
-                            </VStack>
+                            </Box>
+
+                            <Box mt={5} p={3} bg="orange.50" borderRadius="xl" borderLeft="3px solid" borderColor="orange.300">
+                                <Text fontSize="xs" color="orange.700" fontWeight="medium">
+                                    ⚠️ Schedule is subject to change during holidays or special health programs. Contact administration for updates.
+                                </Text>
+                            </Box>
                         </Box>
                     </VStack>
                 );
@@ -1091,21 +1185,28 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 </Box>
             </Box>
 
-            <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalCloseButton />
+            <Modal isOpen={isOpen} onClose={onClose} size={['docs', 'patients', 'consultations', 'history-view', 'soap'].includes(selectedCard as string) ? '4xl' : 'xl'} isCentered scrollBehavior="inside">
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent
+                    borderRadius={['docs', 'patients', 'consultations', 'history-view', 'soap'].includes(selectedCard as string) ? '2xl' : 'md'}
+                    overflow="hidden"
+                    bg={selectedCard === 'soap' ? 'transparent' : 'white'}
+                    boxShadow={selectedCard === 'soap' ? 'none' : 'sm'}
+                >
+                    {selectedCard !== 'soap' && <ModalCloseButton mt={['docs', 'patients', 'consultations', 'history-view'].includes(selectedCard as string) ? 2 : 0} zIndex={10} />}
                     {renderModalContent()}
                 </ModalContent>
             </Modal>
 
             {/* Add Inventory Modal */}
-            <Modal isOpen={isAddInventoryOpen} onClose={onAddInventoryClose}>
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Add New Inventory Item</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
+            <Modal isOpen={isAddInventoryOpen} onClose={onAddInventoryClose} isCentered>
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius="2xl" overflow="hidden">
+                    <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                        Add New Inventory Item
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
                         <VStack spacing={4}>
                             <Box w="full">
                                 <Text mb={1} fontSize="sm" fontWeight="bold">Item Name</Text>
@@ -1148,7 +1249,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             </HStack>
                         </VStack>
                     </ModalBody>
-                    <ModalFooter>
+                    <ModalFooter bg="gray.50" borderTopWidth="1px">
                         <Button variant="ghost" mr={3} onClick={onAddInventoryClose}>Cancel</Button>
                         <Button colorScheme="teal" onClick={handleAddInventoryItem}>Add Item</Button>
                     </ModalFooter>
@@ -1156,12 +1257,14 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
             </Modal>
 
             {/* Restock Inventory Modal */}
-            <Modal isOpen={isRestockOpen} onClose={onRestockClose} size="sm">
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Restock Item</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
+            <Modal isOpen={isRestockOpen} onClose={onRestockClose} size="sm" isCentered>
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius="2xl" overflow="hidden">
+                    <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                        Restock Item
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
                         <VStack spacing={4}>
                             <Box w="full">
                                 <Text mb={1} fontSize="sm" fontWeight="bold">Quantity to Add</Text>
@@ -1177,7 +1280,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             </Box>
                         </VStack>
                     </ModalBody>
-                    <ModalFooter>
+                    <ModalFooter bg="gray.50" borderTopWidth="1px">
                         <Button variant="ghost" mr={3} onClick={onRestockClose}>Cancel</Button>
                         <Button colorScheme="teal" onClick={handleRestockItem}>Confirm Restock</Button>
                     </ModalFooter>

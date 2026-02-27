@@ -23,7 +23,8 @@ from email_config import (
     invalidate_reset_token,
     send_password_reset_email,
     send_registration_success_email,
-    send_staff_creation_email
+    send_staff_creation_email,
+    send_document_ready_email
 )
 
 load_dotenv()
@@ -1381,7 +1382,23 @@ def register():
         full_address = data.get('full_address', '')
         suffix = data.get('suffix', '')
         
-        if not all([email, password, first_name, last_name, dob, gender, contact, barangay, city, province]):
+        # Compile full address if not provided by OCR/frontend
+        if not full_address:
+            address_parts = []
+            if house_number: address_parts.append(f"House {house_number}")
+            if block_number: address_parts.append(f"Blk {block_number}")
+            if lot_number: address_parts.append(f"Lot {lot_number}")
+            if street_name: address_parts.append(street_name.strip())
+            if subdivision: address_parts.append(subdivision.strip())
+            if barangay: address_parts.append(barangay.strip())
+            if city: address_parts.append(city.strip())
+            if province: address_parts.append(province.strip())
+            if zip_code: address_parts.append(zip_code.strip())
+            full_address = ", ".join([p for p in address_parts if p])
+            
+
+        
+        if not all([email, password, first_name, last_name, dob, gender, contact, barangay, city]):
             return jsonify({"error": "Missing required fields"}), 400
         
         conn = get_db()
@@ -1630,7 +1647,7 @@ def get_all_users():
         query = """
             SELECT 
                 id, patient_number, first_name, last_name, email, 
-                contact_number, gender, date_of_birth,
+                contact_number, gender, date_of_birth, full_address,
                 barangay, city, role, created_at, status, suffix
             FROM users 
             ORDER BY created_at DESC
@@ -2372,17 +2389,28 @@ def get_admin_activities():
             })
 
         # Recent Users (using ID as proxy for recency)
-        cur.execute("SELECT first_name, last_name, role, id, email, patient_number FROM users ORDER BY id DESC LIMIT 3")
+        cur.execute("SELECT first_name, last_name, role, id, email, patient_number, created_at FROM users ORDER BY id DESC LIMIT 3")
         user_recs = cur.fetchall()
         for u in user_recs:
+            role_lower = str(u['role']).lower() if u['role'] else ''
+            prefix = 'PT'
+            if 'doctor' in role_lower: prefix = 'DR'
+            elif 'super admin' in role_lower or 'superadmin' in role_lower: prefix = 'SA'
+            elif 'medic' in role_lower or 'staff' in role_lower: prefix = 'MS'
+            elif 'admin' in role_lower: prefix = 'AD'
+            
+            year = u['created_at'].year if u.get('created_at') else datetime.now().year
+            padded_id = str(u['id']).zfill(3)
+            formatted_id = f"{prefix}{year}{padded_id}"
+
             activities.append({
                 "id": str(u['id']),
                 "user": f"{u['first_name']} {u['last_name']}",
                 "action": f"New user registered as {u['role']}",
-                "time": "Recently", # simplified
+                "time": u['created_at'].strftime('%Y-%m-%d %H:%M') if u.get('created_at') else "Recently",
                 "type": "USER",
-                "details": f"Email: {u.get('email', 'N/A')} | Role: {u['role']} | Patient ID: {u.get('patient_number') or 'N/A'}",
-                "sort_key": f"9999-{u['id']}" # forceful float to top if simplified
+                "details": f"Email: {u.get('email', 'N/A')} | Role: {u['role']} | User ID: {formatted_id}",
+                "sort_key": u['created_at'].strftime('%Y-%m-%d %H:%M:%S') if u.get('created_at') else f"9999-{u['id']}"
             })
 
         # Sort combined list (simplistic sort)
@@ -2833,6 +2861,122 @@ def restock_inventory_item():
         print(f"Error restocking inventory item: {e}")
         return jsonify({"error": str(e)}), 500
 
+# ============= DOCUMENT REQUEST ENDPOINTS =============
+@app.route("/api/documents/request", methods=["POST"])
+def request_document():
+    """Submit a request for a medical certificate or health clearance"""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        document_type = data.get('document_type')
+        reason = data.get('reason')
+        sickness = data.get('sickness')
+        consultation_acknowledged = data.get('consultation_acknowledged')
+        
+        if not all([user_id, document_type, reason, sickness, consultation_acknowledged]):
+            return jsonify({"error": "Missing required fields"}), 400
+            
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO document_requests (user_id, document_type, reason, sickness, consultation_acknowledged, status) 
+               VALUES (%s, %s, %s, %s, %s, 'pending') RETURNING id""",
+            (user_id, document_type, reason, sickness, consultation_acknowledged)
+        )
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"message": f"{document_type} requested successfully", "id": new_id}), 201
+    except Exception as e:
+        print(f"Error requesting document: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/documents/pending", methods=["GET"])
+def get_pending_documents():
+    """Get all pending document requests for doctor dashboard"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT d.id, d.document_type, d.reason, d.sickness, d.status, d.created_at, 
+                   u.first_name, u.last_name, u.id as patient_id
+            FROM document_requests d
+            JOIN users u ON d.user_id = u.id
+            WHERE d.status = 'pending'
+            ORDER BY d.created_at ASC
+        """)
+        requests = cur.fetchall()
+        
+        request_list = []
+        for req in requests:
+            req_dict = dict(req)
+            if req_dict.get('created_at'):
+                req_dict['created_at'] = req_dict['created_at'].strftime('%Y-%m-%d %H:%M')
+            request_list.append(req_dict)
+            
+        cur.close()
+        conn.close()
+        return jsonify(request_list), 200
+    except Exception as e:
+        print(f"Error fetching pending requests: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/documents/<int:doc_id>/complete", methods=["PUT"])
+def complete_document_request(doc_id):
+    """Mark a document request as completed, create a notification, and send an email"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # 1. Update the document status and fetch details needed for notification/email
+        cur.execute("""
+            UPDATE document_requests 
+            SET status = 'completed', completed_at = CURRENT_TIMESTAMP 
+            WHERE id = %s
+            RETURNING user_id, document_type
+        """, (doc_id,))
+        
+        updated_doc = cur.fetchone()
+        
+        if not updated_doc:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Request not found"}), 404
+            
+        user_id = updated_doc['user_id']
+        document_type = updated_doc['document_type']
+        
+        # 2. Fetch user details for the email and notification
+        cur.execute("SELECT first_name, email FROM users WHERE id = %s", (user_id,))
+        user = cur.fetchone()
+        
+        # 3. Insert in-app notification
+        notification_message = f"Your requested {document_type} is now ready for pickup at the center."
+        
+        cur.execute("""
+            INSERT INTO notifications (user_id, message, type, is_read)
+            VALUES (%s, %s, %s, false)
+        """, (user_id, notification_message, 'system'))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # 4. Attempt to send Email (fail silently if email fails so the DB transaction still succeeds)
+        if user and user.get('email'):
+            try:
+                from flask import current_app
+                send_document_ready_email(mail, user['email'], user['first_name'], document_type)
+            except Exception as email_err:
+                print(f"Non-fatal error: Failed to send document ready email: {email_err}")
+        
+        return jsonify({"message": "Document marked as completed and patient notified"}), 200
+    except Exception as e:
+        print(f"Error completing document request: {e}")
+        return jsonify({"error": str(e)}), 500
+
 import time
 resend_cooldowns = {}
 
@@ -2908,6 +3052,162 @@ def change_password():
     except Exception as e:
         print(f"Error changing password: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PREDICTIVE RESOURCE ANALYTICS
+# Sources: appointment logs + actual inventory table. No hardcoded supply lists.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/admin/predictive-insights", methods=["GET"])
+def predictive_insights():
+    """
+    Analyzes appointment patterns and cross-references actual inventory to surface
+    items that may need restocking. No clinical data is used.
+    """
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # ── 1. Top services (last 90 days + upcoming) ───────────────────────
+        cur.execute("""
+            SELECT
+                LOWER(service_type) AS service,
+                COUNT(*) AS total,
+                SUM(CASE WHEN status IN ('pending', 'approved', 'confirmed') THEN 1 ELSE 0 END) AS upcoming,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed
+            FROM appointments
+            WHERE status != 'cancelled'
+              AND appointment_date >= CURRENT_DATE - INTERVAL '90 days'
+            GROUP BY LOWER(service_type)
+            ORDER BY total DESC
+            LIMIT 10
+        """)
+        service_rows = cur.fetchall()
+
+        # ── 2. Busiest day of week ───────────────────────────────────────────
+        cur.execute("""
+            SELECT
+                EXTRACT(DOW FROM appointment_date)::int AS day_num,
+                COUNT(*) AS appt_count
+            FROM appointments
+            WHERE status != 'cancelled'
+            GROUP BY day_num
+            ORDER BY appt_count DESC
+            LIMIT 1
+        """)
+        busiest_day_row = cur.fetchone()
+
+        # ── 3. Next 7-day upcoming summary per service ───────────────────────
+        cur.execute("""
+            SELECT
+                LOWER(service_type) AS service,
+                COUNT(*) AS upcoming_count
+            FROM appointments
+            WHERE status IN ('pending', 'approved', 'confirmed')
+              AND appointment_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+            GROUP BY LOWER(service_type)
+            ORDER BY upcoming_count DESC
+            LIMIT 5
+        """)
+        next_week_rows = cur.fetchall()
+
+        # ── 4. Fetch REAL inventory from the database ────────────────────────
+        cur.execute("""
+            SELECT id, item_name, category, stock_quantity, unit, status
+            FROM inventory
+            ORDER BY stock_quantity ASC
+        """)
+        inventory_rows = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        # ── Build top_services list ──────────────────────────────────────────
+        top_services = []
+        high_demand_keywords = set()  # keywords from service names to match against inventory
+        for row in service_rows:
+            svc = row['service']
+            total = int(row['total'] or 0)
+            upcoming = int(row['upcoming'] or 0)
+            top_services.append({
+                "service": svc.title(),
+                "total": total,
+                "upcoming": upcoming,
+                "completed": int(row['completed'] or 0)
+            })
+            # Extract individual words from service name for keyword matching
+            for word in svc.split():
+                if len(word) > 3:  # skip short words like 'of', 'and'
+                    high_demand_keywords.add(word.lower())
+
+        # ── Cross-reference inventory with demand keywords ───────────────────
+        # Score each inventory item: lower stock = higher urgency; match on
+        # keywords from booked services = extra relevance points.
+        recommended_inventory = []
+        for item in inventory_rows:
+            name = item['item_name'] or ''
+            name_lower = name.lower()
+            stock = int(item['stock_quantity'] or 0)
+            status = item['status'] or 'Good'
+
+            # Relevance: does this item name contain any high-demand service keyword?
+            relevance = sum(1 for kw in high_demand_keywords if kw in name_lower)
+
+            # Base urgency from stock level and status flags
+            if status in ('Low Stock', 'Critical') or stock == 0:
+                urgency_score = 1000 - stock  # always surface critical items
+            elif stock <= 10:
+                urgency_score = 500 - stock + (relevance * 20)
+            elif stock <= 50:
+                urgency_score = 100 - stock + (relevance * 10)
+            else:
+                urgency_score = max(0, relevance * 5 - stock)
+
+            if urgency_score > 0:
+                recommended_inventory.append({
+                    "item": name,
+                    "category": item['category'] or 'General',
+                    "stock": stock,
+                    "unit": item['unit'] or '',
+                    "status": status,
+                    "urgency_score": urgency_score
+                })
+
+        # Sort by urgency and cap at top 15
+        recommended_inventory.sort(key=lambda x: x['urgency_score'], reverse=True)
+        recommended_inventory = recommended_inventory[:15]
+
+        # ── Staffing alerts ──────────────────────────────────────────────────
+        staffing_alerts = []
+        pg_day_map = {0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday",
+                      4: "Thursday", 5: "Friday", 6: "Saturday"}
+
+        if busiest_day_row:
+            day_name = pg_day_map.get(int(busiest_day_row['day_num']), "Unknown")
+            staffing_alerts.append({
+                "level": "info",
+                "message": f"{day_name} is historically the busiest day. Ensure full staffing."
+            })
+
+        for nw in next_week_rows[:3]:
+            svc_title = nw['service'].title()
+            count = int(nw['upcoming_count'])
+            staffing_alerts.append({
+                "level": "warning" if count >= 3 else "info",
+                "message": f"{count} upcoming {svc_title} appointment{'s' if count > 1 else ''} this week. Prepare accordingly."
+            })
+
+        return jsonify({
+            "top_services": top_services,
+            "recommended_inventory": recommended_inventory,
+            "staffing_alerts": staffing_alerts
+        }), 200
+
+    except Exception as e:
+        print(f"Predictive insights error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -21,6 +21,13 @@ import {
     ModalHeader,
     ModalBody,
     ModalCloseButton,
+    AlertDialog,
+    AlertDialogBody,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogContent,
+    AlertDialogOverlay,
+    useDisclosure,
 } from '@chakra-ui/react';
 import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw } from 'react-icons/fi';
 
@@ -54,6 +61,10 @@ interface AppointmentsProps {
 }
 
 const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, initialView = 'book' }) => {
+    const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
+    const cancelRef = React.useRef(null);
+    const [appointmentToCancel, setAppointmentToCancel] = useState<number | null>(null);
+
     const [step, setStep] = useState(1);
     const [services, setServices] = useState<Service[]>([]);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -219,13 +230,16 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
         }
     };
 
-    const handleCancelAppointment = async (appointmentId: number) => {
-        if (!window.confirm('Are you sure you want to cancel this appointment?')) {
-            return;
-        }
+    const handleCancelClick = (appointmentId: number) => {
+        setAppointmentToCancel(appointmentId);
+        onCancelOpen();
+    };
+
+    const confirmCancelAppointment = async () => {
+        if (!appointmentToCancel) return;
 
         try {
-            const response = await fetch(`/api/appointments/${appointmentId}/cancel`, {
+            const response = await fetch(`/api/appointments/${appointmentToCancel}/cancel`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: 'Cancelled by patient' }),
@@ -258,6 +272,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                 duration: 3000,
                 isClosable: true,
             });
+        } finally {
+            onCancelClose();
+            setAppointmentToCancel(null);
         }
     };
 
@@ -596,407 +613,214 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside" isCentered>
-            <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(12px)" />
-            <ModalContent
-                maxH="92vh"
-                borderRadius="3xl"
-                boxShadow="2xl"
-                mx={4}
-            >
-                <ModalHeader
-                    bgGradient="linear(to-r, green.500, teal.500)"
-                    color="white"
-                    borderTopRadius="3xl"
-                    py={8}
-                    px={8}
-                    position="relative"
-                    _before={{
-                        content: '""',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        bgGradient: 'linear(to-br, rgba(255,255,255,0.2), transparent)',
-                        pointerEvents: 'none',
-                        borderTopRadius: '3xl'
-                    }}
+        <>
+            <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside" isCentered>
+                <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(12px)" />
+                <ModalContent
+                    maxH="92vh"
+                    borderRadius="3xl"
+                    boxShadow="2xl"
+                    mx={4}
                 >
-                    <HStack spacing={4}>
-                        <Icon as={FiCalendar} boxSize={8} />
-                        <VStack align="start" spacing={0}>
-                            <Heading size="xl" fontWeight="800">Appointments</Heading>
-                            <Text fontSize="sm" color="whiteAlpha.900" fontWeight="500">
-                                Book and manage your healthcare appointments
-                            </Text>
-                        </VStack>
-                    </HStack>
-                </ModalHeader>
-                <ModalCloseButton
-                    color="white"
-                    size="lg"
-                    top={6}
-                    right={6}
-                    _hover={{ bg: 'whiteAlpha.300', transform: 'scale(1.1)' }}
-                    borderRadius="lg"
-                />
-                <ModalBody p={8} bg="gray.50">
-                    <Box bg="white" borderRadius="2xl" p={6} boxShadow="sm">
-                        {/* View Toggle */}
-                        <HStack spacing={3} mb={8} bg="gray.100" p={2} borderRadius="xl">
-                            <Button
-                                flex={1}
-                                variant={view === 'book' ? 'solid' : 'ghost'}
-                                bgGradient={view === 'book' ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                color={view === 'book' ? 'white' : 'gray.600'}
-                                onClick={() => setView('book')}
-                                fontWeight="700"
-                                size="lg"
-                                borderRadius="lg"
-                                _hover={{
-                                    transform: 'translateY(-2px)',
-                                    boxShadow: view === 'book' ? 'lg' : 'none'
-                                }}
-                                transition="all 0.2s"
-                            >
-                                📅 Book Appointment
-                            </Button>
-                            <Button
-                                flex={1}
-                                variant={view === 'my-appointments' ? 'solid' : 'ghost'}
-                                bgGradient={view === 'my-appointments' ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                color={view === 'my-appointments' ? 'white' : 'gray.600'}
-                                onClick={() => setView('my-appointments')}
-                                fontWeight="700"
-                                size="lg"
-                                borderRadius="lg"
-                                _hover={{
-                                    transform: 'translateY(-2px)',
-                                    boxShadow: view === 'my-appointments' ? 'lg' : 'none'
-                                }}
-                                transition="all 0.2s"
-                            >
-                                📋 My Appointments
-                            </Button>
+                    <ModalHeader
+                        bgGradient="linear(to-r, green.500, teal.500)"
+                        color="white"
+                        borderTopRadius="3xl"
+                        py={8}
+                        px={8}
+                        position="relative"
+                        _before={{
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            bgGradient: 'linear(to-br, rgba(255,255,255,0.2), transparent)',
+                            pointerEvents: 'none',
+                            borderTopRadius: '3xl'
+                        }}
+                    >
+                        <HStack spacing={4}>
+                            <Icon as={FiCalendar} boxSize={8} />
+                            <VStack align="start" spacing={0}>
+                                <Heading size="xl" fontWeight="800">Appointments</Heading>
+                                <Text fontSize="sm" color="whiteAlpha.900" fontWeight="500">
+                                    Book and manage your healthcare appointments
+                                </Text>
+                            </VStack>
                         </HStack>
+                    </ModalHeader>
+                    <ModalCloseButton
+                        color="white"
+                        size="lg"
+                        top={6}
+                        right={6}
+                        _hover={{ bg: 'whiteAlpha.300', transform: 'scale(1.1)' }}
+                        borderRadius="lg"
+                    />
+                    <ModalBody p={8} bg="gray.50">
+                        <Box bg="white" borderRadius="2xl" p={6} boxShadow="sm">
+                            {/* View Toggle */}
+                            <HStack spacing={3} mb={8} bg="gray.100" p={2} borderRadius="xl">
+                                <Button
+                                    flex={1}
+                                    variant={view === 'book' ? 'solid' : 'ghost'}
+                                    bgGradient={view === 'book' ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                    color={view === 'book' ? 'white' : 'gray.600'}
+                                    onClick={() => setView('book')}
+                                    fontWeight="700"
+                                    size="lg"
+                                    borderRadius="lg"
+                                    _hover={{
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: view === 'book' ? 'lg' : 'none'
+                                    }}
+                                    transition="all 0.2s"
+                                >
+                                    📅 Book Appointment
+                                </Button>
+                                <Button
+                                    flex={1}
+                                    variant={view === 'my-appointments' ? 'solid' : 'ghost'}
+                                    bgGradient={view === 'my-appointments' ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                    color={view === 'my-appointments' ? 'white' : 'gray.600'}
+                                    onClick={() => setView('my-appointments')}
+                                    fontWeight="700"
+                                    size="lg"
+                                    borderRadius="lg"
+                                    _hover={{
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: view === 'my-appointments' ? 'lg' : 'none'
+                                    }}
+                                    transition="all 0.2s"
+                                >
+                                    📋 My Appointments
+                                </Button>
+                            </HStack>
 
-                        {view === 'book' ? (
-                            <VStack align="stretch" spacing={8}>
-                                {/* Step Indicator */}
-                                <Flex justify="center" align="center" mb={4}>
-                                    <HStack spacing={4}>
-                                        <VStack spacing={2}>
-                                            <Flex
-                                                w="50px"
-                                                h="50px"
-                                                borderRadius="full"
-                                                align="center"
-                                                justify="center"
-                                                fontWeight="bold"
-                                                fontSize="lg"
-                                                bgGradient={step >= 1 ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                                bg={step >= 1 ? 'teal.500' : 'gray.200'}
-                                                color={step >= 1 ? 'white' : 'gray.500'}
-                                                boxShadow={step >= 1 ? 'lg' : 'none'}
-                                                transition="all 0.3s"
-                                            >
-                                                1
-                                            </Flex>
-                                            <Text fontSize="xs" fontWeight="600" color="gray.600">Service</Text>
-                                        </VStack>
-
-                                        <Box w="80px" h="3px" bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 2 ? 'teal.500' : 'gray.200'} borderRadius="full" />
-
-                                        <VStack spacing={2}>
-                                            <Flex
-                                                w="50px"
-                                                h="50px"
-                                                borderRadius="full"
-                                                align="center"
-                                                justify="center"
-                                                fontWeight="bold"
-                                                fontSize="lg"
-                                                bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                                bg={step >= 2 ? 'teal.500' : 'gray.200'}
-                                                color={step >= 2 ? 'white' : 'gray.500'}
-                                                boxShadow={step >= 2 ? 'lg' : 'none'}
-                                                transition="all 0.3s"
-                                            >
-                                                2
-                                            </Flex>
-                                            <Text fontSize="xs" fontWeight="600" color="gray.600">Date & Time</Text>
-                                        </VStack>
-
-                                        <Box w="80px" h="3px" bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 3 ? 'teal.500' : 'gray.200'} borderRadius="full" />
-
-                                        <VStack spacing={2}>
-                                            <Flex
-                                                w="50px"
-                                                h="50px"
-                                                borderRadius="full"
-                                                align="center"
-                                                justify="center"
-                                                fontWeight="bold"
-                                                fontSize="lg"
-                                                bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                                bg={step >= 3 ? 'teal.500' : 'gray.200'}
-                                                color={step >= 3 ? 'white' : 'gray.500'}
-                                                boxShadow={step >= 3 ? 'lg' : 'none'}
-                                                transition="all 0.3s"
-                                            >
-                                                3
-                                            </Flex>
-                                            <Text fontSize="xs" fontWeight="600" color="gray.600">Confirm</Text>
-                                        </VStack>
-                                    </HStack>
-                                </Flex>
-
-                                {/* Step 1: Select Service */}
-                                {step === 1 && (
-                                    <VStack align="stretch" spacing={6}>
-                                        <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
-                                            Select a Service
-                                        </Heading>
-                                        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                                            {services.map(service => (
-                                                <Box
-                                                    key={service.id}
-                                                    onClick={() => setSelectedService(service)}
-                                                    p={6}
-                                                    borderRadius="2xl"
-                                                    border="3px solid"
-                                                    borderColor={selectedService?.id === service.id ? 'teal.400' : 'gray.200'}
-                                                    bg={selectedService?.id === service.id ? 'teal.50' : 'white'}
-                                                    cursor="pointer"
-                                                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                                                    _hover={{
-                                                        borderColor: 'teal.400',
-                                                        transform: 'translateY(-4px)',
-                                                        boxShadow: 'xl'
-                                                    }}
-                                                    boxShadow={selectedService?.id === service.id ? 'lg' : 'sm'}
+                            {view === 'book' ? (
+                                <VStack align="stretch" spacing={8}>
+                                    {/* Step Indicator */}
+                                    <Flex justify="center" align="center" mb={4}>
+                                        <HStack spacing={4}>
+                                            <VStack spacing={2}>
+                                                <Flex
+                                                    w="50px"
+                                                    h="50px"
+                                                    borderRadius="full"
+                                                    align="center"
+                                                    justify="center"
+                                                    fontWeight="bold"
+                                                    fontSize="lg"
+                                                    bgGradient={step >= 1 ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                    bg={step >= 1 ? 'teal.500' : 'gray.200'}
+                                                    color={step >= 1 ? 'white' : 'gray.500'}
+                                                    boxShadow={step >= 1 ? 'lg' : 'none'}
+                                                    transition="all 0.3s"
                                                 >
-                                                    <HStack align="start" spacing={4}>
-                                                        <Text fontSize="5xl">🏥</Text>
-                                                        <VStack align="start" flex={1} spacing={2}>
-                                                            <Heading size="md" color="gray.900" fontWeight="700">{service.name}</Heading>
-                                                            <Text fontSize="sm" color="gray.600" lineHeight="tall">{service.description}</Text>
-                                                            <Badge
-                                                                colorScheme="teal"
-                                                                borderRadius="full"
-                                                                px={4}
-                                                                py={1.5}
-                                                                fontSize="xs"
-                                                                fontWeight="700"
-                                                            >
-                                                                ⏱️ {service.duration_minutes} mins
-                                                            </Badge>
-                                                        </VStack>
-                                                    </HStack>
-                                                </Box>
-                                            ))}
-                                        </SimpleGrid>
-                                        <Button
-                                            isDisabled={!selectedService}
-                                            onClick={() => setStep(2)}
-                                            bgGradient="linear(to-r, green.500, teal.500)"
-                                            color="white"
-                                            size="lg"
-                                            h="56px"
-                                            fontSize="lg"
-                                            fontWeight="700"
-                                            borderRadius="xl"
-                                            _hover={{
-                                                transform: 'translateY(-2px)',
-                                                boxShadow: 'xl'
-                                            }}
-                                            _active={{
-                                                transform: 'translateY(0)'
-                                            }}
-                                            transition="all 0.2s"
-                                        >
-                                            Next Step →
-                                        </Button>
-                                    </VStack>
-                                )}
+                                                    1
+                                                </Flex>
+                                                <Text fontSize="xs" fontWeight="600" color="gray.600">Service</Text>
+                                            </VStack>
 
-                                {/* Step 2: Select Date & Time */}
-                                {step === 2 && (
-                                    <VStack align="stretch" spacing={6}>
-                                        <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
-                                            Choose Date & Time
-                                        </Heading>
+                                            <Box w="80px" h="3px" bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 2 ? 'teal.500' : 'gray.200'} borderRadius="full" />
 
-                                        {/* Custom Calendar Picker */}
-                                        <Box>
-                                            <Text fontSize="sm" fontWeight="700" color="gray.700" mb={4}>Select Date</Text>
-                                            <CalendarPicker />
-                                        </Box>
+                                            <VStack spacing={2}>
+                                                <Flex
+                                                    w="50px"
+                                                    h="50px"
+                                                    borderRadius="full"
+                                                    align="center"
+                                                    justify="center"
+                                                    fontWeight="bold"
+                                                    fontSize="lg"
+                                                    bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                    bg={step >= 2 ? 'teal.500' : 'gray.200'}
+                                                    color={step >= 2 ? 'white' : 'gray.500'}
+                                                    boxShadow={step >= 2 ? 'lg' : 'none'}
+                                                    transition="all 0.3s"
+                                                >
+                                                    2
+                                                </Flex>
+                                                <Text fontSize="xs" fontWeight="600" color="gray.600">Date & Time</Text>
+                                            </VStack>
 
-                                        {selectedDate && (
-                                            <Box>
-                                                <Text fontSize="sm" fontWeight="700" color="gray.700" mb={4}>
-                                                    Available Time Slots
-                                                </Text>
-                                                {availableSlots.length > 0 ? (
-                                                    <VStack align="stretch" spacing={6}>
-                                                        {(() => {
-                                                            const { morning, afternoon, evening } = groupTimeSlots();
-                                                            return (
-                                                                <>
-                                                                    {morning.length > 0 && (
-                                                                        <Box>
-                                                                            <HStack mb={3} spacing={2}>
-                                                                                <Icon as={FiClock} color="orange.500" boxSize={5} />
-                                                                                <Text fontSize="md" fontWeight="700" color="gray.700">
-                                                                                    🌅 Morning (8 AM - 12 PM)
-                                                                                </Text>
-                                                                            </HStack>
-                                                                            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-                                                                                {morning.map((slot, index) => (
-                                                                                    <Button
-                                                                                        key={index}
-                                                                                        onClick={() => setSelectedTime(slot.time)}
-                                                                                        variant={selectedTime === slot.time ? 'solid' : 'outline'}
-                                                                                        bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                                                                        color={selectedTime === slot.time ? 'white' : 'gray.700'}
-                                                                                        borderColor="teal.300"
-                                                                                        borderWidth="2px"
-                                                                                        size="lg"
-                                                                                        fontWeight="700"
-                                                                                        borderRadius="xl"
-                                                                                        _hover={{
-                                                                                            transform: 'translateY(-2px)',
-                                                                                            boxShadow: 'md'
-                                                                                        }}
-                                                                                        transition="all 0.2s"
-                                                                                    >
-                                                                                        {slot.display}
-                                                                                    </Button>
-                                                                                ))}
-                                                                            </SimpleGrid>
-                                                                        </Box>
-                                                                    )}
+                                            <Box w="80px" h="3px" bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 3 ? 'teal.500' : 'gray.200'} borderRadius="full" />
 
-                                                                    {afternoon.length > 0 && (
-                                                                        <Box>
-                                                                            <HStack mb={3} spacing={2}>
-                                                                                <Icon as={FiClock} color="orange.500" boxSize={5} />
-                                                                                <Text fontSize="md" fontWeight="700" color="gray.700">
-                                                                                    ☀️ Afternoon (12 PM - 5 PM)
-                                                                                </Text>
-                                                                            </HStack>
-                                                                            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-                                                                                {afternoon.map((slot, index) => (
-                                                                                    <Button
-                                                                                        key={index}
-                                                                                        onClick={() => setSelectedTime(slot.time)}
-                                                                                        variant={selectedTime === slot.time ? 'solid' : 'outline'}
-                                                                                        bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                                                                        color={selectedTime === slot.time ? 'white' : 'gray.700'}
-                                                                                        borderColor="teal.300"
-                                                                                        borderWidth="2px"
-                                                                                        size="lg"
-                                                                                        fontWeight="700"
-                                                                                        borderRadius="xl"
-                                                                                        _hover={{
-                                                                                            transform: 'translateY(-2px)',
-                                                                                            boxShadow: 'md'
-                                                                                        }}
-                                                                                        transition="all 0.2s"
-                                                                                    >
-                                                                                        {slot.display}
-                                                                                    </Button>
-                                                                                ))}
-                                                                            </SimpleGrid>
-                                                                        </Box>
-                                                                    )}
+                                            <VStack spacing={2}>
+                                                <Flex
+                                                    w="50px"
+                                                    h="50px"
+                                                    borderRadius="full"
+                                                    align="center"
+                                                    justify="center"
+                                                    fontWeight="bold"
+                                                    fontSize="lg"
+                                                    bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                    bg={step >= 3 ? 'teal.500' : 'gray.200'}
+                                                    color={step >= 3 ? 'white' : 'gray.500'}
+                                                    boxShadow={step >= 3 ? 'lg' : 'none'}
+                                                    transition="all 0.3s"
+                                                >
+                                                    3
+                                                </Flex>
+                                                <Text fontSize="xs" fontWeight="600" color="gray.600">Confirm</Text>
+                                            </VStack>
+                                        </HStack>
+                                    </Flex>
 
-                                                                    {evening.length > 0 && (
-                                                                        <Box>
-                                                                            <HStack mb={3} spacing={2}>
-                                                                                <Icon as={FiClock} color="orange.500" boxSize={5} />
-                                                                                <Text fontSize="md" fontWeight="700" color="gray.700">
-                                                                                    🌙 Evening (After 5 PM)
-                                                                                </Text>
-                                                                            </HStack>
-                                                                            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-                                                                                {evening.map((slot, index) => (
-                                                                                    <Button
-                                                                                        key={index}
-                                                                                        onClick={() => setSelectedTime(slot.time)}
-                                                                                        variant={selectedTime === slot.time ? 'solid' : 'outline'}
-                                                                                        bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
-                                                                                        color={selectedTime === slot.time ? 'white' : 'gray.700'}
-                                                                                        borderColor="teal.300"
-                                                                                        borderWidth="2px"
-                                                                                        size="lg"
-                                                                                        fontWeight="700"
-                                                                                        borderRadius="xl"
-                                                                                        _hover={{
-                                                                                            transform: 'translateY(-2px)',
-                                                                                            boxShadow: 'md'
-                                                                                        }}
-                                                                                        transition="all 0.2s"
-                                                                                    >
-                                                                                        {slot.display}
-                                                                                    </Button>
-                                                                                ))}
-                                                                            </SimpleGrid>
-                                                                        </Box>
-                                                                    )}
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </VStack>
-                                                ) : (
+                                    {/* Step 1: Select Service */}
+                                    {step === 1 && (
+                                        <VStack align="stretch" spacing={6}>
+                                            <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
+                                                Select a Service
+                                            </Heading>
+                                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                                                {services.map(service => (
                                                     <Box
-                                                        p={12}
-                                                        textAlign="center"
+                                                        key={service.id}
+                                                        onClick={() => setSelectedService(service)}
+                                                        p={6}
                                                         borderRadius="2xl"
-                                                        bg="gradient-to-br from-gray-50 to-gray-100"
-                                                        border="2px dashed"
-                                                        borderColor="gray.300"
+                                                        border="3px solid"
+                                                        borderColor={selectedService?.id === service.id ? 'teal.400' : 'gray.200'}
+                                                        bg={selectedService?.id === service.id ? 'teal.50' : 'white'}
+                                                        cursor="pointer"
+                                                        transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                                                        _hover={{
+                                                            borderColor: 'teal.400',
+                                                            transform: 'translateY(-4px)',
+                                                            boxShadow: 'xl'
+                                                        }}
+                                                        boxShadow={selectedService?.id === service.id ? 'lg' : 'sm'}
                                                     >
-                                                        <Icon as={FiClock} boxSize={16} color="gray.400" mb={4} />
-                                                        <Text color="gray.700" fontWeight="700" fontSize="lg" mb={2}>
-                                                            No available time slots
-                                                        </Text>
-                                                        <Text fontSize="sm" color="gray.500">
-                                                            Please select another date
-                                                        </Text>
+                                                        <HStack align="start" spacing={4}>
+                                                            <Text fontSize="5xl">🏥</Text>
+                                                            <VStack align="start" flex={1} spacing={2}>
+                                                                <Heading size="md" color="gray.900" fontWeight="700">{service.name}</Heading>
+                                                                <Text fontSize="sm" color="gray.600" lineHeight="tall">{service.description}</Text>
+                                                                <Badge
+                                                                    colorScheme="teal"
+                                                                    borderRadius="full"
+                                                                    px={4}
+                                                                    py={1.5}
+                                                                    fontSize="xs"
+                                                                    fontWeight="700"
+                                                                >
+                                                                    ⏱️ {service.duration_minutes} mins
+                                                                </Badge>
+                                                            </VStack>
+                                                        </HStack>
                                                     </Box>
-                                                )}
-                                            </Box>
-                                        )}
-
-                                        <HStack spacing={3}>
+                                                ))}
+                                            </SimpleGrid>
                                             <Button
-                                                onClick={() => setStep(1)}
-                                                variant="outline"
-                                                borderColor="gray.300"
-                                                borderWidth="2px"
-                                                color="gray.700"
-                                                size="lg"
-                                                flex={1}
-                                                h="56px"
-                                                fontSize="lg"
-                                                fontWeight="700"
-                                                borderRadius="xl"
-                                                _hover={{
-                                                    bg: 'gray.50'
-                                                }}
-                                            >
-                                                ← Back
-                                            </Button>
-                                            <Button
-                                                isDisabled={!selectedDate || !selectedTime}
-                                                onClick={() => setStep(3)}
+                                                isDisabled={!selectedService}
+                                                onClick={() => setStep(2)}
                                                 bgGradient="linear(to-r, green.500, teal.500)"
                                                 color="white"
                                                 size="lg"
-                                                flex={1}
                                                 h="56px"
                                                 fontSize="lg"
                                                 fontWeight="700"
@@ -1004,244 +828,467 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                 _hover={{
                                                     transform: 'translateY(-2px)',
                                                     boxShadow: 'xl'
+                                                }}
+                                                _active={{
+                                                    transform: 'translateY(0)'
                                                 }}
                                                 transition="all 0.2s"
                                             >
                                                 Next Step →
                                             </Button>
-                                        </HStack>
-                                    </VStack>
-                                )}
+                                        </VStack>
+                                    )}
 
-                                {/* Step 3: Confirm */}
-                                {step === 3 && (
-                                    <VStack align="stretch" spacing={6}>
-                                        <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
-                                            Confirm Appointment
-                                        </Heading>
+                                    {/* Step 2: Select Date & Time */}
+                                    {step === 2 && (
+                                        <VStack align="stretch" spacing={6}>
+                                            <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
+                                                Choose Date & Time
+                                            </Heading>
 
-                                        <Box
-                                            bgGradient="linear(to-br, green.50, teal.50)"
-                                            borderRadius="2xl"
-                                            p={8}
-                                            border="2px solid"
-                                            borderColor="teal.200"
-                                            boxShadow="md"
-                                        >
-                                            <VStack align="stretch" spacing={5}>
-                                                <Flex justify="space-between" align="center">
-                                                    <Text color="gray.600" fontWeight="600">Service:</Text>
-                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">{selectedService?.name}</Text>
-                                                </Flex>
-                                                <Divider borderColor="teal.200" />
-                                                <Flex justify="space-between" align="center">
-                                                    <Text color="gray.600" fontWeight="600">Date:</Text>
-                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">
-                                                        {new Date(selectedDate).toLocaleDateString('en-US', {
-                                                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                                                        })}
+                                            {/* Custom Calendar Picker */}
+                                            <Box>
+                                                <Text fontSize="sm" fontWeight="700" color="gray.700" mb={4}>Select Date</Text>
+                                                <CalendarPicker />
+                                            </Box>
+
+                                            {selectedDate && (
+                                                <Box>
+                                                    <Text fontSize="sm" fontWeight="700" color="gray.700" mb={4}>
+                                                        Available Time Slots
                                                     </Text>
-                                                </Flex>
-                                                <Divider borderColor="teal.200" />
-                                                <Flex justify="space-between" align="center">
-                                                    <Text color="gray.600" fontWeight="600">Time:</Text>
-                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">
-                                                        {availableSlots.find(s => s.time === selectedTime)?.display}
-                                                    </Text>
-                                                </Flex>
-                                                <Divider borderColor="teal.200" />
-                                                <Flex justify="space-between" align="center">
-                                                    <Text color="gray.600" fontWeight="600">Duration:</Text>
-                                                    <Text fontWeight="800" color="gray.900" fontSize="lg">{selectedService?.duration_minutes} minutes</Text>
-                                                </Flex>
-                                            </VStack>
-                                        </Box>
+                                                    {availableSlots.length > 0 ? (
+                                                        <VStack align="stretch" spacing={6}>
+                                                            {(() => {
+                                                                const { morning, afternoon, evening } = groupTimeSlots();
+                                                                return (
+                                                                    <>
+                                                                        {morning.length > 0 && (
+                                                                            <Box>
+                                                                                <HStack mb={3} spacing={2}>
+                                                                                    <Icon as={FiClock} color="orange.500" boxSize={5} />
+                                                                                    <Text fontSize="md" fontWeight="700" color="gray.700">
+                                                                                        🌅 Morning (8 AM - 12 PM)
+                                                                                    </Text>
+                                                                                </HStack>
+                                                                                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                                                                                    {morning.map((slot, index) => (
+                                                                                        <Button
+                                                                                            key={index}
+                                                                                            onClick={() => setSelectedTime(slot.time)}
+                                                                                            variant={selectedTime === slot.time ? 'solid' : 'outline'}
+                                                                                            bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                                                            color={selectedTime === slot.time ? 'white' : 'gray.700'}
+                                                                                            borderColor="teal.300"
+                                                                                            borderWidth="2px"
+                                                                                            size="lg"
+                                                                                            fontWeight="700"
+                                                                                            borderRadius="xl"
+                                                                                            _hover={{
+                                                                                                transform: 'translateY(-2px)',
+                                                                                                boxShadow: 'md'
+                                                                                            }}
+                                                                                            transition="all 0.2s"
+                                                                                        >
+                                                                                            {slot.display}
+                                                                                        </Button>
+                                                                                    ))}
+                                                                                </SimpleGrid>
+                                                                            </Box>
+                                                                        )}
 
-                                        <Box>
-                                            <Text fontSize="sm" fontWeight="700" color="gray.700" mb={3}>Reason for Visit (Optional)</Text>
-                                            <Textarea
-                                                value={reason}
-                                                onChange={(e) => setReason(e.target.value)}
-                                                placeholder="Describe your symptoms or reason for visit..."
-                                                rows={4}
-                                                focusBorderColor="teal.400"
-                                                borderColor="gray.300"
-                                                borderWidth="2px"
-                                                borderRadius="xl"
-                                                resize="none"
-                                                fontSize="md"
-                                                _hover={{
-                                                    borderColor: 'teal.300'
-                                                }}
-                                            />
-                                        </Box>
+                                                                        {afternoon.length > 0 && (
+                                                                            <Box>
+                                                                                <HStack mb={3} spacing={2}>
+                                                                                    <Icon as={FiClock} color="orange.500" boxSize={5} />
+                                                                                    <Text fontSize="md" fontWeight="700" color="gray.700">
+                                                                                        ☀️ Afternoon (12 PM - 5 PM)
+                                                                                    </Text>
+                                                                                </HStack>
+                                                                                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                                                                                    {afternoon.map((slot, index) => (
+                                                                                        <Button
+                                                                                            key={index}
+                                                                                            onClick={() => setSelectedTime(slot.time)}
+                                                                                            variant={selectedTime === slot.time ? 'solid' : 'outline'}
+                                                                                            bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                                                            color={selectedTime === slot.time ? 'white' : 'gray.700'}
+                                                                                            borderColor="teal.300"
+                                                                                            borderWidth="2px"
+                                                                                            size="lg"
+                                                                                            fontWeight="700"
+                                                                                            borderRadius="xl"
+                                                                                            _hover={{
+                                                                                                transform: 'translateY(-2px)',
+                                                                                                boxShadow: 'md'
+                                                                                            }}
+                                                                                            transition="all 0.2s"
+                                                                                        >
+                                                                                            {slot.display}
+                                                                                        </Button>
+                                                                                    ))}
+                                                                                </SimpleGrid>
+                                                                            </Box>
+                                                                        )}
 
-                                        <HStack spacing={3}>
-                                            <Button
-                                                onClick={() => setStep(2)}
-                                                variant="outline"
-                                                borderColor="gray.300"
-                                                borderWidth="2px"
-                                                color="gray.700"
-                                                size="lg"
-                                                flex={1}
-                                                h="56px"
-                                                fontSize="lg"
-                                                fontWeight="700"
-                                                borderRadius="xl"
-                                                _hover={{
-                                                    bg: 'gray.50'
-                                                }}
-                                            >
-                                                ← Back
-                                            </Button>
-                                            <Button
-                                                onClick={handleBookAppointment}
-                                                isLoading={loading}
-                                                loadingText="Booking..."
-                                                bgGradient="linear(to-r, green.500, teal.500)"
-                                                color="white"
-                                                size="lg"
-                                                flex={1}
-                                                h="56px"
-                                                fontSize="lg"
-                                                fontWeight="700"
-                                                borderRadius="xl"
-                                                leftIcon={<Icon as={FiCheckCircle} boxSize={6} />}
-                                                _hover={{
-                                                    transform: 'translateY(-2px)',
-                                                    boxShadow: 'xl'
-                                                }}
-                                                transition="all 0.2s"
-                                            >
-                                                Confirm Booking ✓
-                                            </Button>
-                                        </HStack>
-                                    </VStack>
-                                )}
-                            </VStack>
-                        ) : (
-                            <VStack align="stretch" spacing={6}>
-                                <Heading size="lg" bgGradient="linear(to-r, teal.600, orange.600)" bgClip="text">
-                                    My Appointments
-                                </Heading>
-                                {myAppointments.length > 0 ? (
-                                    <VStack align="stretch" spacing={4}>
-                                        {myAppointments.map(apt => (
-                                            <Box
-                                                key={apt.id}
-                                                bg="white"
-                                                border="2px solid"
-                                                borderColor="gray.200"
-                                                borderRadius="2xl"
-                                                p={6}
-                                                transition="all 0.3s"
-                                                _hover={{
-                                                    boxShadow: 'xl',
-                                                    transform: 'translateY(-2px)',
-                                                    borderColor: 'teal.300'
-                                                }}
-                                            >
-                                                <Flex justify="space-between" align="start" mb={4}>
-                                                    <Heading size="md" color="gray.900" fontWeight="700">{apt.service_type}</Heading>
-                                                    <Badge
-                                                        colorScheme={getDisplayStatusColor(apt)}
-                                                        borderRadius="full"
-                                                        px={4}
-                                                        py={2}
-                                                        fontSize="sm"
-                                                        fontWeight="700"
-                                                        textTransform="uppercase"
-                                                    >
-                                                        {getDisplayStatus(apt)}
-                                                    </Badge>
-                                                </Flex>
-                                                <HStack spacing={6} mb={4} fontSize="md" color="gray.600" fontWeight="600">
-                                                    <HStack>
-                                                        <Icon as={FiCalendar} boxSize={5} />
-                                                        <Text>{new Date(apt.appointment_date).toLocaleDateString()}</Text>
-                                                    </HStack>
-                                                    <HStack>
-                                                        <Icon as={FiClock} boxSize={5} />
-                                                        <Text>{apt.appointment_time}</Text>
-                                                    </HStack>
-                                                </HStack>
-                                                {/* Past appointment with pending/waiting status → Not Complete + Reschedule */}
-                                                {['pending', 'waiting'].includes(apt.status.toLowerCase()) && isAppointmentPast(apt) && (
-                                                    <HStack spacing={3}>
-                                                        <Button
-                                                            onClick={() => handleReschedule(apt)}
-                                                            colorScheme="orange"
-                                                            variant="solid"
-                                                            size="md"
-                                                            fontWeight="700"
-                                                            leftIcon={<Icon as={FiRefreshCw} />}
-                                                            borderRadius="lg"
-                                                            _hover={{
-                                                                transform: 'translateY(-1px)',
-                                                                boxShadow: 'md'
-                                                            }}
-                                                            transition="all 0.2s"
+                                                                        {evening.length > 0 && (
+                                                                            <Box>
+                                                                                <HStack mb={3} spacing={2}>
+                                                                                    <Icon as={FiClock} color="orange.500" boxSize={5} />
+                                                                                    <Text fontSize="md" fontWeight="700" color="gray.700">
+                                                                                        🌙 Evening (After 5 PM)
+                                                                                    </Text>
+                                                                                </HStack>
+                                                                                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                                                                                    {evening.map((slot, index) => (
+                                                                                        <Button
+                                                                                            key={index}
+                                                                                            onClick={() => setSelectedTime(slot.time)}
+                                                                                            variant={selectedTime === slot.time ? 'solid' : 'outline'}
+                                                                                            bgGradient={selectedTime === slot.time ? 'linear(to-r, green.500, teal.500)' : 'none'}
+                                                                                            color={selectedTime === slot.time ? 'white' : 'gray.700'}
+                                                                                            borderColor="teal.300"
+                                                                                            borderWidth="2px"
+                                                                                            size="lg"
+                                                                                            fontWeight="700"
+                                                                                            borderRadius="xl"
+                                                                                            _hover={{
+                                                                                                transform: 'translateY(-2px)',
+                                                                                                boxShadow: 'md'
+                                                                                            }}
+                                                                                            transition="all 0.2s"
+                                                                                        >
+                                                                                            {slot.display}
+                                                                                        </Button>
+                                                                                    ))}
+                                                                                </SimpleGrid>
+                                                                            </Box>
+                                                                        )}
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </VStack>
+                                                    ) : (
+                                                        <Box
+                                                            p={12}
+                                                            textAlign="center"
+                                                            borderRadius="2xl"
+                                                            bg="gradient-to-br from-gray-50 to-gray-100"
+                                                            border="2px dashed"
+                                                            borderColor="gray.300"
                                                         >
-                                                            Reschedule
-                                                        </Button>
+                                                            <Icon as={FiClock} boxSize={16} color="gray.400" mb={4} />
+                                                            <Text color="gray.700" fontWeight="700" fontSize="lg" mb={2}>
+                                                                No available time slots
+                                                            </Text>
+                                                            <Text fontSize="sm" color="gray.500">
+                                                                Please select another date
+                                                            </Text>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            )}
+
+                                            <HStack spacing={3}>
+                                                <Button
+                                                    onClick={() => setStep(1)}
+                                                    variant="outline"
+                                                    borderColor="gray.300"
+                                                    borderWidth="2px"
+                                                    color="gray.700"
+                                                    size="lg"
+                                                    flex={1}
+                                                    h="56px"
+                                                    fontSize="lg"
+                                                    fontWeight="700"
+                                                    borderRadius="xl"
+                                                    _hover={{
+                                                        bg: 'gray.50'
+                                                    }}
+                                                >
+                                                    ← Back
+                                                </Button>
+                                                <Button
+                                                    isDisabled={!selectedDate || !selectedTime}
+                                                    onClick={() => setStep(3)}
+                                                    bgGradient="linear(to-r, green.500, teal.500)"
+                                                    color="white"
+                                                    size="lg"
+                                                    flex={1}
+                                                    h="56px"
+                                                    fontSize="lg"
+                                                    fontWeight="700"
+                                                    borderRadius="xl"
+                                                    _hover={{
+                                                        transform: 'translateY(-2px)',
+                                                        boxShadow: 'xl'
+                                                    }}
+                                                    transition="all 0.2s"
+                                                >
+                                                    Next Step →
+                                                </Button>
+                                            </HStack>
+                                        </VStack>
+                                    )}
+
+                                    {/* Step 3: Confirm */}
+                                    {step === 3 && (
+                                        <VStack align="stretch" spacing={6}>
+                                            <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
+                                                Confirm Appointment
+                                            </Heading>
+
+                                            <Box
+                                                bgGradient="linear(to-br, green.50, teal.50)"
+                                                borderRadius="2xl"
+                                                p={8}
+                                                border="2px solid"
+                                                borderColor="teal.200"
+                                                boxShadow="md"
+                                            >
+                                                <VStack align="stretch" spacing={5}>
+                                                    <Flex justify="space-between" align="center">
+                                                        <Text color="gray.600" fontWeight="600">Service:</Text>
+                                                        <Text fontWeight="800" color="gray.900" fontSize="lg">{selectedService?.name}</Text>
+                                                    </Flex>
+                                                    <Divider borderColor="teal.200" />
+                                                    <Flex justify="space-between" align="center">
+                                                        <Text color="gray.600" fontWeight="600">Date:</Text>
+                                                        <Text fontWeight="800" color="gray.900" fontSize="lg">
+                                                            {new Date(selectedDate).toLocaleDateString('en-US', {
+                                                                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                                                            })}
+                                                        </Text>
+                                                    </Flex>
+                                                    <Divider borderColor="teal.200" />
+                                                    <Flex justify="space-between" align="center">
+                                                        <Text color="gray.600" fontWeight="600">Time:</Text>
+                                                        <Text fontWeight="800" color="gray.900" fontSize="lg">
+                                                            {availableSlots.find(s => s.time === selectedTime)?.display}
+                                                        </Text>
+                                                    </Flex>
+                                                    <Divider borderColor="teal.200" />
+                                                    <Flex justify="space-between" align="center">
+                                                        <Text color="gray.600" fontWeight="600">Duration:</Text>
+                                                        <Text fontWeight="800" color="gray.900" fontSize="lg">{selectedService?.duration_minutes} minutes</Text>
+                                                    </Flex>
+                                                </VStack>
+                                            </Box>
+
+                                            <Box>
+                                                <Text fontSize="sm" fontWeight="700" color="gray.700" mb={3}>Reason for Visit (Optional)</Text>
+                                                <Textarea
+                                                    value={reason}
+                                                    onChange={(e) => setReason(e.target.value)}
+                                                    placeholder="Describe your symptoms or reason for visit..."
+                                                    rows={4}
+                                                    focusBorderColor="teal.400"
+                                                    borderColor="gray.300"
+                                                    borderWidth="2px"
+                                                    borderRadius="xl"
+                                                    resize="none"
+                                                    fontSize="md"
+                                                    _hover={{
+                                                        borderColor: 'teal.300'
+                                                    }}
+                                                />
+                                            </Box>
+
+                                            <HStack spacing={3}>
+                                                <Button
+                                                    onClick={() => setStep(2)}
+                                                    variant="outline"
+                                                    borderColor="gray.300"
+                                                    borderWidth="2px"
+                                                    color="gray.700"
+                                                    size="lg"
+                                                    flex={1}
+                                                    h="56px"
+                                                    fontSize="lg"
+                                                    fontWeight="700"
+                                                    borderRadius="xl"
+                                                    _hover={{
+                                                        bg: 'gray.50'
+                                                    }}
+                                                >
+                                                    ← Back
+                                                </Button>
+                                                <Button
+                                                    onClick={handleBookAppointment}
+                                                    isLoading={loading}
+                                                    loadingText="Booking..."
+                                                    bgGradient="linear(to-r, green.500, teal.500)"
+                                                    color="white"
+                                                    size="lg"
+                                                    flex={1}
+                                                    h="56px"
+                                                    fontSize="lg"
+                                                    fontWeight="700"
+                                                    borderRadius="xl"
+                                                    leftIcon={<Icon as={FiCheckCircle} boxSize={6} />}
+                                                    _hover={{
+                                                        transform: 'translateY(-2px)',
+                                                        boxShadow: 'xl'
+                                                    }}
+                                                    transition="all 0.2s"
+                                                >
+                                                    Confirm Booking ✓
+                                                </Button>
+                                            </HStack>
+                                        </VStack>
+                                    )}
+                                </VStack>
+                            ) : (
+                                <VStack align="stretch" spacing={6}>
+                                    <Heading size="lg" bgGradient="linear(to-r, teal.600, orange.600)" bgClip="text">
+                                        My Appointments
+                                    </Heading>
+                                    {myAppointments.length > 0 ? (
+                                        <VStack align="stretch" spacing={4}>
+                                            {myAppointments.map(apt => (
+                                                <Box
+                                                    key={apt.id}
+                                                    bg="white"
+                                                    border="2px solid"
+                                                    borderColor="gray.200"
+                                                    borderRadius="2xl"
+                                                    p={6}
+                                                    transition="all 0.3s"
+                                                    _hover={{
+                                                        boxShadow: 'xl',
+                                                        transform: 'translateY(-2px)',
+                                                        borderColor: 'teal.300'
+                                                    }}
+                                                >
+                                                    <Flex justify="space-between" align="start" mb={4}>
+                                                        <Heading size="md" color="gray.900" fontWeight="700">{apt.service_type}</Heading>
+                                                        <Badge
+                                                            colorScheme={getDisplayStatusColor(apt)}
+                                                            borderRadius="full"
+                                                            px={4}
+                                                            py={2}
+                                                            fontSize="sm"
+                                                            fontWeight="700"
+                                                            textTransform="uppercase"
+                                                        >
+                                                            {getDisplayStatus(apt)}
+                                                        </Badge>
+                                                    </Flex>
+                                                    <HStack spacing={6} mb={4} fontSize="md" color="gray.600" fontWeight="600">
+                                                        <HStack>
+                                                            <Icon as={FiCalendar} boxSize={5} />
+                                                            <Text>{new Date(apt.appointment_date).toLocaleDateString()}</Text>
+                                                        </HStack>
+                                                        <HStack>
+                                                            <Icon as={FiClock} boxSize={5} />
+                                                            <Text>{apt.appointment_time}</Text>
+                                                        </HStack>
+                                                    </HStack>
+                                                    {/* Past appointment with pending/waiting status → Not Complete + Reschedule */}
+                                                    {['pending', 'waiting'].includes(apt.status.toLowerCase()) && isAppointmentPast(apt) && (
+                                                        <HStack spacing={3}>
+                                                            <Button
+                                                                onClick={() => handleReschedule(apt)}
+                                                                colorScheme="orange"
+                                                                variant="solid"
+                                                                size="md"
+                                                                fontWeight="700"
+                                                                leftIcon={<Icon as={FiRefreshCw} />}
+                                                                borderRadius="lg"
+                                                                _hover={{
+                                                                    transform: 'translateY(-1px)',
+                                                                    boxShadow: 'md'
+                                                                }}
+                                                                transition="all 0.2s"
+                                                            >
+                                                                Reschedule
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() => handleCancelClick(apt.id)}
+                                                                colorScheme="red"
+                                                                variant="ghost"
+                                                                size="md"
+                                                                fontWeight="700"
+                                                                _hover={{ bg: 'red.50' }}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        </HStack>
+                                                    )}
+                                                    {/* Future appointment with pending status → Cancel only */}
+                                                    {apt.status.toLowerCase() === 'pending' && !isAppointmentPast(apt) && (
                                                         <Button
-                                                            onClick={() => handleCancelAppointment(apt.id)}
+                                                            onClick={() => handleCancelClick(apt.id)}
                                                             colorScheme="red"
                                                             variant="ghost"
                                                             size="md"
                                                             fontWeight="700"
-                                                            _hover={{ bg: 'red.50' }}
+                                                            _hover={{
+                                                                bg: 'red.50'
+                                                            }}
                                                         >
-                                                            Cancel
+                                                            Cancel Appointment
                                                         </Button>
-                                                    </HStack>
-                                                )}
-                                                {/* Future appointment with pending status → Cancel only */}
-                                                {apt.status.toLowerCase() === 'pending' && !isAppointmentPast(apt) && (
-                                                    <Button
-                                                        onClick={() => handleCancelAppointment(apt.id)}
-                                                        colorScheme="red"
-                                                        variant="ghost"
-                                                        size="md"
-                                                        fontWeight="700"
-                                                        _hover={{
-                                                            bg: 'red.50'
-                                                        }}
-                                                    >
-                                                        Cancel Appointment
-                                                    </Button>
-                                                )}
-                                            </Box>
-                                        ))}
-                                    </VStack>
-                                ) : (
-                                    <VStack py={16} spacing={5}>
-                                        <Text fontSize="6xl">📅</Text>
-                                        <Text color="gray.600" fontSize="lg" fontWeight="600">No appointments yet</Text>
-                                        <Button
-                                            onClick={() => setView('book')}
-                                            bgGradient="linear(to-r, green.500, teal.500)"
-                                            color="white"
-                                            size="lg"
-                                            fontWeight="700"
-                                            borderRadius="xl"
-                                            px={8}
-                                            _hover={{
-                                                transform: 'translateY(-2px)',
-                                                boxShadow: 'xl'
-                                            }}
-                                        >
-                                            Book Your First Appointment
-                                        </Button>
-                                    </VStack>
-                                )}
-                            </VStack>
-                        )}
-                    </Box>
-                </ModalBody>
-            </ModalContent>
-        </Modal>
+                                                    )}
+                                                </Box>
+                                            ))}
+                                        </VStack>
+                                    ) : (
+                                        <VStack py={16} spacing={5}>
+                                            <Text fontSize="6xl">📅</Text>
+                                            <Text color="gray.600" fontSize="lg" fontWeight="600">No appointments yet</Text>
+                                            <Button
+                                                onClick={() => setView('book')}
+                                                bgGradient="linear(to-r, green.500, teal.500)"
+                                                color="white"
+                                                size="lg"
+                                                fontWeight="700"
+                                                borderRadius="xl"
+                                                px={8}
+                                                _hover={{
+                                                    transform: 'translateY(-2px)',
+                                                    boxShadow: 'xl'
+                                                }}
+                                            >
+                                                Book Your First Appointment
+                                            </Button>
+                                        </VStack>
+                                    )}
+                                </VStack>
+                            )}
+                        </Box>
+                    </ModalBody>
+                </ModalContent>
+            </Modal>
+
+            <AlertDialog
+                isOpen={isCancelOpen}
+                leastDestructiveRef={cancelRef}
+                onClose={onCancelClose}
+                isCentered
+            >
+                <AlertDialogOverlay backdropFilter="blur(4px)">
+                    <AlertDialogContent borderRadius="2xl" boxShadow="2xl">
+                        <AlertDialogHeader fontSize="lg" fontWeight="bold" color="red.600">
+                            Cancel Appointment
+                        </AlertDialogHeader>
+
+                        <AlertDialogBody color="gray.600" fontSize="md">
+                            Are you sure you want to cancel this appointment? This action cannot be undone.
+                        </AlertDialogBody>
+
+                        <AlertDialogFooter>
+                            <Button ref={cancelRef} onClick={onCancelClose} variant="ghost" mr={3} borderRadius="lg">
+                                Keep it
+                            </Button>
+                            <Button colorScheme="red" onClick={confirmCancelAppointment} borderRadius="lg" px={6} boxShadow="md">
+                                Cancel Appointment
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
+        </>
     );
 };
 

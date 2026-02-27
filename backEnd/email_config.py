@@ -196,3 +196,42 @@ def send_staff_creation_email(mail, recipient_email, first_name, role, temporary
     )
     
     mail.send(msg)
+
+
+def send_document_ready_email(mail, recipient_email, first_name, document_type):
+    """Send an email notifying the patient that their requested document is ready"""
+    
+    msg = Message(
+        subject=f"Your {document_type} is Ready for Pickup",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+                    
+                    <h2 style="color: #2c5282; text-align: center;">Document Ready for Pickup</h2>
+                    
+                    <p>Hello <strong>{first_name}</strong>,</p>
+                    
+                    <p>We are pleased to inform you that your requested <strong>{document_type}</strong> has been processed and is now ready.</p>
+                    
+                    <div style="margin: 20px 0; padding: 15px; background: #e6fffa; border-left: 4px solid #319795; color: #234e52;">
+                        <p style="margin: 0;"><strong>Next Step:</strong> You may now visit the Barangay 174 Health Center during our regular clinical hours to claim your document.</p>
+                    </div>
+                    
+                    <p>Please remember to bring a valid ID when picking up your document.</p>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+    
+    mail.send(msg)

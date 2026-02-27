@@ -38,6 +38,12 @@ import {
     InputLeftElement,
     FormControl,
     FormLabel,
+    AlertDialog,
+    AlertDialogBody,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogContent,
+    AlertDialogOverlay,
 } from '@chakra-ui/react';
 import {
     FiGrid,
@@ -47,10 +53,13 @@ import {
     FiActivity,
     FiBarChart2,
     FiShield,
-    FiMap,
     FiAlertTriangle,
     FiMenu,
-    FiSearch
+    FiSearch,
+    FiUser,
+    FiUserPlus,
+    FiRefreshCw,
+    FiFileText
 } from 'react-icons/fi';
 import {
     SimpleGrid,
@@ -63,10 +72,45 @@ import {
     Spinner,
 } from '@chakra-ui/react';
 
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 interface AdminDashboardProps {
     user: any;
     onLogout: () => void;
 }
+
+// ── Export Utilities ────────────────────────────────────────────────────────
+
+/** Generic CSV download */
+const downloadCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+};
+
+/** Generic PDF download using jsPDF + autoTable */
+const downloadPDF = (filename: string, title: string, headers: string[], rows: (string | number)[][]) => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(16);
+    doc.text(title, 14, 16);
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(`Brgy. 174 Health Center  ·  Generated: ${new Date().toLocaleString()}`, 14, 23);
+    autoTable(doc, {
+        head: [headers],
+        body: rows.map(r => r.map(c => String(c ?? ''))),
+        startY: 28,
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [0, 128, 128], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 250, 250] },
+    });
+    doc.save(filename);
+};
 
 const NavItem = ({ icon, children, active, onClick }: any) => {
     const activeBg = 'orange.500';
@@ -184,6 +228,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const [medicalStaff, setMedicalStaff] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<any[]>([]);
 
+    const { isOpen: isStatusAlertOpen, onOpen: onStatusAlertOpen, onClose: onStatusAlertClose } = useDisclosure();
+    const cancelStatusRef = React.useRef(null);
+    const [userToToggle, setUserToToggle] = useState<any>(null);
+
     // Search and Sort State
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState('name-asc');
@@ -201,6 +249,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         email: '',
         contact_number: '',
         role: 'Patient',
+        // Patient detail fields
+        date_of_birth: '',
+        gender: '',
+        full_address: '',
+        barangay: '',
+        city: '',
         // Medical Staff Fields
         prc_license_number: '',
         specialization: '',
@@ -233,6 +287,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     // Analytics State
     const [analyticsData, setAnalyticsData] = useState<any>(null);
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
+    const [predictiveData, setPredictiveData] = useState<any>(null);
+    const [predictiveLoading, setPredictiveLoading] = useState(false);
 
     // Auto-refresh State
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -371,10 +427,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         }
     };
 
+    // Fetch Predictive Insights
+    const fetchPredictiveInsights = async () => {
+        setPredictiveLoading(true);
+        try {
+            const res = await fetch('/api/admin/predictive-insights');
+            if (res.ok) {
+                const data = await res.json();
+                setPredictiveData(data);
+            }
+        } catch (err) {
+            console.error('Error fetching predictive insights:', err);
+        } finally {
+            setPredictiveLoading(false);
+        }
+    };
+
     // Trigger analytics fetch when tab opens
     useEffect(() => {
-        if (activeTab === 'analytics' && !analyticsData) {
-            fetchAnalytics();
+        if (activeTab === 'analytics') {
+            if (!analyticsData) fetchAnalytics();
+            if (!predictiveData) fetchPredictiveInsights();
         }
     }, [activeTab]);
 
@@ -446,6 +519,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             email: user.email || '',
             contact_number: user.contact_number || '',
             role: user.role || 'Patient',
+            date_of_birth: user.date_of_birth || '',
+            gender: user.gender || '',
+            full_address: user.full_address || '',
+            barangay: user.barangay || '',
+            city: user.city || '',
             prc_license_number: user.prc_license_number || '',
             specialization: user.specialization || '',
             schedule: user.schedule || '',
@@ -499,10 +577,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         }
     };
 
-    const handleToggleUserStatus = async (user: any) => {
-        const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
+    const openToggleUserStatus = (user: any) => {
+        setUserToToggle(user);
+        onStatusAlertOpen();
+    };
+
+    const confirmToggleUserStatus = async () => {
+        if (!userToToggle) return;
+        const newStatus = userToToggle.status === 'Active' ? 'Inactive' : 'Active';
         const actionWord = newStatus === 'Active' ? 'activate' : 'deactivate';
-        if (!confirm(`Are you sure you want to ${actionWord} this user?`)) return;
 
         try {
             // We use the same update endpoint
@@ -532,6 +615,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             }
         } catch (error) {
             console.error('Error toggling user status:', error);
+        } finally {
+            onStatusAlertClose();
         }
     };
 
@@ -549,44 +634,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
                 return (
                     <>
-                        <ModalHeader>Total Users Breakdown</ModalHeader>
-                        <ModalBody>
-                            <Box overflowX="auto">
-                                <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Category</Th><Th isNumeric>Count</Th></Tr></Thead>
-                                    <Tbody>
-                                        <Tr><Td>Residents (Barangay 174)</Td><Td isNumeric>{residentsCount}</Td></Tr>
-                                        <Tr><Td>Non-Residents</Td><Td isNumeric>{nonResidentsCount}</Td></Tr>
-                                        <Tr><Td fontWeight="bold">Total</Td><Td isNumeric fontWeight="bold">{users.length}</Td></Tr>
-                                    </Tbody>
-                                </Table>
-                            </Box>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiUsers} boxSize={6} />
+                                <Text>Users Details</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            <VStack align="stretch" spacing={4}>
+                                <Text fontWeight="bold" fontSize="md" color="gray.700">Total Users Breakdown</Text>
+                                <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                    <Table variant="simple" size="sm">
+                                        <Thead bg="gray.50">
+                                            <Tr>
+                                                <Th py={3}>Category</Th>
+                                                <Th py={3} isNumeric>Count</Th>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            <Tr><Td py={3}>Residents (Barangay 174)</Td><Td py={3} isNumeric>{residentsCount}</Td></Tr>
+                                            <Tr><Td py={3}>Non-Residents</Td><Td py={3} isNumeric>{nonResidentsCount}</Td></Tr>
+                                            <Tr bg="teal.50"><Td py={3} fontWeight="bold" color="teal.800">Total</Td><Td py={3} isNumeric fontWeight="bold" color="teal.800">{users.length}</Td></Tr>
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            </VStack>
                         </ModalBody>
                     </>
                 );
             case 'doctors':
                 return (
                     <>
-                        <ModalHeader>Active Medical Staff</ModalHeader>
-                        <ModalBody>
-                            <Box overflowX="auto">
-                                <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Name</Th><Th>Role</Th><Th>Status</Th></Tr></Thead>
-                                    <Tbody>
-                                        {medicalStaff.length > 0 ? (
-                                            medicalStaff.map((staff: any) => (
-                                                <Tr key={staff.id}>
-                                                    <Td>{staff.first_name} {staff.last_name}</Td>
-                                                    <Td>{staff.specialization || staff.role}</Td>
-                                                    <Td><Badge colorScheme="green">Active</Badge></Td>
-                                                </Tr>
-                                            ))
-                                        ) : (
-                                            <Tr><Td colSpan={3}>No medical staff found.</Td></Tr>
-                                        )}
-                                    </Tbody>
-                                </Table>
-                            </Box>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiActivity} boxSize={6} />
+                                <Text>Doctors Details</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            <VStack align="stretch" spacing={4}>
+                                <Text fontWeight="bold" fontSize="md" color="gray.700">Active Medical Staff</Text>
+                                <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                    <Table variant="simple" size="sm">
+                                        <Thead bg="gray.50">
+                                            <Tr>
+                                                <Th py={3}>Name</Th>
+                                                <Th py={3}>Role</Th>
+                                                <Th py={3}>Status</Th>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            {medicalStaff.length > 0 ? (
+                                                medicalStaff.map((staff: any) => (
+                                                    <Tr key={staff.id}>
+                                                        <Td py={3} fontWeight="500">{staff.first_name} {staff.last_name}</Td>
+                                                        <Td py={3} color="gray.600">{staff.specialization || staff.role}</Td>
+                                                        <Td py={3}><Badge colorScheme="green" borderRadius="full" px={2}>Active</Badge></Td>
+                                                    </Tr>
+                                                ))
+                                            ) : (
+                                                <Tr><Td colSpan={3} py={5} textAlign="center" color="gray.500">No medical staff found.</Td></Tr>
+                                            )}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            </VStack>
                         </ModalBody>
                     </>
                 );
@@ -602,45 +714,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
                 return (
                     <>
-                        <ModalHeader>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
                             <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
-                                <Text>Today's Appointments</Text>
+                                <HStack align="center" spacing={3}>
+                                    <Icon as={FiCalendar} boxSize={6} />
+                                    <Text>Appointments Details</Text>
+                                </HStack>
                                 <HStack>
-                                    <InputGroup w={{ base: "full", md: "200px" }} size="sm">
+                                    <InputGroup w={{ base: "full", md: "200px" }} size="sm" bg="white" borderRadius="md">
                                         <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
                                         <Input placeholder="Search patient..." value={aptSearchQuery} onChange={(e) => setAptSearchQuery(e.target.value)} />
                                     </InputGroup>
-                                    <Select w="150px" size="sm" value={aptSortOrder} onChange={(e) => setAptSortOrder(e.target.value)}>
+                                    <Select w="150px" size="sm" bg="white" value={aptSortOrder} onChange={(e) => setAptSortOrder(e.target.value)}>
                                         <option value="time-asc">Earliest First</option>
                                         <option value="time-desc">Latest First</option>
                                     </Select>
                                 </HStack>
                             </Flex>
                         </ModalHeader>
-                        <ModalBody>
-                            <Box overflowX="auto">
-                                <Table variant="simple" size="sm">
-                                    <Thead><Tr><Th>Time</Th><Th>Patient</Th><Th>Type</Th></Tr></Thead>
-                                    <Tbody>
-                                        {filteredAppointments.length > 0 ? (
-                                            filteredAppointments.map((apt: any) => (
-                                                <Tr key={apt.id}>
-                                                    <Td>{apt.appointment_time || 'N/A'}</Td>
-                                                    <Td>{apt.first_name ? `${apt.first_name} ${apt.last_name}` : 'Walk-in'}</Td>
-                                                    <Td>{apt.service_type}</Td>
-                                                </Tr>
-                                            ))
-                                        ) : (
-                                            <Tr><Td colSpan={3}>No appointments for today.</Td></Tr>
-                                        )}
-                                    </Tbody>
-                                </Table>
-                            </Box>
-                            <Box mt={4}>
-                                <Text fontSize="sm" color="gray.500" fontStyle="italic">
-                                    Showing {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
-                                </Text>
-                            </Box>
+                        <ModalBody py={6}>
+                            <VStack align="stretch" spacing={4}>
+                                <Text fontWeight="bold" fontSize="md" color="gray.700">Today's Appointments</Text>
+                                <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                    <Table variant="simple" size="sm">
+                                        <Thead bg="gray.50">
+                                            <Tr>
+                                                <Th py={3}>Time</Th>
+                                                <Th py={3}>Patient</Th>
+                                                <Th py={3}>Type</Th>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            {filteredAppointments.length > 0 ? (
+                                                filteredAppointments.map((apt: any) => (
+                                                    <Tr key={apt.id}>
+                                                        <Td py={3} fontWeight="500">{apt.appointment_time || 'N/A'}</Td>
+                                                        <Td py={3}>{apt.first_name ? `${apt.first_name} ${apt.last_name}` : 'Walk-in'}</Td>
+                                                        <Td py={3} color="gray.600">{apt.service_type}</Td>
+                                                    </Tr>
+                                                ))
+                                            ) : (
+                                                <Tr><Td colSpan={3} py={5} textAlign="center" color="gray.500">No appointments for today.</Td></Tr>
+                                            )}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                                <Box mt={2}>
+                                    <Text fontSize="sm" color="gray.500" fontStyle="italic">
+                                        Showing {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
+                                    </Text>
+                                </Box>
+                            </VStack>
                         </ModalBody>
                     </>
                 );
@@ -673,43 +797,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </ModalBody>
                     </>
                 );
-            // FHSIS Modal Content
             case 'activity':
                 return (
-                    <ModalBody>
-                        {selectedActivity ? (
-                            <VStack align="stretch" spacing={4}>
-                                <Box>
-                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">User</Text>
-                                    <Text fontSize="lg">{selectedActivity.user}</Text>
+                    <>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiActivity} boxSize={6} />
+                                <Text>Activity Details</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            {selectedActivity ? (
+                                <VStack align="stretch" spacing={5}>
+                                    <Box p={4} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                        <Text fontWeight="bold" color="teal.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">User</Text>
+                                        <Text fontSize="lg" fontWeight="600" color="gray.800" mt={1}>{selectedActivity.user}</Text>
+                                    </Box>
+                                    <Box p={4} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                        <Text fontWeight="bold" color="teal.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Action Taken</Text>
+                                        <Text fontSize="md" color="gray.700" mt={1}>{selectedActivity.action}</Text>
+                                    </Box>
+                                    <HStack spacing={4}>
+                                        <Box flex={1} p={4} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                            <Text fontWeight="bold" color="teal.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Type</Text>
+                                            <Badge mt={2} colorScheme={
+                                                selectedActivity.type === 'UPDATE' ? 'blue' :
+                                                    selectedActivity.type === 'NEW' ? 'green' :
+                                                        selectedActivity.type === 'COMPLETE' ? 'orange' :
+                                                            selectedActivity.type === 'COMPLETED' ? 'orange' : 'gray'
+                                            } borderRadius="full" px={3} py={1}>{selectedActivity.type}</Badge>
+                                        </Box>
+                                        <Box flex={1} p={4} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                            <Text fontWeight="bold" color="teal.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Timestamp</Text>
+                                            <Text mt={2} fontSize="sm" color="gray.700" fontWeight="500">{selectedActivity.time}</Text>
+                                        </Box>
+                                    </HStack>
+                                    <Box p={4} bg="gray.50" borderRadius="xl" border="1px solid" borderColor="gray.200">
+                                        <Text fontWeight="bold" color="teal.600" fontSize="xs" textTransform="uppercase" letterSpacing="wider">Additional Details</Text>
+                                        <Text mt={2} fontSize="sm" color="gray.700">{selectedActivity.details || 'No further details available for this activity log.'}</Text>
+                                    </Box>
+                                </VStack>
+                            ) : (
+                                <Box py={10} textAlign="center">
+                                    <Icon as={FiAlertTriangle} boxSize={10} color="gray.400" mb={3} />
+                                    <Text color="gray.500">No activity selected.</Text>
                                 </Box>
-                                <Box>
-                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Action</Text>
-                                    <Text>{selectedActivity.action}</Text>
-                                </Box>
-                                <Box>
-                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Type</Text>
-                                    <Badge colorScheme={
-                                        selectedActivity.type === 'UPDATE' ? 'blue' :
-                                            selectedActivity.type === 'NEW' ? 'green' :
-                                                selectedActivity.type === 'COMPLETE' ? 'orange' :
-                                                    selectedActivity.type === 'COMPLETED' ? 'orange' : 'gray'
-                                    }>{selectedActivity.type}</Badge>
-                                </Box>
-                                <Box>
-                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Timestamp</Text>
-                                    <Text>{selectedActivity.time}</Text>
-                                </Box>
-                                <Divider />
-                                <Box>
-                                    <Text fontWeight="bold" color="gray.500" fontSize="sm">Additional Details</Text>
-                                    <Text mt={1} p={3} bg="gray.50" borderRadius="md">{selectedActivity.details || 'No further details available.'}</Text>
-                                </Box>
-                            </VStack>
-                        ) : (
-                            <Text>No activity selected.</Text>
-                        )}
-                    </ModalBody>
+                            )}
+                        </ModalBody>
+                    </>
                 );
             case 'prenatal':
                 return (
@@ -871,7 +1006,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                     </Badge>
                                                 </Td>
                                                 <Td>
-                                                    <Button size="xs" variant="link" colorScheme="teal" onClick={() => { handleCardClick('activity'); handleViewActivity(activity); }}>View</Button>
+                                                    <Button size="xs" colorScheme="gray" variant="outline" onClick={() => { handleCardClick('activity'); handleViewActivity(activity); }}>View</Button>
                                                 </Td>
                                             </Tr>
                                         ))}
@@ -931,6 +1066,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         <option value="date">Date Joined</option>
                                     </Select>
                                     <Button size="sm" colorScheme="orange" leftIcon={<FiActivity />} onClick={fetchUsers}>Refresh List</Button>
+                                    <Button
+                                        size="sm" colorScheme="red" variant="outline"
+                                        leftIcon={<Icon as={FiFileText} />}
+                                        onClick={() => {
+                                            const headers = ['User ID', 'First Name', 'Last Name', 'Email', 'Role', 'Status', 'Date Joined'];
+                                            const rows = filteredUsers.map((u: any) => [
+                                                formatUserId(u.id, u.role, u.created_at),
+                                                u.first_name, u.last_name, u.email,
+                                                u.role, u.status,
+                                                u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
+                                            ]);
+                                            downloadPDF('users_report.pdf', 'Registered Users Report', headers, rows);
+                                        }}
+                                    >
+                                        PDF
+                                    </Button>
+                                    <Button
+                                        size="sm" colorScheme="green" variant="outline"
+                                        leftIcon={<Icon as={FiFileText} />}
+                                        onClick={() => {
+                                            const headers = ['User ID', 'First Name', 'Last Name', 'Email', 'Role', 'Status', 'Date Joined'];
+                                            const rows = filteredUsers.map((u: any) => [
+                                                formatUserId(u.id, u.role, u.created_at),
+                                                u.first_name, u.last_name, u.email,
+                                                u.role, u.status,
+                                                u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
+                                            ]);
+                                            downloadCSV('users_report.csv', headers, rows);
+                                        }}
+                                    >
+                                        CSV
+                                    </Button>
                                 </HStack>
                             </Flex>
                             <Box overflowX="auto">
@@ -960,15 +1127,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                     <Td>{user.created_at || 'N/A'}</Td>
                                                     <Td>
                                                         <HStack spacing={2}>
-                                                            <Button size="xs" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
-                                                            <Button
-                                                                size="xs"
-                                                                colorScheme={user.status === 'Active' ? 'red' : 'green'}
-                                                                variant="ghost"
-                                                                onClick={() => handleToggleUserStatus(user)}
-                                                            >
-                                                                {user.status === 'Active' ? 'Deactivate' : 'Activate'}
-                                                            </Button>
+                                                            {(user?.role || '').toLowerCase().includes('super') ? (
+                                                                <>
+                                                                    <Button size="xs" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
+                                                                    <Button
+                                                                        size="xs"
+                                                                        colorScheme={user.status === 'Active' ? 'red' : 'green'}
+                                                                        variant="ghost"
+                                                                        onClick={() => openToggleUserStatus(user)}
+                                                                    >
+                                                                        {user.status === 'Active' ? 'Deactivate' : 'Activate'}
+                                                                    </Button>
+                                                                </>
+                                                            ) : (
+                                                                <Button size="xs" colorScheme="gray" variant="outline" onClick={() => handleEditClick(user)}>View</Button>
+                                                            )}
                                                         </HStack>
                                                     </Td>
                                                 </Tr>
@@ -1072,8 +1245,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                     </Td>
                                                     <Td>
                                                         <HStack spacing={1}>
-                                                            <Button size="xs" variant="ghost" onClick={() => handleEditClick(staff)}>Edit</Button>
-                                                            <Button size="xs" variant="ghost" colorScheme="orange" onClick={() => handleResendCredentials(staff.id)}>Resend</Button>
+                                                            {(user?.role || '').toLowerCase().includes('super') ? (
+                                                                <>
+                                                                    <Button size="xs" variant="ghost" onClick={() => handleEditClick(staff)}>Edit</Button>
+                                                                    <Button size="xs" variant="ghost" colorScheme="orange" onClick={() => handleResendCredentials(staff.id)}>Resend</Button>
+                                                                </>
+                                                            ) : (
+                                                                <Button size="xs" colorScheme="gray" variant="outline" onClick={() => handleEditClick(staff)}>View</Button>
+                                                            )}
                                                         </HStack>
                                                     </Td>
                                                 </Tr>
@@ -1110,9 +1289,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 const tbPct = analyticsData?.tb_treatment?.success_pct ?? 0;
                 const tbTotal = analyticsData?.tb_treatment?.total ?? 0;
 
-                const morbidity: any[] = analyticsData?.morbidity ?? [];
-                const hotspots: any[] = analyticsData?.dengue_hotspots ?? [];
-                const dengueTotal: number = analyticsData?.dengue_total ?? 0;
 
                 return (
                     <VStack align="stretch" spacing={10}>
@@ -1121,6 +1297,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             title="Field Health Services Information System"
                             description="Real-time tracking of public health programs, immunization targets, and morbidity statistics complying with DOH standards."
                         />
+
+                        {/* Export Toolbar */}
+                        <Flex justify="flex-end" wrap="wrap" gap={3}>
+                            <Text alignSelf="center" fontSize="sm" color="gray.500" fontWeight="medium">Export Records:</Text>
+                            <Button
+                                size="sm" colorScheme="red" variant="outline"
+                                leftIcon={<Icon as={FiFileText} />}
+                                onClick={() => {
+                                    const headers = ['Service', 'Total Appointments', 'Upcoming', 'Completed'];
+                                    const rows = (predictiveData?.top_services || []).map((s: any) => [
+                                        s.service, s.total, s.upcoming, s.completed
+                                    ]);
+                                    downloadPDF(
+                                        'service_demand_report.pdf',
+                                        'Service Demand Report',
+                                        headers, rows
+                                    );
+                                }}
+                                isDisabled={!predictiveData}
+                            >
+                                PDF
+                            </Button>
+                            <Button
+                                size="sm" colorScheme="green" variant="outline"
+                                leftIcon={<Icon as={FiFileText} />}
+                                onClick={() => {
+                                    const headers = ['Service', 'Total Appointments', 'Upcoming', 'Completed'];
+                                    const rows = (predictiveData?.top_services || []).map((s: any) => [
+                                        s.service, s.total, s.upcoming, s.completed
+                                    ]);
+                                    downloadCSV('service_demand_report.csv', headers, rows);
+                                }}
+                                isDisabled={!predictiveData}
+                            >
+                                CSV
+                            </Button>
+                        </Flex>
 
                         {analyticsLoading && (
                             <Flex justify="center" py={4}>
@@ -1194,123 +1407,178 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     </Box>
                                 </SimpleGrid>
 
-                                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={10}>
-                                    {/* Morbidity Report */}
-                                    <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm">
-                                        <Flex justify="space-between" align="center" mb={4}>
-                                            <HStack>
-                                                <Icon as={FiAlertTriangle} color="red.500" />
-                                                <Heading size="md" color="gray.700">Top Morbidity (Diagnoses)</Heading>
-                                            </HStack>
-                                            <HStack>
-                                                <Badge colorScheme="red">Live Data</Badge>
-                                                <Button size="xs" variant="ghost" colorScheme="teal" onClick={fetchAnalytics}>Refresh</Button>
-                                            </HStack>
-                                        </Flex>
-                                        <Box overflowX="auto">
-                                            <Table variant="simple" size="sm">
-                                                <Thead>
-                                                    <Tr>
-                                                        <Th>Rank</Th>
-                                                        <Th>Illness / Diagnosis</Th>
-                                                        <Th isNumeric>Cases</Th>
-                                                        <Th>Trend</Th>
-                                                    </Tr>
-                                                </Thead>
-                                                <Tbody>
-                                                    {morbidity.length > 0 ? (
-                                                        morbidity.map((d: any, i: number) => (
-                                                            <Tr key={i}>
-                                                                <Td fontWeight="bold" color="gray.500">#{i + 1}</Td>
-                                                                <Td fontWeight="600">{d.name}</Td>
-                                                                <Td isNumeric fontWeight="bold">{d.cases.toLocaleString()}</Td>
-                                                                <Td>
-                                                                    <Badge colorScheme={
-                                                                        d.trend === 'up' ? 'red' :
-                                                                            d.trend === 'down' ? 'green' : 'gray'
-                                                                    }>
-                                                                        {d.trend === 'up' ? 'Rising' : d.trend === 'down' ? 'Falling' : 'Stable'}
-                                                                    </Badge>
-                                                                </Td>
-                                                            </Tr>
-                                                        ))
-                                                    ) : (
-                                                        <Tr>
-                                                            <Td colSpan={4} textAlign="center" py={6} color="gray.400">
-                                                                No diagnosis data recorded yet. Data will appear as doctors complete consultations.
-                                                            </Td>
-                                                        </Tr>
-                                                    )}
-                                                </Tbody>
-                                            </Table>
-                                        </Box>
+                            </>
+                        )}
+
+                        {/* ── Predictive Resource Allocation ─────────────────── */}
+                        <Box>
+                            <HStack mb={6} spacing={3} align="center">
+                                <Box p={2} bg="purple.50" borderRadius="lg">
+                                    <Icon as={FiBarChart2} color="purple.500" boxSize={5} />
+                                </Box>
+                                <Box>
+                                    <Text fontWeight="bold" fontSize="lg" color="gray.800">
+                                        Predictive Resource Allocation
+                                    </Text>
+                                </Box>
+                                <Badge ml="auto" colorScheme="purple" variant="subtle" px={3} py={1} borderRadius="full">
+                                    AI-Assisted
+                                </Badge>
+                                <Button size="xs" leftIcon={<Icon as={FiRefreshCw} />} variant="ghost" colorScheme="purple"
+                                    onClick={fetchPredictiveInsights} isLoading={predictiveLoading}>
+                                    Refresh
+                                </Button>
+                            </HStack>
+
+                            {/* Legend */}
+                            <Flex
+                                wrap="wrap" gap={4} px={4} py={3}
+                                bg="gray.50" borderRadius="xl" mb={2}
+                                align="center"
+                            >
+                                <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase" letterSpacing="wide" mr={2}>
+                                    Legend:
+                                </Text>
+                                {/* Inventory badges */}
+                                <HStack spacing={1}>
+                                    <Box w={2} h={2} borderRadius="full" bg="red.500" />
+                                    <Badge colorScheme="red" fontSize="2xs" variant="subtle">CRITICAL</Badge>
+                                    <Text fontSize="2xs" color="gray.500">— Out of stock or flagged Critical</Text>
+                                </HStack>
+                                <HStack spacing={1}>
+                                    <Box w={2} h={2} borderRadius="full" bg="orange.400" />
+                                    <Badge colorScheme="orange" fontSize="2xs" variant="subtle">LOW</Badge>
+                                    <Text fontSize="2xs" color="gray.500">— ≤10 units or Low Stock status</Text>
+                                </HStack>
+                                <HStack spacing={1}>
+                                    <Box w={2} h={2} borderRadius="full" bg="yellow.400" />
+                                    <Badge colorScheme="yellow" fontSize="2xs" variant="subtle">WATCH</Badge>
+                                    <Text fontSize="2xs" color="gray.500">— Related to high-demand services</Text>
+                                </HStack>
+                                <HStack spacing={1}>
+                                    <Badge colorScheme="orange" fontSize="2xs">⚠️ Warning</Badge>
+                                    <Text fontSize="2xs" color="gray.500">— ≥3 appointments this week</Text>
+                                </HStack>
+                                <HStack spacing={1}>
+                                    <Badge colorScheme="blue" fontSize="2xs">ℹ️ Info</Badge>
+                                    <Text fontSize="2xs" color="gray.500">— General scheduling insight</Text>
+                                </HStack>
+                            </Flex>
+
+                            {predictiveLoading && (
+                                <Flex justify="center" py={8}>
+                                    <Spinner color="purple.500" size="lg" />
+                                </Flex>
+                            )}
+
+                            {!predictiveLoading && predictiveData && (
+                                <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={6}>
+
+                                    {/* Top Services */}
+                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderTop="4px solid" borderColor="purple.400">
+                                        <Text fontWeight="bold" fontSize="sm" color="purple.700" mb={4} textTransform="uppercase" letterSpacing="wide">
+                                            📊 Service Demand
+                                        </Text>
+                                        <VStack align="stretch" spacing={3}>
+                                            {(predictiveData.top_services || []).slice(0, 5).map((svc: any, i: number) => (
+                                                <Box key={i}>
+                                                    <Flex justify="space-between" mb={1}>
+                                                        <Text fontSize="sm" fontWeight="medium" color="gray.700" noOfLines={1}>
+                                                            {svc.service}
+                                                        </Text>
+                                                        <HStack spacing={1}>
+                                                            {svc.upcoming > 0 && (
+                                                                <Badge colorScheme="orange" fontSize="xs">{svc.upcoming} upcoming</Badge>
+                                                            )}
+                                                            <Badge colorScheme="teal" variant="outline" fontSize="xs">{svc.total}</Badge>
+                                                        </HStack>
+                                                    </Flex>
+                                                    <Progress
+                                                        value={Math.min(100, (svc.total / Math.max(...(predictiveData.top_services || []).map((s: any) => s.total), 1)) * 100)}
+                                                        size="xs" colorScheme="purple" borderRadius="full"
+                                                    />
+                                                </Box>
+                                            ))}
+                                            {(predictiveData.top_services || []).length === 0 && (
+                                                <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
+                                                    No appointment data yet
+                                                </Text>
+                                            )}
+                                        </VStack>
                                     </Box>
 
-                                    {/* Disease Heatmap */}
-                                    <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm">
-                                        <Flex justify="space-between" align="center" mb={4}>
-                                            <HStack>
-                                                <Icon as={FiMap} color="teal.500" />
-                                                <Heading size="md" color="gray.700">Disease Heatmap (Dengue)</Heading>
-                                            </HStack>
-                                            <Badge colorScheme={dengueTotal > 0 ? 'red' : 'gray'}>
-                                                {dengueTotal > 0 ? `${dengueTotal} cases` : 'No cases'}
-                                            </Badge>
-                                        </Flex>
-
-                                        <Box
-                                            h="220px"
-                                            bg="gray.100"
-                                            borderRadius="xl"
-                                            display="flex"
-                                            alignItems="center"
-                                            justifyContent="center"
-                                            bgImage="linear-gradient(rgba(255,255,255,0.8), rgba(255,255,255,0.8)), url('https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Caloocan_City_Barangays.png/1200px-Caloocan_City_Barangays.png')"
-                                            bgSize="cover"
-                                            bgPosition="center"
-                                            position="relative"
-                                            mb={4}
-                                        >
-                                            {/* Dynamic blobs for hotspots */}
-                                            {hotspots.map((h: any, i: number) => (
-                                                <Box
-                                                    key={i}
-                                                    position="absolute"
-                                                    top={`${25 + i * 18}%`}
-                                                    left={`${30 + i * 15}%`}
-                                                    bg={h.level === 'High' ? 'red.500' : h.level === 'Medium' ? 'orange.400' : 'yellow.400'}
-                                                    w={`${50 - i * 5}px`} h={`${50 - i * 5}px`}
-                                                    borderRadius="full"
-                                                    opacity={0.6 - i * 0.05}
-                                                    filter="blur(8px)"
-                                                />
-                                            ))}
-                                            {hotspots.length === 0 && (
-                                                <Text color="gray.500" fontSize="sm">No active dengue hotspots</Text>
-                                            )}
-                                        </Box>
-
-                                        {/* Hotspot List */}
+                                    {/* Recommended Inventory */}
+                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderTop="4px solid" borderColor="green.400">
+                                        <Text fontWeight="bold" fontSize="sm" color="green.700" mb={4} textTransform="uppercase" letterSpacing="wide">
+                                            💊 Inventory Forecast
+                                        </Text>
                                         <VStack align="stretch" spacing={2}>
-                                            <Text fontWeight="bold" fontSize="sm" mb={1}>Hotspot Summary</Text>
-                                            {hotspots.length > 0 ? (
-                                                hotspots.map((h: any, i: number) => (
-                                                    <HStack key={i} spacing={2}>
-                                                        <Box
-                                                            w="3" h="3" borderRadius="full" flexShrink={0}
-                                                            bg={h.level === 'High' ? 'red.500' : h.level === 'Medium' ? 'orange.400' : 'yellow.400'}
-                                                        />
-                                                        <Text fontSize="xs">{h.area} ({h.level}) — {h.count} case{h.count !== 1 ? 's' : ''}</Text>
+                                            {(predictiveData.recommended_inventory || []).slice(0, 8).map((inv: any, i: number) => {
+                                                const isOut = inv.stock === 0;
+                                                const isCritical = inv.status === 'Critical' || isOut;
+                                                const isLow = inv.status === 'Low Stock' || inv.stock <= 10;
+                                                const dotColor = isCritical ? "red.500" : isLow ? "orange.400" : "yellow.400";
+                                                const badgeColor = isCritical ? "red" : isLow ? "orange" : "yellow";
+                                                const badgeLabel = isCritical ? "CRITICAL" : isLow ? "LOW" : "WATCH";
+                                                return (
+                                                    <Box key={i} py={1} borderBottom="1px solid" borderColor="gray.100" _last={{ borderBottom: 'none' }}>
+                                                        <Flex align="center" gap={2}>
+                                                            <Box w={2} h={2} borderRadius="full" bg={dotColor} flexShrink={0} />
+                                                            <Box flex={1} minW={0}>
+                                                                <Text fontSize="xs" color="gray.800" fontWeight="medium" noOfLines={1}>{inv.item}</Text>
+                                                                <Text fontSize="2xs" color="gray.400">{inv.category} · {inv.stock} {inv.unit} remaining</Text>
+                                                            </Box>
+                                                            <Badge colorScheme={badgeColor} fontSize="2xs" variant="subtle" flexShrink={0}>
+                                                                {badgeLabel}
+                                                            </Badge>
+                                                        </Flex>
+                                                    </Box>
+                                                );
+                                            })}
+                                            {(predictiveData.recommended_inventory || []).length === 0 && (
+                                                <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
+                                                    All inventory levels look sufficient
+                                                </Text>
+                                            )}
+                                        </VStack>
+                                    </Box>
+
+                                    {/* Staffing Alerts */}
+                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderTop="4px solid" borderColor="blue.400">
+                                        <Text fontWeight="bold" fontSize="sm" color="blue.700" mb={4} textTransform="uppercase" letterSpacing="wide">
+                                            👥 Staffing Insights
+                                        </Text>
+                                        <VStack align="stretch" spacing={3}>
+                                            {(predictiveData.staffing_alerts || []).map((alert: any, i: number) => (
+                                                <Box
+                                                    key={i} p={3} borderRadius="lg"
+                                                    bg={alert.level === 'warning' ? "orange.50" : "blue.50"}
+                                                    borderLeft="3px solid"
+                                                    borderColor={alert.level === 'warning' ? "orange.400" : "blue.400"}
+                                                >
+                                                    <HStack spacing={2} align="flex-start">
+                                                        <Text fontSize="sm">{alert.level === 'warning' ? '⚠️' : 'ℹ️'}</Text>
+                                                        <Text fontSize="xs" color="gray.700" lineHeight="tall">{alert.message}</Text>
                                                     </HStack>
-                                                ))
-                                            ) : (
-                                                <Text fontSize="xs" color="gray.400">No dengue cases recorded. Hotspots will appear when dengue diagnoses are logged.</Text>
+                                                </Box>
+                                            ))}
+                                            {(predictiveData.staffing_alerts || []).length === 0 && (
+                                                <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
+                                                    No staffing alerts at this time
+                                                </Text>
                                             )}
                                         </VStack>
                                     </Box>
                                 </SimpleGrid>
-                            </>
-                        )}
+                            )}
+
+                            {!predictiveLoading && !predictiveData && (
+                                <Box p={8} textAlign="center" bg="white" borderRadius="2xl" boxShadow="sm">
+                                    <Text color="gray.400">Could not load predictive data. Please try refreshing.</Text>
+                                </Box>
+                            )}
+                        </Box>
+
                     </VStack>
                 );
             }
@@ -1457,13 +1725,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             </Drawer>
 
             {/* Edit User Modal */}
-            <Modal isOpen={isEditOpen} onClose={onEditClose}>
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Edit User</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
-                        <VStack spacing={4}>
+            <Modal isOpen={isEditOpen} onClose={onEditClose} isCentered size="lg">
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius="2xl" overflow="hidden">
+                    <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                        <HStack align="center" spacing={3}>
+                            <Icon as={FiUser} boxSize={6} />
+                            <Text>{(user?.role || '').toLowerCase().includes('super') ? 'Edit User Information' : 'User Information'}</Text>
+                        </HStack>
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
+                        <VStack spacing={5}>
                             <Box w="full">
                                 <Text mb={1} fontSize="sm" fontWeight="bold">First Name</Text>
                                 <input
@@ -1505,20 +1778,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     maxLength={11}
                                 />
                             </Box>
+                            <HStack w="full" spacing={4}>
+                                <Box w="full">
+                                    <Text mb={1} fontSize="sm" fontWeight="bold">Date of Birth</Text>
+                                    <input
+                                        type="date"
+                                        className="chakra-input css-1"
+                                        style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem', backgroundColor: '#f7fafc', cursor: 'not-allowed' }}
+                                        value={formData.date_of_birth ? new Date(formData.date_of_birth).toISOString().split('T')[0] : ''}
+                                        readOnly
+                                    />
+                                </Box>
+                                <Box w="full">
+                                    <Text mb={1} fontSize="sm" fontWeight="bold">Gender</Text>
+                                    <input
+                                        className="chakra-input css-1"
+                                        style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem', backgroundColor: '#f7fafc', cursor: 'not-allowed' }}
+                                        value={formData.gender || ''}
+                                        readOnly
+                                    />
+                                </Box>
+                            </HStack>
                             <Box w="full">
-                                <Text mb={1} fontSize="sm" fontWeight="bold">Role (Access Level)</Text>
-                                <Select
-                                    value={formData.role}
-                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                >
-                                    <option value="Patient">Patient</option>
-                                    <option value="Medical Staff">Medical Staff</option>
-                                    <option value="Administrator">Administrator</option>
-                                    <option value="Doctor">Doctor</option>
-                                    <option value="Nurse">Nurse</option>
-                                    <option value="Midwife">Midwife</option>
-                                    <option value="Health Worker">Health Worker</option>
-                                </Select>
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Complete Address (Include Barangay & City)</Text>
+                                <textarea
+                                    className="chakra-textarea css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem', backgroundColor: '#f7fafc', cursor: 'not-allowed', resize: 'vertical', minHeight: '120px' }}
+                                    value={formData.full_address || [formData.barangay, formData.city].filter(Boolean).join(', ') || 'Address not provided'}
+                                    readOnly
+                                />
                             </Box>
 
                             {['Medical Staff', 'Doctor', 'Nurse', 'Midwife', 'Health Worker'].includes(formData.role) && (
@@ -1584,21 +1872,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             )}
                         </VStack>
                     </ModalBody>
-                    <ModalFooter>
-                        <Button variant="ghost" mr={3} onClick={onEditClose}>Cancel</Button>
-                        <Button colorScheme="blue" onClick={handleUpdateUser}>Save Changes</Button>
+                    <ModalFooter bg="gray.50" borderTopWidth="1px">
+                        <Button variant="ghost" mr={3} onClick={onEditClose}>
+                            {(user?.role || '').toLowerCase().includes('super') ? 'Cancel' : 'Close'}
+                        </Button>
+                        {(user?.role || '').toLowerCase().includes('super') && (
+                            <Button colorScheme="blue" onClick={handleUpdateUser} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>Save Changes</Button>
+                        )}
                     </ModalFooter>
                 </ModalContent>
             </Modal>
 
             {/* Add Staff Modal */}
-            <Modal isOpen={isAddStaffOpen} onClose={onAddStaffClose}>
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Add New Medical Staff</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
-                        <VStack spacing={4}>
+            <Modal isOpen={isAddStaffOpen} onClose={onAddStaffClose} isCentered size="lg">
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius="2xl" overflow="hidden">
+                    <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                        <HStack align="center" spacing={3}>
+                            <Icon as={FiUserPlus} boxSize={6} />
+                            <Text>Add New Medical Staff</Text>
+                        </HStack>
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
+                        <VStack spacing={5}>
                             <FormControl>
                                 <FormLabel>Role</FormLabel>
                                 <Select
@@ -1684,12 +1981,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             </HStack>
                         </VStack>
                     </ModalBody>
-                    <ModalFooter>
+                    <ModalFooter bg="gray.50" borderTopWidth="1px">
                         <Button variant="ghost" mr={3} onClick={onAddStaffClose}>Cancel</Button>
-                        <Button colorScheme="teal" onClick={handleAddStaff}>Create Account</Button>
+                        <Button colorScheme="teal" onClick={handleAddStaff} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>Create Account</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>
+            {/* Action Confirmation AlertDialog */}
+            <AlertDialog
+                isOpen={isStatusAlertOpen}
+                leastDestructiveRef={cancelStatusRef}
+                onClose={onStatusAlertClose}
+                isCentered
+            >
+                <AlertDialogOverlay backdropFilter="blur(4px)">
+                    <AlertDialogContent borderRadius="2xl" boxShadow="2xl">
+                        <AlertDialogHeader fontSize="lg" fontWeight="bold">
+                            User Status Confirmation
+                        </AlertDialogHeader>
+
+                        <AlertDialogBody color="gray.600" fontSize="md">
+                            Are you sure you want to {userToToggle?.status === 'Active' ? 'deactivate' : 'activate'} this user's account?
+                        </AlertDialogBody>
+
+                        <AlertDialogFooter>
+                            <Button ref={cancelStatusRef} onClick={onStatusAlertClose} variant="ghost" mr={3} borderRadius="lg">
+                                Cancel
+                            </Button>
+                            <Button
+                                colorScheme={userToToggle?.status === 'Active' ? 'red' : 'green'}
+                                onClick={confirmToggleUserStatus}
+                                borderRadius="lg"
+                                px={6}
+                                boxShadow="md"
+                            >
+                                Confirm
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
         </Box>
     );
 };

@@ -1,6 +1,7 @@
 import { useState, FC, ReactNode, InputHTMLAttributes, SelectHTMLAttributes, FormEvent, ChangeEvent, useEffect } from 'react';
 import { useLanguage } from './contexts/LanguageContext';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { useToast } from '@chakra-ui/react';
 
 type Option = { code: string; name: string };
 type ConfidenceMap = Record<string, number>;
@@ -127,6 +128,7 @@ const Select: FC<
 
 function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register' }) {
   const { t } = useLanguage();
+  const toast = useToast();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [activePortal, setActivePortal] = useState<'patient' | 'staff' | 'admin' | 'superadmin'>('patient');
   const [pendingUser, setPendingUser] = useState<any>(null);
@@ -982,10 +984,12 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
     if (!password) newErrors.password = true;
     if (!confirmPassword) newErrors.confirmPassword = true;
     if (!dob) newErrors.dob = true;
+    if (!gender) newErrors.gender = true;
     if (!contact) newErrors.contact = true;
+    if (!selectedRegion) newErrors.region = true;
     if (!barangay) newErrors.barangay = true;
     if (!city) newErrors.city = true;
-    if (!province) newErrors.province = true;
+    if (!province && selectedRegion !== '1300000000') newErrors.province = true;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -1071,7 +1075,16 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       const res = await fetch('/api/register', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Registration failed');
-      alert('Registration successful!');
+
+      toast({
+        title: 'Registration Successful!',
+        description: 'Your account has been created. You can now log in.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+        position: 'top',
+      });
+
       setMode('login');
       resetFormFields();
     } catch (err: any) {
@@ -1750,7 +1763,11 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         { code: 'Other', name: t.other }
                       ]}
                       value={gender}
-                      onChange={(e) => setGender(e.target.value)}
+                      onChange={(e) => {
+                        setGender(e.target.value);
+                        if (errors.gender) setErrors(prev => ({ ...prev, gender: false }));
+                      }}
+                      invalid={errors.gender}
                       required
                     />
 
@@ -1784,7 +1801,11 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       icon="🗺️"
                       options={regions.map(r => ({ code: r.code, name: r.name }))}
                       value={selectedRegion}
-                      onChange={(e) => setSelectedRegion(e.target.value)}
+                      onChange={(e) => {
+                        setSelectedRegion(e.target.value);
+                        if (errors.region) setErrors(prev => ({ ...prev, region: false }));
+                      }}
+                      invalid={errors.region}
                       required
                     />
 
@@ -1795,11 +1816,13 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       value={selectedProvince}
                       onChange={(e) => {
                         setSelectedProvince(e.target.value);
+                        if (errors.province) setErrors(prev => ({ ...prev, province: false }));
                         const provName = provinces.find(p => p.code === e.target.value)?.name || '';
                         handleInputChange('province', provName, setProvince);
                       }}
                       disabled={selectedRegion === '1300000000' || provinces.length === 0}
                       required={selectedRegion !== '1300000000'}
+                      invalid={errors.province}
                       placeholder={selectedRegion === '1300000000' ? "Metro Manila (NCR)" : "Select Province"}
                     />
 
@@ -1811,6 +1834,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       onChange={(e) => {
                         const code = e.target.value;
                         setSelectedCity(code);
+                        if (errors.city) setErrors(prev => ({ ...prev, city: false }));
                         const cityName = cities.find(c => c.code === code)?.name || '';
                         handleInputChange('city', cityName, setCity);
 
@@ -1820,6 +1844,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         }
                       }}
                       disabled={cities.length === 0}
+                      invalid={errors.city}
                       required
                     />
 
@@ -1831,6 +1856,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       onChange={(e) => {
                         const code = e.target.value;
                         setSelectedBarangay(code);
+                        if (errors.barangay) setErrors(prev => ({ ...prev, barangay: false }));
                         const brgyName = barangays.find(b => b.code === code)?.name || '';
                         handleInputChange('barangay', brgyName, setBarangay);
 
@@ -1844,6 +1870,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         }
                       }}
                       disabled={barangays.length === 0}
+                      invalid={errors.barangay}
                       required
                     />
 

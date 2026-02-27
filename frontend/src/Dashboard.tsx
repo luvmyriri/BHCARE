@@ -27,12 +27,18 @@ import {
     ModalCloseButton,
     useDisclosure,
     Drawer,
+    Textarea,
+    Checkbox,
+    FormControl,
+    FormLabel,
+    Input,
     DrawerBody,
     DrawerOverlay,
     DrawerContent,
     DrawerCloseButton,
     IconButton,
     SimpleGrid,
+    useToast,
 } from '@chakra-ui/react';
 import {
     FiHome,
@@ -42,6 +48,7 @@ import {
     FiActivity,
     FiFileText,
     FiMenu,
+    FiClipboard,
 } from 'react-icons/fi';
 import Profile from './Profile';
 import Appointments from './Appointments';
@@ -171,6 +178,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
     const { isOpen: isImageZoomOpen, onOpen: onImageZoomOpen, onClose: onImageZoomClose } = useDisclosure();
     const [selectedCard, setSelectedCard] = useState<string | null>(null);
     const [appointmentView, setAppointmentView] = useState<'book' | 'my-appointments'>('book');
+    const toast = useToast();
 
     const handleOpenAppointments = (view: 'book' | 'my-appointments') => {
         setAppointmentView(view);
@@ -189,6 +197,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
     const [appointments, setAppointments] = useState<any[]>([]);
     const [medicalHistory, setMedicalHistory] = useState<any[]>([]);
     const [selectedRecord, setSelectedRecord] = useState<any>(null);
+
+    // Document Request States
+    const [isDocReqModalOpen, setIsDocReqModalOpen] = useState(false);
+    const [docReqType, setDocReqType] = useState('');
+    const [docReqReason, setDocReqReason] = useState('');
+    const [docReqSickness, setDocReqSickness] = useState('');
+    const [docReqConsult, setDocReqConsult] = useState(false);
+    const [isDocReqSubmitting, setIsDocReqSubmitting] = useState(false);
+
+    const onDocReqClose = () => {
+        setIsDocReqModalOpen(false);
+        setDocReqReason('');
+        setDocReqSickness('');
+        setDocReqConsult(false);
+    };
+
+    const handleOpenDocReqModal = (type: string) => {
+        setDocReqType(type);
+        setIsDocReqModalOpen(true);
+    };
 
     React.useEffect(() => {
         if (user?.id) {
@@ -211,6 +239,64 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                 .catch(err => console.error(err));
         }
     }, [user?.id]);
+
+    const handleDocumentRequest = async () => {
+        if (!docReqReason.trim() || !docReqSickness.trim() || !docReqConsult) {
+            toast({
+                title: "Missing fields",
+                description: "Please fill out the reason, your condition, and acknowledge the consultation requirement.",
+                status: "warning",
+                duration: 4000,
+                isClosable: true,
+            });
+            return;
+        }
+
+        setIsDocReqSubmitting(true);
+        try {
+            const res = await fetch('/api/documents/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user?.id,
+                    document_type: docReqType,
+                    reason: docReqReason,
+                    sickness: docReqSickness,
+                    consultation_acknowledged: docReqConsult
+                }),
+            });
+
+            if (res.ok) {
+                toast({
+                    title: "Request Submitted",
+                    description: `Your request for a ${docReqType} has been successfully submitted.`,
+                    status: "success",
+                    duration: 5000,
+                    isClosable: true,
+                });
+                onDocReqClose();
+            } else {
+                toast({
+                    title: "Request Failed",
+                    description: "There was an error submitting your request. Please try again later.",
+                    status: "error",
+                    duration: 5000,
+                    isClosable: true,
+                });
+            }
+        } catch (error) {
+            console.error("Error requesting document:", error);
+            toast({
+                title: "Error",
+                description: "A network error occurred.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+        } finally {
+            setIsDocReqSubmitting(false);
+        }
+    };
 
     const nextAppointment = appointments.length > 0 ? appointments[0] : null;
 
@@ -259,45 +345,69 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
             case 'record_detail':
                 return (
                     <>
-                        <ModalHeader>Medical Record Detail</ModalHeader>
-                        <ModalBody>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiClipboard} boxSize={6} />
+                                <Text>Medical Record Detail</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
                             {selectedRecord ? (
-                                <VStack align="stretch" spacing={4}>
-                                    <Box>
-                                        <Text fontWeight="bold" fontSize="sm">Date:</Text>
-                                        <Text>{selectedRecord.created_at}</Text>
+                                <VStack align="stretch" spacing={5}>
+                                    <Box p={5} bg="blue.50" borderRadius="xl" border="1px solid" borderColor="blue.100">
+                                        <SimpleGrid columns={2} spacing={4}>
+                                            <Box>
+                                                <Text fontWeight="800" fontSize="xs" color="blue.800" textTransform="uppercase">Date Recorded</Text>
+                                                <Text fontSize="md" color="blue.900" fontWeight="600">{selectedRecord.created_at}</Text>
+                                            </Box>
+                                            <Box>
+                                                <Text fontWeight="800" fontSize="xs" color="blue.800" textTransform="uppercase">Attending Doctor</Text>
+                                                <Text fontSize="md" color="blue.900" fontWeight="600">{selectedRecord.doctor_name || 'Medical Officer'}</Text>
+                                            </Box>
+                                        </SimpleGrid>
                                     </Box>
-                                    <Box>
-                                        <Text fontWeight="bold" fontSize="sm">Doctor:</Text>
-                                        <Text>{selectedRecord.doctor_name || 'Unknown'}</Text>
+
+                                    <Box p={5} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                        <VStack align="stretch" spacing={4}>
+                                            <Box borderLeft="3px solid" borderColor="purple.400" pl={4}>
+                                                <Text fontWeight="800" fontSize="xs" color="gray.500" textTransform="uppercase" mb={1}>Assessment (Diagnosis)</Text>
+                                                <Text fontSize="md" color="gray.800">{selectedRecord.assessment || 'None specified'}</Text>
+                                            </Box>
+                                            {selectedRecord.subjective && (
+                                                <Box borderLeft="3px solid" borderColor="blue.400" pl={4}>
+                                                    <Text fontWeight="800" fontSize="xs" color="gray.500" textTransform="uppercase" mb={1}>Subjective (Symptoms)</Text>
+                                                    <Text fontSize="md" color="gray.800">{selectedRecord.subjective}</Text>
+                                                </Box>
+                                            )}
+                                            {selectedRecord.objective && (
+                                                <Box borderLeft="3px solid" borderColor="green.400" pl={4}>
+                                                    <Text fontWeight="800" fontSize="xs" color="gray.500" textTransform="uppercase" mb={1}>Objective (Findings)</Text>
+                                                    <Text fontSize="md" color="gray.800">{selectedRecord.objective}</Text>
+                                                </Box>
+                                            )}
+                                            {selectedRecord.plan && (
+                                                <Box borderLeft="3px solid" borderColor="orange.400" pl={4}>
+                                                    <Text fontWeight="800" fontSize="xs" color="gray.500" textTransform="uppercase" mb={1}>Plan (Treatment)</Text>
+                                                    <Text fontSize="md" color="gray.800">{selectedRecord.plan}</Text>
+                                                </Box>
+                                            )}
+                                        </VStack>
                                     </Box>
-                                    <Box>
-                                        <Text fontWeight="bold" fontSize="sm">Assessment (Diagnosis):</Text>
-                                        <Text>{selectedRecord.assessment || 'None'}</Text>
-                                    </Box>
-                                    {selectedRecord.subjective && (
-                                        <Box>
-                                            <Text fontWeight="bold" fontSize="sm">Subjective (Symptoms):</Text>
-                                            <Text>{selectedRecord.subjective}</Text>
-                                        </Box>
-                                    )}
-                                    {selectedRecord.objective && (
-                                        <Box>
-                                            <Text fontWeight="bold" fontSize="sm">Objective (Findings):</Text>
-                                            <Text>{selectedRecord.objective}</Text>
-                                        </Box>
-                                    )}
-                                    {selectedRecord.plan && (
-                                        <Box>
-                                            <Text fontWeight="bold" fontSize="sm">Plan (Treatment):</Text>
-                                            <Text>{selectedRecord.plan}</Text>
-                                        </Box>
-                                    )}
                                 </VStack>
                             ) : (
-                                <Text>No record details available.</Text>
+                                <Box py={10} textAlign="center">
+                                    <VStack color="gray.400" spacing={3}>
+                                        <Icon as={FiFileText} boxSize={12} color="gray.300" />
+                                        <Text fontSize="md" fontWeight="500">No record details available.</Text>
+                                    </VStack>
+                                </Box>
                             )}
                         </ModalBody>
+                        <ModalFooter bg="gray.50" borderTopWidth="1px">
+                            <Button colorScheme="teal" mr={3} onClick={onClose} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>
+                                Close
+                            </Button>
+                        </ModalFooter>
                     </>
                 );
             // Health score modal removed
@@ -513,6 +623,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             isOpen={isAppointmentsOpen}
                             initialView={appointmentView}
                         />
+
                     </>
                 );
             case 'profile':
@@ -581,10 +692,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                         Need a medical certificate or health clearance? Request it here and pick it up at the center.
                                     </Text>
                                     <Divider borderColor="teal.200" />
-                                    <Button w="full" colorScheme="teal" size="md">
+                                    <Button w="full" colorScheme="teal" size="md" onClick={() => handleOpenDocReqModal('Medical Certificate')}>
                                         Request Medical Certificate
                                     </Button>
-                                    <Button w="full" colorScheme="orange" variant="outline" size="md">
+                                    <Button w="full" colorScheme="orange" variant="outline" size="md" onClick={() => handleOpenDocReqModal('Health Clearance')}>
                                         Request Health Clearance
                                     </Button>
                                     <Text fontSize="xs" color="gray.500" mt={2}>
@@ -766,17 +877,87 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
             {/* AI Chatbot */}
             <AIChatbot />
 
-            <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>{selectedCard && selectedCard.replace('_', ' ').charAt(0).toUpperCase() + selectedCard.replace('_', ' ').slice(1)} Details</ModalHeader>
-                    <ModalCloseButton />
-                    {renderModalContent()}
-                    <ModalFooter>
-                        <Button colorScheme="teal" mr={3} onClick={onClose}>
-                            Close
+            {/* Document Request Modal */}
+            <Modal isOpen={isDocReqModalOpen} onClose={onDocReqClose} size="xl" isCentered>
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius="2xl" overflow="hidden">
+                    <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                        Request {docReqType}
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
+                        <VStack spacing={6} align="stretch">
+                            {/* Instructional Box */}
+                            <Box p={4} bg="blue.50" borderRadius="lg" border="1px solid" borderColor="blue.100">
+                                <Heading size="sm" color="blue.800" mb={3}>Instructions & Requirements</Heading>
+                                <VStack align="start" spacing={3} fontSize="sm" color="blue.900">
+                                    <Text><b>1. Choose a Service:</b> Select an online platform that offers medical certificates.</Text>
+                                    <Text><b>2. Fill Out the Application:</b> Complete the patient form with the accurate details below.</Text>
+                                    <Text><b>3. Consultation:</b> After submitting your application, a registered doctor will review your case. This document requires a consultation to be valid.</Text>
+                                </VStack>
+                            </Box>
+
+                            <FormControl isRequired>
+                                <FormLabel fontWeight="600" color="gray.700">Reason for Request</FormLabel>
+                                <Textarea
+                                    placeholder="e.g. For employment requirements, fit to work, school absence..."
+                                    value={docReqReason}
+                                    onChange={(e) => setDocReqReason(e.target.value)}
+                                    focusBorderColor="teal.400"
+                                    rows={2}
+                                />
+                            </FormControl>
+
+                            <FormControl isRequired>
+                                <FormLabel fontWeight="600" color="gray.700">Type of Sickness / Condition</FormLabel>
+                                <Input
+                                    placeholder="e.g. None (Healthy), Recovering from flu, etc."
+                                    value={docReqSickness}
+                                    onChange={(e) => setDocReqSickness(e.target.value)}
+                                    focusBorderColor="teal.400"
+                                />
+                            </FormControl>
+
+                            <Checkbox
+                                colorScheme="teal"
+                                mt={2}
+                                isChecked={docReqConsult}
+                                onChange={(e) => setDocReqConsult(e.target.checked)}
+                            >
+                                <Text fontSize="sm" fontWeight="600" color="gray.700">
+                                    I acknowledge that I need to consult the doctor for this document to be valid.
+                                </Text>
+                            </Checkbox>
+                        </VStack>
+                    </ModalBody>
+                    <ModalFooter bg="gray.50" borderTopWidth="1px">
+                        <Button variant="ghost" mr={3} onClick={onDocReqClose}>Cancel</Button>
+                        <Button
+                            colorScheme="teal"
+                            onClick={handleDocumentRequest}
+                            isLoading={isDocReqSubmitting}
+                            isDisabled={!docReqReason.trim() || !docReqSickness.trim() || !docReqConsult}
+                            _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}
+                        >
+                            Submit Application
                         </Button>
                     </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            <Modal isOpen={isOpen} onClose={onClose} size={['record_detail'].includes(selectedCard as string) ? '2xl' : 'xl'} isCentered scrollBehavior="inside">
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius={['record_detail'].includes(selectedCard as string) ? '2xl' : 'md'} overflow="hidden">
+                    {selectedCard !== 'record_detail' && <ModalHeader>{selectedCard && selectedCard.replace('_', ' ').charAt(0).toUpperCase() + selectedCard.replace('_', ' ').slice(1)}</ModalHeader>}
+                    <ModalCloseButton mt={['record_detail'].includes(selectedCard as string) ? 2 : 0} zIndex={10} />
+                    {renderModalContent()}
+                    {selectedCard !== 'record_detail' && (
+                        <ModalFooter>
+                            <Button colorScheme="teal" mr={3} onClick={onClose}>
+                                Close
+                            </Button>
+                        </ModalFooter>
+                    )}
                 </ModalContent>
             </Modal>
 
