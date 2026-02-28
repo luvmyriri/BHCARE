@@ -169,7 +169,7 @@ function App() {
           />
           <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
           <LocationShowcase />
-          <Services />
+          <Services onServiceClick={() => openLogin('login')} />
           <ContactForm />
           <Footer onAppointmentClick={() => openLogin('login')} />
           <FloatingActions />

@@ -21,13 +21,6 @@ import {
     ModalHeader,
     ModalBody,
     ModalCloseButton,
-    AlertDialog,
-    AlertDialogBody,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogContent,
-    AlertDialogOverlay,
-    useDisclosure,
 } from '@chakra-ui/react';
 import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw } from 'react-icons/fi';
 
@@ -61,10 +54,6 @@ interface AppointmentsProps {
 }
 
 const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, initialView = 'book' }) => {
-    const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
-    const cancelRef = React.useRef(null);
-    const [appointmentToCancel, setAppointmentToCancel] = useState<number | null>(null);
-
     const [step, setStep] = useState(1);
     const [services, setServices] = useState<Service[]>([]);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -230,16 +219,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
         }
     };
 
-    const handleCancelClick = (appointmentId: number) => {
-        setAppointmentToCancel(appointmentId);
-        onCancelOpen();
-    };
-
-    const confirmCancelAppointment = async () => {
-        if (!appointmentToCancel) return;
-
+    const handleCancelClick = async (appointmentId: number) => {
         try {
-            const response = await fetch(`/api/appointments/${appointmentToCancel}/cancel`, {
+            const response = await fetch(`/api/appointments/${appointmentId}/cancel`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: 'Cancelled by patient' }),
@@ -248,17 +230,16 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
             if (response.ok) {
                 toast({
                     title: 'Cancelled',
-                    description: 'Appointment cancelled successfully',
+                    description: 'Your appointment has been cancelled',
                     status: 'info',
                     duration: 3000,
                     isClosable: true,
                 });
                 fetchMyAppointments();
             } else {
-                const errorData = await response.json();
                 toast({
                     title: 'Error',
-                    description: errorData.error || 'Failed to cancel appointment',
+                    description: 'Failed to cancel appointment',
                     status: 'error',
                     duration: 3000,
                     isClosable: true,
@@ -267,14 +248,11 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'Error cancelling appointment',
+                description: 'An unexpected error occurred',
                 status: 'error',
                 duration: 3000,
                 isClosable: true,
             });
-        } finally {
-            onCancelClose();
-            setAppointmentToCancel(null);
         }
     };
 
@@ -1260,34 +1238,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                     </ModalBody>
                 </ModalContent>
             </Modal>
-
-            <AlertDialog
-                isOpen={isCancelOpen}
-                leastDestructiveRef={cancelRef}
-                onClose={onCancelClose}
-                isCentered
-            >
-                <AlertDialogOverlay backdropFilter="blur(4px)">
-                    <AlertDialogContent borderRadius="2xl" boxShadow="2xl">
-                        <AlertDialogHeader fontSize="lg" fontWeight="bold" color="red.600">
-                            Cancel Appointment
-                        </AlertDialogHeader>
-
-                        <AlertDialogBody color="gray.600" fontSize="md">
-                            Are you sure you want to cancel this appointment? This action cannot be undone.
-                        </AlertDialogBody>
-
-                        <AlertDialogFooter>
-                            <Button ref={cancelRef} onClick={onCancelClose} variant="ghost" mr={3} borderRadius="lg">
-                                Keep it
-                            </Button>
-                            <Button colorScheme="red" onClick={confirmCancelAppointment} borderRadius="lg" px={6} boxShadow="md">
-                                Cancel Appointment
-                            </Button>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialogOverlay>
-            </AlertDialog>
         </>
     );
 };

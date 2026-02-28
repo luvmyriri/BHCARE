@@ -13,7 +13,10 @@ import {
     Icon,
     HStack,
     Text,
-    Flex
+    Flex,
+    Select,
+    Input,
+    IconButton
 } from '@chakra-ui/react';
 import {
     FiUser,
@@ -22,7 +25,9 @@ import {
     FiFileText,
     FiSave,
     FiX,
-    FiCheckCircle
+    FiCheckCircle,
+    FiPlus,
+    FiTrash2
 } from 'react-icons/fi';
 
 interface SoapNoteFormProps {
@@ -72,11 +77,55 @@ const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, doctorEmail, onS
     const [isSubmitting, setIsSubmitting] = useState(false);
     const toast = useToast();
 
+    // Inventory and Prescription State
+    const [inventory, setInventory] = useState<any[]>([]);
+    const [prescriptions, setPrescriptions] = useState<any[]>([]);
+
+    React.useEffect(() => {
+        const fetchInventory = async () => {
+            try {
+                const res = await fetch('/api/inventory');
+                if (res.ok) {
+                    const data = await res.json();
+                    setInventory(data);
+                }
+            } catch (err) {
+                console.error("Failed to load inventory", err);
+            }
+        };
+        fetchInventory();
+    }, []);
+
+    const handleAddPrescription = () => {
+        setPrescriptions([...prescriptions, { inventory_id: '', item_name: '', quantity: 1, instructions: '' }]);
+    };
+
+    const handleUpdatePrescription = (index: number, field: string, value: any) => {
+        const newPrescriptions = [...prescriptions];
+        newPrescriptions[index] = { ...newPrescriptions[index], [field]: value };
+        // If inventory_id changed, auto-update item_name for easier history display
+        if (field === 'inventory_id') {
+            const selectedItem = inventory.find(item => String(item.id) === String(value));
+            if (selectedItem) {
+                newPrescriptions[index].item_name = selectedItem.item_name;
+            } else {
+                newPrescriptions[index].item_name = '';
+            }
+        }
+        setPrescriptions(newPrescriptions);
+    };
+
+    const handleRemovePrescription = (index: number) => {
+        setPrescriptions(prescriptions.filter((_, i) => i !== index));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         try {
+            const validPrescriptions = prescriptions.filter(p => p.inventory_id && p.quantity > 0);
+
             const response = await fetch('/api/soap-notes', {
                 method: 'POST',
                 headers: {
@@ -88,7 +137,8 @@ const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, doctorEmail, onS
                     subjective,
                     objective,
                     assessment,
-                    plan
+                    plan,
+                    prescription: validPrescriptions
                 }),
             });
 
@@ -110,6 +160,7 @@ const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, doctorEmail, onS
             setObjective('');
             setAssessment('');
             setPlan('');
+            setPrescriptions([]);
 
             if (onSuccess) onSuccess();
 
@@ -208,6 +259,54 @@ const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, doctorEmail, onS
                         color="orange"
                     />
                 </SimpleGrid>
+
+                <Divider borderColor="gray.100" />
+
+                <Box>
+                    <HStack justify="space-between" mb={4}>
+                        <HStack>
+                            <Box p={2} bg="teal.100" borderRadius="md">
+                                <Icon as={FiPlus} color="teal.600" />
+                            </Box>
+                            <FormLabel fontWeight="bold" color="gray.700" m={0} fontSize="sm">
+                                MEDICINE DISTRIBUTION (OPTIONAL)
+                            </FormLabel>
+                        </HStack>
+                        <Button size="sm" colorScheme="teal" variant="outline" leftIcon={<FiPlus />} onClick={handleAddPrescription}>
+                            Add Medicine
+                        </Button>
+                    </HStack>
+
+                    {prescriptions.length === 0 ? (
+                        <Text fontSize="sm" color="gray.500" fontStyle="italic">No medicines prescribed.</Text>
+                    ) : (
+                        <VStack align="stretch" spacing={3}>
+                            {prescriptions.map((p, index) => (
+                                <Flex key={index} gap={3} align="flex-start" bg="gray.50" p={3} borderRadius="md" border="1px solid" borderColor="gray.200">
+                                    <FormControl isRequired>
+                                        <FormLabel fontSize="xs" color="gray.600">Medicine</FormLabel>
+                                        <Select size="sm" bg="white" value={p.inventory_id} onChange={(e) => handleUpdatePrescription(index, 'inventory_id', e.target.value)} placeholder="Select medicine">
+                                            {inventory.map(item => (
+                                                <option key={item.id} value={item.id} disabled={item.stock_quantity <= 0}>
+                                                    {item.item_name} {item.stock_quantity <= 0 ? '(Out of Stock)' : `(${item.stock_quantity} available)`}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    <FormControl w="120px" isRequired>
+                                        <FormLabel fontSize="xs" color="gray.600">Quantity</FormLabel>
+                                        <Input type="number" min={1} size="sm" bg="white" value={p.quantity} onChange={(e) => handleUpdatePrescription(index, 'quantity', parseInt(e.target.value) || 0)} />
+                                    </FormControl>
+                                    <FormControl minW="200px" flex={3}>
+                                        <FormLabel fontSize="xs" color="gray.600">Instructions</FormLabel>
+                                        <Textarea size="sm" bg="white" value={p.instructions} onChange={(e) => handleUpdatePrescription(index, 'instructions', e.target.value)} placeholder="e.g. Take 1 tablet every 8 hours" rows={3} resize="vertical" />
+                                    </FormControl>
+                                    <IconButton aria-label="Remove medicine" icon={<FiTrash2 />} size="sm" colorScheme="red" variant="ghost" mt={6} onClick={() => handleRemovePrescription(index)} />
+                                </Flex>
+                            ))}
+                        </VStack>
+                    )}
+                </Box>
 
                 {/* Actions */}
                 <Box

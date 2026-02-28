@@ -82,8 +82,21 @@ app.register_blueprint(notifications_bp)
 try:
     print("⏳ Testing database connection at startup...")
     conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('''CREATE TABLE IF NOT EXISTS contact_tickets (
+        id SERIAL PRIMARY KEY, 
+        name VARCHAR(255), 
+        email VARCHAR(255), 
+        phone VARCHAR(20), 
+        subject TEXT, 
+        message TEXT, 
+        status VARCHAR(50) DEFAULT 'open', 
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );''')
+    conn.commit()
+    cur.close()
     conn.close()
-    print("✅ Database connection verified.")
+    print("✅ Database connection verified and contact_tickets table checked.")
 except Exception as e:
     print(f"❌ CRITICAL: Database connection failed at startup: {e}")
 
@@ -2315,6 +2328,45 @@ def get_all_medical_records():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    """Permanently delete a user account (admin only). Super admins and Admins cannot be deleted."""
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Fetch the user first — SELECT id(0), role(1), email(2)
+        cur.execute("SELECT id, role, email FROM users WHERE id = %s", (user_id,))
+        target = cur.fetchone()
+
+        if not target:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "User not found."}), 404
+
+        user_role  = target[1] or ''   # role column (index 1)
+        user_email = target[2] or ''   # email column (index 2)
+
+        role_lower = user_role.lower()
+        if 'super' in role_lower or role_lower in ('admin', 'administrator'):
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Administrator accounts cannot be deleted for security reasons."}), 403
+
+        # Delete related records first to avoid FK constraint errors
+        cur.execute("DELETE FROM appointments WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"message": f"User {user_email} has been permanently deleted."}), 200
+
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/stats", methods=["GET"])
 def get_admin_stats():
     """Get statistics for the admin dashboard"""
@@ -2862,6 +2914,36 @@ def restock_inventory_item():
         return jsonify({"error": str(e)}), 500
 
 # ============= DOCUMENT REQUEST ENDPOINTS =============
+@app.route("/api/documents/user/<int:user_id>", methods=["GET"])
+def get_user_documents(user_id):
+    """Get all document requests for a specific user"""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT id, document_type, reason, sickness, status, created_at, completed_at
+            FROM document_requests
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+        """, (user_id,))
+        requests = cur.fetchall()
+        
+        request_list = []
+        for req in requests:
+            req_dict = dict(req)
+            if req_dict.get('created_at'):
+                req_dict['created_at'] = req_dict['created_at'].strftime('%Y-%m-%d %H:%M')
+            if req_dict.get('completed_at'):
+                req_dict['completed_at'] = req_dict['completed_at'].strftime('%Y-%m-%d %H:%M')
+            request_list.append(req_dict)
+            
+        cur.close()
+        conn.close()
+        return jsonify(request_list), 200
+    except Exception as e:
+        print(f"Error fetching user requests: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/documents/request", methods=["POST"])
 def request_document():
     """Submit a request for a medical certificate or health clearance"""
@@ -3208,6 +3290,94 @@ def predictive_insights():
         print(f"Predictive insights error: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+# ============= CONTACT US ENDPOINTS =============
+@app.route('/api/contact', methods=['POST'])
+def submit_contact_form():
+    data = request.json
+    name = data.get('name')
+    email = data.get('email')
+    phone = data.get('phone')
+    subject = data.get('subject')
+    message = data.get('message')
+
+    if not email or not message:
+        return jsonify({"error": "Email and message are required"}), 400
+
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(
+            """
+            INSERT INTO contact_tickets (name, email, phone, subject, message)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+            """,
+            (name, email, phone, subject, message)
+        )
+        ticket_id = cur.fetchone()['id']
+        conn.commit()
+        return jsonify({"message": "Message sent successfully", "ticket_id": ticket_id}), 201
+    except Exception as e:
+        conn.rollback()
+        print("Error saving contact ticket:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/contact/tickets', methods=['GET'])
+def get_contact_tickets():
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM contact_tickets ORDER BY created_at DESC")
+        tickets = cur.fetchall()
+        return jsonify(tickets), 200
+    except Exception as e:
+        print("Error fetching contact tickets:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/contact/tickets/<int:ticket_id>', methods=['PUT'])
+def update_contact_ticket(ticket_id):
+    data = request.json
+    new_status = data.get('status')
+    
+    if not new_status:
+        return jsonify({"error": "Status is required"}), 400
+
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE contact_tickets SET status = %s WHERE id = %s RETURNING id",
+            (new_status, ticket_id)
+        )
+        updated = cur.fetchone()
+        conn.commit()
+        
+        if updated:
+            return jsonify({"message": "Ticket updated successfully"}), 200
+        else:
+            return jsonify({"error": "Ticket not found"}), 404
+    except Exception as e:
+        conn.rollback()
+        print("Error updating contact ticket:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

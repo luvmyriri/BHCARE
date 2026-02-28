@@ -17,7 +17,11 @@ const item: Variants = {
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } }
 };
 
-function Services() {
+interface ServicesProps {
+  onServiceClick?: () => void;
+}
+
+function Services({ onServiceClick }: ServicesProps) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -74,6 +78,9 @@ function Services() {
 
   const handleClick = (title: string) => {
     console.log(`Clicked service: ${title}`);
+    if (onServiceClick) {
+      onServiceClick();
+    }
   };
 
   return (

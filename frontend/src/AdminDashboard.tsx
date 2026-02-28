@@ -37,13 +37,7 @@ import {
     InputGroup,
     InputLeftElement,
     FormControl,
-    FormLabel,
-    AlertDialog,
-    AlertDialogBody,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogContent,
-    AlertDialogOverlay,
+    FormLabel
 } from '@chakra-ui/react';
 import {
     FiGrid,
@@ -59,7 +53,8 @@ import {
     FiUser,
     FiUserPlus,
     FiRefreshCw,
-    FiFileText
+    FiFileText,
+    FiMessageSquare
 } from 'react-icons/fi';
 import {
     SimpleGrid,
@@ -227,10 +222,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const [users, setUsers] = useState<any[]>([]);
     const [medicalStaff, setMedicalStaff] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<any[]>([]);
+    const [contactTickets, setContactTickets] = useState<any[]>([]);
+    const [ticketFilter, setTicketFilter] = useState<'open' | 'resolved'>('open');
 
-    const { isOpen: isStatusAlertOpen, onOpen: onStatusAlertOpen, onClose: onStatusAlertClose } = useDisclosure();
-    const cancelStatusRef = React.useRef(null);
-    const [userToToggle, setUserToToggle] = useState<any>(null);
 
     // Search and Sort State
     const [searchQuery, setSearchQuery] = useState('');
@@ -462,6 +456,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         }
     };
 
+    // Fetch Contact Tickets
+    const fetchContactTickets = async () => {
+        try {
+            const res = await fetch('/api/contact/tickets');
+            if (res.ok) {
+                const data = await res.json();
+                setContactTickets(data);
+            }
+        } catch (error) {
+            console.error('Error fetching tickets:', error);
+        }
+    };
+
+    const handleResolveTicket = async (id: number) => {
+        try {
+            const res = await fetch(`/api/contact/tickets/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Resolved' })
+            });
+            if (res.ok) {
+                toast({ title: 'Ticket Resolved', status: 'success', duration: 3000 });
+                fetchContactTickets();
+            } else {
+                toast({ title: 'Error', description: 'Could not resolve ticket', status: 'error', duration: 3000 });
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     // Refresh all live data
     const refreshAll = async (showSpinner = false) => {
         if (showSpinner) setIsRefreshing(true);
@@ -471,6 +496,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             fetchAppointments(),
             fetchSystemStats(),
             fetchActivities(),
+            fetchContactTickets()
         ]);
         setLastUpdated(new Date());
         if (showSpinner) setIsRefreshing(false);
@@ -574,49 +600,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 duration: 3000,
                 isClosable: true,
             });
-        }
-    };
-
-    const openToggleUserStatus = (user: any) => {
-        setUserToToggle(user);
-        onStatusAlertOpen();
-    };
-
-    const confirmToggleUserStatus = async () => {
-        if (!userToToggle) return;
-        const newStatus = userToToggle.status === 'Active' ? 'Inactive' : 'Active';
-        const actionWord = newStatus === 'Active' ? 'activate' : 'deactivate';
-
-        try {
-            // We use the same update endpoint
-            const response = await fetch(`/user/${user.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus })
-            });
-
-            if (response.ok) {
-                fetchUsers(); // Refresh list
-                toast({
-                    title: "Status Updated",
-                    description: `User is now ${newStatus}.`,
-                    status: "info",
-                    duration: 3000,
-                    isClosable: true,
-                });
-            } else {
-                toast({
-                    title: "Failed",
-                    description: `Failed to ${actionWord} user`,
-                    status: "error",
-                    duration: 3000,
-                    isClosable: true,
-                });
-            }
-        } catch (error) {
-            console.error('Error toggling user status:', error);
-        } finally {
-            onStatusAlertClose();
         }
     };
 
@@ -925,7 +908,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         <PageHero
                             badge="ADMIN CONTROL"
                             title={`Welcome, ${user?.first_name || 'Administrator'} 🛡️`}
-                            description="Complete system oversight and management. Monitor all health center operations, user activities, and system performance in real-time."
+                            description="Complete system oversight and management. Monitor all health center operations, user activities."
                         />
 
                         <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={8}>
@@ -1070,11 +1053,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         size="sm" colorScheme="red" variant="outline"
                                         leftIcon={<Icon as={FiFileText} />}
                                         onClick={() => {
-                                            const headers = ['User ID', 'First Name', 'Last Name', 'Email', 'Role', 'Status', 'Date Joined'];
+                                            const headers = ['First Name', 'Last Name', 'Email', 'Date Joined'];
                                             const rows = filteredUsers.map((u: any) => [
-                                                formatUserId(u.id, u.role, u.created_at),
                                                 u.first_name, u.last_name, u.email,
-                                                u.role, u.status,
                                                 u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
                                             ]);
                                             downloadPDF('users_report.pdf', 'Registered Users Report', headers, rows);
@@ -1086,11 +1067,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         size="sm" colorScheme="green" variant="outline"
                                         leftIcon={<Icon as={FiFileText} />}
                                         onClick={() => {
-                                            const headers = ['User ID', 'First Name', 'Last Name', 'Email', 'Role', 'Status', 'Date Joined'];
+                                            const headers = ['First Name', 'Last Name', 'Email', 'Date Joined'];
                                             const rows = filteredUsers.map((u: any) => [
-                                                formatUserId(u.id, u.role, u.created_at),
                                                 u.first_name, u.last_name, u.email,
-                                                u.role, u.status,
                                                 u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
                                             ]);
                                             downloadCSV('users_report.csv', headers, rows);
@@ -1128,17 +1107,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                     <Td>
                                                         <HStack spacing={2}>
                                                             {(user?.role || '').toLowerCase().includes('super') ? (
-                                                                <>
-                                                                    <Button size="xs" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
-                                                                    <Button
-                                                                        size="xs"
-                                                                        colorScheme={user.status === 'Active' ? 'red' : 'green'}
-                                                                        variant="ghost"
-                                                                        onClick={() => openToggleUserStatus(user)}
-                                                                    >
-                                                                        {user.status === 'Active' ? 'Deactivate' : 'Activate'}
-                                                                    </Button>
-                                                                </>
+                                                                <Button size="xs" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
                                                             ) : (
                                                                 <Button size="xs" colorScheme="gray" variant="outline" onClick={() => handleEditClick(user)}>View</Button>
                                                             )}
@@ -1582,6 +1551,104 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </VStack>
                 );
             }
+            case 'tickets': {
+                const filteredTickets = contactTickets.filter(ticket =>
+                    ticketFilter === 'open' ? ticket.status !== 'Resolved' : ticket.status === 'Resolved'
+                );
+
+                return (
+                    <VStack align="stretch" spacing={10}>
+                        <PageHero
+                            badge="SUPPORT TICKETS"
+                            title="Patient & Public Inquiries"
+                            description="Review and resolve contact form submissions from the public website."
+                        />
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Flex justify="space-between" align="center" mb={6}>
+                                <HStack spacing={6}>
+                                    <Heading size="md" color="teal.800">Recent Tickets</Heading>
+                                    <HStack bg="gray.100" p={1} borderRadius="lg">
+                                        <Button
+                                            size="sm"
+                                            variant={ticketFilter === 'open' ? 'solid' : 'ghost'}
+                                            colorScheme={ticketFilter === 'open' ? 'teal' : 'gray'}
+                                            onClick={() => setTicketFilter('open')}
+                                            borderRadius="md"
+                                        >
+                                            Open Inquiries
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant={ticketFilter === 'resolved' ? 'solid' : 'ghost'}
+                                            colorScheme={ticketFilter === 'resolved' ? 'teal' : 'gray'}
+                                            onClick={() => setTicketFilter('resolved')}
+                                            borderRadius="md"
+                                        >
+                                            Resolved
+                                        </Button>
+                                    </HStack>
+                                </HStack>
+                                <Button size="sm" colorScheme="teal" variant="outline" leftIcon={<Icon as={FiRefreshCw} />} onClick={fetchContactTickets}>
+                                    Refresh
+                                </Button>
+                            </Flex>
+                            <Box overflowX="auto">
+                                <Table variant="simple">
+                                    <Thead>
+                                        <Tr>
+                                            <Th>Ticket No.</Th>
+                                            <Th>Date</Th>
+                                            <Th>Name</Th>
+                                            <Th>Email</Th>
+                                            <Th>Subject & Message</Th>
+                                            <Th>Status</Th>
+                                            <Th>Actions</Th>
+                                        </Tr>
+                                    </Thead>
+                                    <Tbody>
+                                        {filteredTickets.length > 0 ? (
+                                            filteredTickets.map(ticket => (
+                                                <Tr key={ticket.id}>
+                                                    <Td>
+                                                        <Badge colorScheme="purple" variant="subtle" fontSize="sm">
+                                                            {`TCKT-${new Date(ticket.created_at).getFullYear()}-${ticket.id.toString().padStart(3, '0')}`}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td>{new Date(ticket.created_at).toLocaleDateString()}</Td>
+                                                    <Td fontWeight="600">{ticket.name}</Td>
+                                                    <Td>{ticket.email}<br /><Text fontSize="xs" color="gray.500">{ticket.phone}</Text></Td>
+                                                    <Td maxW="300px">
+                                                        <Text fontWeight="bold" noOfLines={1} mb={1}>{ticket.subject}</Text>
+                                                        <Text fontSize="sm" color="gray.600" noOfLines={2}>{ticket.message}</Text>
+                                                    </Td>
+                                                    <Td>
+                                                        <Badge colorScheme={ticket.status === 'Resolved' ? 'green' : 'orange'}>
+                                                            {ticket.status}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td>
+                                                        {ticket.status !== 'Resolved' && (
+                                                            <Button size="xs" colorScheme="teal" onClick={() => handleResolveTicket(ticket.id)}>
+                                                                Mark Resolved
+                                                            </Button>
+                                                        )}
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={7} textAlign="center" py={6} color="gray.500">
+                                                    No {ticketFilter} tickets found.
+                                                </Td>
+                                            </Tr>
+                                        )}
+                                    </Tbody>
+                                </Table>
+                            </Box>
+                        </Box>
+                    </VStack>
+                );
+            }
 
             default:
                 return null;
@@ -1619,6 +1686,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </NavItem>
                     <NavItem icon={FiActivity} active={activeTab === 'doctors'} onClick={() => setActiveTab('doctors')}>
                         Medical Staff
+                    </NavItem>
+                    <NavItem icon={FiMessageSquare} active={activeTab === 'tickets'} onClick={() => setActiveTab('tickets')}>
+                        Support Tickets
                     </NavItem>
                     <NavItem icon={FiBarChart2} active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')}>
                         Analytics & Reports
@@ -1708,6 +1778,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 </NavItem>
                                 <NavItem icon={FiActivity} active={activeTab === 'doctors'} onClick={() => { setActiveTab('doctors'); onSidebarClose(); }}>
                                     Medical Staff
+                                </NavItem>
+                                <NavItem icon={FiMessageSquare} active={activeTab === 'tickets'} onClick={() => { setActiveTab('tickets'); onSidebarClose(); }}>
+                                    Support Tickets
                                 </NavItem>
                                 <NavItem icon={FiBarChart2} active={activeTab === 'analytics'} onClick={() => { setActiveTab('analytics'); onSidebarClose(); }}>
                                     Analytics & Reports
@@ -1987,40 +2060,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </ModalFooter>
                 </ModalContent>
             </Modal>
-            {/* Action Confirmation AlertDialog */}
-            <AlertDialog
-                isOpen={isStatusAlertOpen}
-                leastDestructiveRef={cancelStatusRef}
-                onClose={onStatusAlertClose}
-                isCentered
-            >
-                <AlertDialogOverlay backdropFilter="blur(4px)">
-                    <AlertDialogContent borderRadius="2xl" boxShadow="2xl">
-                        <AlertDialogHeader fontSize="lg" fontWeight="bold">
-                            User Status Confirmation
-                        </AlertDialogHeader>
 
-                        <AlertDialogBody color="gray.600" fontSize="md">
-                            Are you sure you want to {userToToggle?.status === 'Active' ? 'deactivate' : 'activate'} this user's account?
-                        </AlertDialogBody>
-
-                        <AlertDialogFooter>
-                            <Button ref={cancelStatusRef} onClick={onStatusAlertClose} variant="ghost" mr={3} borderRadius="lg">
-                                Cancel
-                            </Button>
-                            <Button
-                                colorScheme={userToToggle?.status === 'Active' ? 'red' : 'green'}
-                                onClick={confirmToggleUserStatus}
-                                borderRadius="lg"
-                                px={6}
-                                boxShadow="md"
-                            >
-                                Confirm
-                            </Button>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialogOverlay>
-            </AlertDialog>
         </Box>
     );
 };

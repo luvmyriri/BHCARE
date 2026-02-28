@@ -129,7 +129,7 @@ const Select: FC<
 function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register' }) {
   const { t } = useLanguage();
   const toast = useToast();
-  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [mode, setMode] = useState<'login' | 'register' | 'guide'>(initialMode);
   const [activePortal, setActivePortal] = useState<'patient' | 'staff' | 'admin' | 'superadmin'>('patient');
   const [pendingUser, setPendingUser] = useState<any>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -661,28 +661,6 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       if (!res.ok) throw new Error('Invalid email or password');
       const data = await res.json();
       if (data.user) {
-        // --- ROLE VERIFICATION AGAINST ACTIVE PORTAL ---
-        const role = data.user.role || '';
-        const lowerRole = role.toLowerCase();
-
-        let isValidForPortal = false;
-
-        if (activePortal === 'superadmin') {
-          isValidForPortal = lowerRole === 'super admin';
-        } else if (activePortal === 'admin') {
-          isValidForPortal = lowerRole === 'admin' || lowerRole === 'administrator';
-        } else if (activePortal === 'staff') {
-          isValidForPortal = ['nurse', 'midwife', 'health worker', 'medical staff', 'doctor'].includes(lowerRole);
-        } else if (activePortal === 'patient') {
-          isValidForPortal = lowerRole === 'patient';
-        }
-
-        if (!isValidForPortal) {
-          setError(`Access Denied: Please use the correct login portal for your role.`);
-          setLoading(false);
-          return;
-        }
-
         if (data.user.requires_password_change) {
           setPendingUser(data.user);
           setShowChangePassword(true);
@@ -695,6 +673,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       }
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
+
 
 
 
@@ -1104,20 +1083,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
     <>
       <div className="auth-card">
         {/* LEFT SIDE - BRANDING (Persistent) */}
-        <div style={{
-          flex: '0 0 50%',
-          background: 'linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)',
-          padding: '48px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          textAlign: 'center',
-          color: 'white',
-          position: 'relative',
-          overflow: 'hidden',
-          minHeight: '200px' // Added for mobile stack visibility
-        }}>
+        <div className="auth-hero-branding" style={{ minHeight: '200px' }}>
           <div style={{
             position: 'absolute',
             top: 0,
@@ -1167,103 +1133,14 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         </div>
 
         {/* RIGHT SIDE - DYNAMIC CONTENT */}
-        <div className="form-scroll" style={{
-          flex: '1',
-          padding: '48px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-start',
-          maxHeight: '100%'
-        }}>
+        <div className="form-scroll auth-form-container" style={{ maxHeight: '100%' }}>
           {mode === 'login' ? (
             // LOGIN FORM
             <form onSubmit={handleLogin} autoComplete="off" style={{ width: '100%', maxWidth: '360px', margin: 'auto' }}>
 
-              {/* PORTAL SELECTOR */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setActivePortal('patient')}
-                  style={{
-                    flex: '1 1 45%',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: activePortal === 'patient' ? '#38b2ac' : '#e2e8f0',
-                    background: activePortal === 'patient' ? '#e6fffa' : '#f7fafc',
-                    color: activePortal === 'patient' ? '#2c7a7b' : '#718096',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Patient
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePortal('staff')}
-                  style={{
-                    flex: '1 1 45%',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: activePortal === 'staff' ? '#3182ce' : '#e2e8f0',
-                    background: activePortal === 'staff' ? '#ebf8ff' : '#f7fafc',
-                    color: activePortal === 'staff' ? '#2b6cb0' : '#718096',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Medical Staff
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePortal('admin')}
-                  style={{
-                    flex: '1 1 45%',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: activePortal === 'admin' ? '#d69e2e' : '#e2e8f0',
-                    background: activePortal === 'admin' ? '#fffff0' : '#f7fafc',
-                    color: activePortal === 'admin' ? '#975a16' : '#718096',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePortal('superadmin')}
-                  style={{
-                    flex: '1 1 45%',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: activePortal === 'superadmin' ? '#805ad5' : '#e2e8f0',
-                    background: activePortal === 'superadmin' ? '#faf5ff' : '#f7fafc',
-                    color: activePortal === 'superadmin' ? '#553c9a' : '#718096',
-                    fontWeight: 700,
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Super Admin
-                </button>
-              </div>
 
               <h2 className="auth-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px', color: '#1a202c', textAlign: 'center' }}>
-                {activePortal === 'patient' && 'Patient Sign In'}
-                {activePortal === 'staff' && 'Staff Sign In'}
-                {activePortal === 'admin' && 'Admin Sign In'}
-                {activePortal === 'superadmin' && 'Super Admin Sign In'}
+                Sign In
               </h2>
               <p className="auth-subtitle" style={{ fontSize: '14px', marginBottom: '32px', color: '#718096', textAlign: 'center' }}>
                 Secure access to your health portal
@@ -1324,7 +1201,27 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <a
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMode('register');
+                    resetFormFields();
+                    setSelectedIdType('');
+                  }}
+                  style={{
+                    fontSize: '13px',
+                    color: '#718096',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.color = '#4a5568')}
+                  onMouseOut={(e) => (e.currentTarget.style.color = '#718096')}
+                >
+                  Don't have an account? <span style={{ color: '#ed8936' }}>Sign Up</span>
+                </a>
                 <a
                   onClick={(e) => {
                     e.preventDefault();
@@ -1372,7 +1269,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
               }}>
                 New Patient?{' '}
                 <span
-                  onClick={() => { setMode('register'); resetFormFields(); setSelectedIdType(''); }}
+                  onClick={() => { setMode('guide'); resetFormFields(); setSelectedIdType(''); }}
                   style={{
                     color: '#ed8936',
                     fontWeight: 700,
@@ -1384,12 +1281,100 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 </span>
               </p>
             </form >
+          ) : mode === 'guide' ? (
+            // STEP-BY-STEP REGISTRATION GUIDE
+            <div style={{ width: '100%', maxWidth: '420px', margin: 'auto', display: 'flex', flexDirection: 'column' }}>
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#718096',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  marginBottom: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  alignSelf: 'flex-start'
+                }}
+              >
+                ← Back to Login
+              </button>
+
+              <h2 className="auth-title" style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', color: '#1a202c', textAlign: 'center' }}>
+                Registration Guide
+              </h2>
+              <p style={{ fontSize: '14px', color: '#718096', textAlign: 'center', marginBottom: '32px' }}>
+                Follow these 3 easy steps to create your account!
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '32px' }}>
+                {/* Step 1 */}
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', background: '#f7fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ background: '#e6fffa', color: '#319795', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px', flexShrink: 0 }}>
+                    1
+                  </div>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '700', color: '#2d3748' }}>Choose ID Type & Upload</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#4a5568', lineHeight: '1.5' }}>
+                      Select a valid government ID (like PhilHealth, Driver's License, etc.) and snap a clear picture of the front.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', background: '#f7fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ background: '#ebf8ff', color: '#3182ce', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px', flexShrink: 0 }}>
+                    2
+                  </div>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '700', color: '#2d3748' }}>Automated Extraction</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#4a5568', lineHeight: '1.5' }}>
+                      Our system securely scans your ID to automatically fill out your name, address, and details.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', background: '#f7fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ background: '#fffff0', color: '#d69e2e', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px', flexShrink: 0 }}>
+                    3
+                  </div>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '700', color: '#2d3748' }}>Review & Submit</h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#4a5568', lineHeight: '1.5' }}>
+                      Double-check the auto-filled information, add your email and password, and you're good to go!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setMode('register')}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: '#ed8936',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(237, 137, 54, 0.3)',
+                  transition: 'all 0.2s'
+                }}>
+                Start Registration now! →
+              </button>
+            </div>
           ) : (
             // REGISTER FORM
             <form onSubmit={handleRegister} autoComplete="off" style={{ width: '100%', maxWidth: '800px', margin: 'auto' }}>
               <button
                 type="button"
-                onClick={() => setMode('login')}
+                onClick={() => setMode('guide')}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -1402,7 +1387,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   alignItems: 'center'
                 }}
               >
-                ← Back to Login
+                ← Back to Guide
               </button>
 
               <h2 className="auth-title" style={{ fontSize: '28px', fontWeight: 800, marginBottom: '8px', color: '#1a202c' }}>
@@ -1448,7 +1433,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       </h3>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                    <div className="auth-form-row" style={{ marginBottom: '20px' }}>
                       <div>
                         <p style={{ fontSize: '11px', fontWeight: 700, color: '#4a5568', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Front Side</p>
                         <input type="file" id="front-upload" accept="image/*" onChange={handleFrontUpload} disabled={!selectedIdType} style={{ display: 'none' }} />
@@ -1874,7 +1859,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       required
                     />
 
-                    <div style={{ display: 'flex', gap: '16px' }}>
+                    <div className="auth-form-row">
                       <div style={{ flex: 1 }}>
                         <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
                       </div>
@@ -1997,7 +1982,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                       {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7' }}>{error}</div>}
 
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '24px' }}>
                         <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '14px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '14px' }}>
                           ← Back
                         </button>

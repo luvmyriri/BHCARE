@@ -171,6 +171,7 @@ import SoapNoteForm from './components/SoapNoteForm';
 // ... existing imports
 
 const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUserUpdated }) => {
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState('overview');
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
@@ -208,7 +209,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     unit: 'pcs'
                 });
             } else {
-                alert("Failed to add inventory item");
+                toast({
+                    title: "Error",
+                    description: "Failed to add inventory item",
+                    status: "error",
+                    duration: 3000,
+                    isClosable: true,
+                });
             }
         } catch (error) {
             console.error("Error adding item:", error);
@@ -240,7 +247,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 setRestockItemId(null);
                 setRestockQuantity(0);
             } else {
-                alert("Failed to restock item");
+                toast({
+                    title: "Error",
+                    description: "Failed to restock item",
+                    status: "error",
+                    duration: 3000,
+                    isClosable: true,
+                });
             }
         } catch (error) {
             console.error("Error restocking item:", error);
@@ -592,6 +605,31 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                     <Text fontSize="sm"><Text as="span" fontWeight="800" color="gray.700">O:</Text> {record.objective}</Text>
                                                     <Text fontSize="sm"><Text as="span" fontWeight="800" color="gray.700">A:</Text> {record.assessment}</Text>
                                                     <Text fontSize="sm"><Text as="span" fontWeight="800" color="gray.700">P:</Text> {record.plan}</Text>
+                                                    {(() => {
+                                                        let meds = [];
+                                                        try {
+                                                            meds = typeof record.prescription === 'string' ? JSON.parse(record.prescription) : record.prescription;
+                                                        } catch (e) { }
+
+                                                        if (meds && Array.isArray(meds) && meds.length > 0) {
+                                                            return (
+                                                                <Box mt={2} p={3} bg="teal.50" borderRadius="md" w="full" borderLeft="2px solid" borderColor="teal.400">
+                                                                    <Text fontSize="xs" fontWeight="bold" color="teal.800" mb={2}>Dispensed Medicine(s):</Text>
+                                                                    <VStack align="start" spacing={1}>
+                                                                        {meds.map((med: any, i: number) => (
+                                                                            <HStack key={i} fontSize="sm">
+                                                                                <Icon as={FiBox} color="teal.500" />
+                                                                                <Text fontWeight="700" color="teal.700">{med.item_name}</Text>
+                                                                                <Text color="gray.500">x{med.quantity}</Text>
+                                                                                {med.instructions && <Text color="gray.600" fontStyle="italic">- {med.instructions}</Text>}
+                                                                            </HStack>
+                                                                        ))}
+                                                                    </VStack>
+                                                                </Box>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                 </VStack>
                                             </Box>
                                         ))}

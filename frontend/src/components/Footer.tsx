@@ -10,6 +10,7 @@ import {
     Icon,
     Heading,
     Divider,
+    Image,
 } from '@chakra-ui/react';
 
 const FacebookIcon = (props: any) => (
@@ -51,11 +52,9 @@ const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => 
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={8}>
                     {/* About Section */}
                     <Stack spacing={4}>
-                        <Flex alignItems="center" gap={2}>
-                            <Box bg="teal.500" p={2} borderRadius="lg">
-                                <Text fontSize="2xl" fontWeight="bold">🏥</Text>
-                            </Box>
-                            <Heading size="md" color="white">BHCARE</Heading>
+                        <Flex alignItems="center" gap={3}>
+                            <Image src="/images/Logo.png" h="40px" fallbackSrc="https://via.placeholder.com/40/20c997/ffffff?text=B" />
+                            <Heading size="md" color="white">BHCare Brgy. 174</Heading>
                         </Flex>
                         <Text fontSize="sm" color="gray.400">
                             Barangay 174 Health Center provides quality healthcare services to our community with compassion and excellence.
@@ -92,11 +91,14 @@ const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => 
                     {/* Services */}
                     <Stack spacing={4}>
                         <Heading size="sm" color="teal.300" mb={2}>Our Services</Heading>
-                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>General Consultation</Link>
-                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Vaccination</Link>
-                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Prenatal Care</Link>
-                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Dental Services</Link>
-                        <Link href="#services" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Laboratory</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Consultation</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Prenatal Check Up</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Vaccination (Bakuna)</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Dental Services</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Family Planning</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Dots Center</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Cervical Screening</Link>
+                        <Link onClick={onAppointmentClick} cursor="pointer" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>Nutrition Counseling</Link>
                     </Stack>
 
                     {/* Contact Info */}

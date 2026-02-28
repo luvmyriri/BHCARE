@@ -16,6 +16,7 @@ def create_soap_note():
         objective = data.get('objective')
         assessment = data.get('assessment')
         plan = data.get('plan')
+        prescription = data.get('prescription')
 
         if not patient_id:
             return jsonify({"error": "Patient ID is required"}), 400
@@ -31,15 +32,38 @@ def create_soap_note():
             if doctor_row:
                 doctor_id = doctor_row['id']
 
+        import json
+        prescription_json = json.dumps(prescription) if prescription else None
+
         # 1. Insert SOAP Note
         cursor.execute("""
-            INSERT INTO soap_notes (patient_id, doctor_id, subjective, objective, assessment, plan)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO soap_notes (patient_id, doctor_id, subjective, objective, assessment, plan, prescription)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id, created_at
-        """, (patient_id, doctor_id, subjective, objective, assessment, plan))
+        """, (patient_id, doctor_id, subjective, objective, assessment, plan, prescription_json))
         
         note = cursor.fetchone()
         note_id = note['id']
+
+        # 1.5 Deduct from inventory
+        if prescription:
+            for item in prescription:
+                 inv_id = item.get('inventory_id')
+                 qty = int(item.get('quantity', 0))
+                 if inv_id and qty > 0:
+                      cursor.execute("UPDATE inventory SET stock_quantity = GREATEST(stock_quantity - %s, 0) WHERE id = %s RETURNING stock_quantity", (qty, inv_id))
+                      updated = cursor.fetchone()
+                      if updated:
+                          new_stock = updated['stock_quantity']
+                          # Update status if low
+                          status = 'Good'
+                          if new_stock == 0:
+                              status = 'Critical'
+                          elif new_stock <= 10:
+                              status = 'Low Stock'
+                          
+                          cursor.execute("UPDATE inventory SET status = %s WHERE id = %s", (status, inv_id))
+
         conn.commit()
 
         # 2. Create Notification for Patient

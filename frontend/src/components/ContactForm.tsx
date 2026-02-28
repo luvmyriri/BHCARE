@@ -14,6 +14,7 @@ import {
     Flex,
     Icon,
     Badge,
+    FormErrorMessage,
 } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 
@@ -37,6 +38,7 @@ const ContactForm = () => {
         subject: '',
         message: '',
     });
+    const [errors, setErrors] = useState<Record<string, boolean>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const toast = useToast();
 
@@ -70,6 +72,7 @@ const ContactForm = () => {
             }
 
             setFormData({ ...formData, phone: cleaned });
+            setErrors(prev => ({ ...prev, phone: false }));
             return;
         }
 
@@ -77,6 +80,7 @@ const ContactForm = () => {
             // Allow letters, spaces, hyphens, and apostrophes
             const cleaned = value.replace(/[^a-zA-Z\s'-.]/g, '');
             setFormData({ ...formData, name: cleaned });
+            setErrors(prev => ({ ...prev, name: false }));
             return;
         }
 
@@ -84,42 +88,66 @@ const ContactForm = () => {
             ...formData,
             [name]: value,
         });
+        setErrors(prev => ({ ...prev, [name]: false }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // New Validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.email)) {
+        let hasErrors = false;
+        const newErrors: Record<string, boolean> = {};
+
+        // Strict Email Validation
+        const emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailDomainRegex = /@((gmail\.com)|(yahoo\.com)|(hotmail\.com)|(.*\.gov(\.ph)?))$/i;
+
+        if (!emailFormatRegex.test(formData.email) || !emailDomainRegex.test(formData.email)) {
+            newErrors.email = true;
+            hasErrors = true;
             toast({
                 title: 'Invalid Email',
-                description: 'Please enter a valid email address.',
+                description: 'Please enter a valid email address (e.g., @gmail.com).',
                 status: 'error',
                 duration: 3000,
                 isClosable: true,
                 position: 'top',
             });
-            return;
         }
 
-        // Allow empty check (just +63) for optional field, but if entered, must be valid
-        if (formData.phone && formData.phone !== '+63' && formData.phone.length < 13) {
+        // PH Phone Validation (+639XXXXXXXXX)
+        const phoneRegex = /^\+639\d{9}$/;
+        if (formData.phone && formData.phone !== '+63' && !phoneRegex.test(formData.phone)) {
+            newErrors.phone = true;
+            hasErrors = true;
             toast({
                 title: 'Invalid Phone Number',
-                description: 'Please enter a valid contact number starting with +63.',
+                description: 'Please enter a valid Philippine mobile number starting with +639.',
                 status: 'error',
                 duration: 3000,
                 isClosable: true,
                 position: 'top',
             });
+        }
+
+        if (hasErrors) {
+            setErrors(newErrors);
             return;
         }
 
         setIsSubmitting(true);
 
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            const res = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to send message');
+            }
+
             toast({
                 title: 'Message Sent!',
                 description: 'Thank you for contacting us. We will get back to you soon.',
@@ -129,8 +157,18 @@ const ContactForm = () => {
                 position: 'top',
             });
             setFormData({ name: '', email: '', phone: '+63', subject: '', message: '' });
+        } catch (err: any) {
+            toast({
+                title: 'Error',
+                description: err.message || 'Something went wrong. Please try again.',
+                status: 'error',
+                duration: 4000,
+                isClosable: true,
+                position: 'top',
+            });
+        } finally {
             setIsSubmitting(false);
-        }, 1000);
+        }
     };
 
     return (
@@ -203,7 +241,7 @@ const ContactForm = () => {
                                     />
                                 </FormControl>
 
-                                <FormControl isRequired>
+                                <FormControl isRequired isInvalid={errors.email}>
                                     <FormLabel color="gray.700" fontWeight="600">Email Address</FormLabel>
                                     <Input
                                         name="email"
@@ -217,11 +255,12 @@ const ContactForm = () => {
                                         _hover={{ borderColor: 'teal.400' }}
                                         _focus={{ borderColor: 'teal.500', boxShadow: '0 0 0 1px var(--chakra-colors-teal-500)' }}
                                     />
+                                    <FormErrorMessage>Please enter a valid email address (e.g., @gmail.com).</FormErrorMessage>
                                 </FormControl>
                             </SimpleGrid>
 
                             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={6}>
-                                <FormControl>
+                                <FormControl isInvalid={errors.phone}>
                                     <FormLabel color="gray.700" fontWeight="600">Phone Number</FormLabel>
                                     <Input
                                         name="phone"
@@ -235,6 +274,7 @@ const ContactForm = () => {
                                         _hover={{ borderColor: 'teal.400' }}
                                         _focus={{ borderColor: 'teal.500', boxShadow: '0 0 0 1px var(--chakra-colors-teal-500)' }}
                                     />
+                                    <FormErrorMessage>Please enter a valid Philippine mobile number starting with +639.</FormErrorMessage>
                                 </FormControl>
 
                                 <FormControl isRequired>
