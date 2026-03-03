@@ -65,6 +65,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
     const [reschedulingAppointmentId, setReschedulingAppointmentId] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
     const [view, setView] = useState<'book' | 'my-appointments'>(initialView);
+    const [statusFilter, setStatusFilter] = useState<'pending' | 'completed' | 'cancelled'>('pending');
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
@@ -778,16 +779,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                             <VStack align="start" flex={1} spacing={2}>
                                                                 <Heading size="md" color="gray.900" fontWeight="700">{service.name}</Heading>
                                                                 <Text fontSize="sm" color="gray.600" lineHeight="tall">{service.description}</Text>
-                                                                <Badge
-                                                                    colorScheme="teal"
-                                                                    borderRadius="full"
-                                                                    px={4}
-                                                                    py={1.5}
-                                                                    fontSize="xs"
-                                                                    fontWeight="700"
-                                                                >
-                                                                    ⏱️ {service.duration_minutes} mins
-                                                                </Badge>
                                                             </VStack>
                                                         </HStack>
                                                     </Box>
@@ -1046,10 +1037,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                         </Text>
                                                     </Flex>
                                                     <Divider borderColor="teal.200" />
-                                                    <Flex justify="space-between" align="center">
-                                                        <Text color="gray.600" fontWeight="600">Duration:</Text>
-                                                        <Text fontWeight="800" color="gray.900" fontSize="lg">{selectedService?.duration_minutes} minutes</Text>
-                                                    </Flex>
+
                                                 </VStack>
                                             </Box>
 
@@ -1121,117 +1109,142 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                     <Heading size="lg" bgGradient="linear(to-r, teal.600, orange.600)" bgClip="text">
                                         My Appointments
                                     </Heading>
-                                    {myAppointments.length > 0 ? (
-                                        <VStack align="stretch" spacing={4}>
-                                            {myAppointments.map(apt => (
-                                                <Box
-                                                    key={apt.id}
-                                                    bg="white"
-                                                    border="2px solid"
-                                                    borderColor="gray.200"
-                                                    borderRadius="2xl"
-                                                    p={6}
-                                                    transition="all 0.3s"
-                                                    _hover={{
-                                                        boxShadow: 'xl',
-                                                        transform: 'translateY(-2px)',
-                                                        borderColor: 'teal.300'
-                                                    }}
-                                                >
-                                                    <Flex justify="space-between" align="start" mb={4}>
-                                                        <Heading size="md" color="gray.900" fontWeight="700">{apt.service_type}</Heading>
+
+                                    {/* Status Filter Tabs */}
+                                    <HStack spacing={2} bg="gray.100" p={1.5} borderRadius="xl">
+                                        {(['pending', 'completed', 'cancelled'] as const).map(tab => {
+                                            const count = myAppointments.filter(a => {
+                                                const s = a.status.toLowerCase();
+                                                if (tab === 'pending') return s === 'pending' || s === 'waiting' || s === 'confirmed';
+                                                if (tab === 'completed') return s === 'completed' || s === 'complete';
+                                                return s === 'cancelled';
+                                            }).length;
+                                            const isActive = statusFilter === tab;
+                                            const colors: Record<string, string> = { pending: 'teal', completed: 'green', cancelled: 'red' };
+                                            return (
+                                                <Button
+                                                    key={tab}
+                                                    flex={1}
+                                                    size="sm"
+                                                    variant={isActive ? 'solid' : 'ghost'}
+                                                    bgGradient={isActive ? `linear(to-r, ${colors[tab]}.500, ${colors[tab]}.400)` : 'none'}
+                                                    color={isActive ? 'white' : 'gray.600'}
+                                                    fontWeight="700"
+                                                    borderRadius="lg"
+                                                    onClick={() => setStatusFilter(tab)}
+                                                    textTransform="capitalize"
+                                                    rightIcon={
                                                         <Badge
-                                                            colorScheme={getDisplayStatusColor(apt)}
                                                             borderRadius="full"
-                                                            px={4}
-                                                            py={2}
-                                                            fontSize="sm"
-                                                            fontWeight="700"
-                                                            textTransform="uppercase"
-                                                        >
-                                                            {getDisplayStatus(apt)}
-                                                        </Badge>
-                                                    </Flex>
-                                                    <HStack spacing={6} mb={4} fontSize="md" color="gray.600" fontWeight="600">
-                                                        <HStack>
-                                                            <Icon as={FiCalendar} boxSize={5} />
-                                                            <Text>{new Date(apt.appointment_date).toLocaleDateString()}</Text>
-                                                        </HStack>
-                                                        <HStack>
-                                                            <Icon as={FiClock} boxSize={5} />
-                                                            <Text>{apt.appointment_time}</Text>
-                                                        </HStack>
-                                                    </HStack>
-                                                    {/* Past appointment with pending/waiting status → Not Complete + Reschedule */}
-                                                    {['pending', 'waiting'].includes(apt.status.toLowerCase()) && isAppointmentPast(apt) && (
-                                                        <HStack spacing={3}>
-                                                            <Button
-                                                                onClick={() => handleReschedule(apt)}
-                                                                colorScheme="orange"
-                                                                variant="solid"
-                                                                size="md"
+                                                            colorScheme={isActive ? 'whiteAlpha' : colors[tab]}
+                                                            bg={isActive ? 'whiteAlpha.300' : undefined}
+                                                            color={isActive ? 'white' : undefined}
+                                                            fontSize="xs"
+                                                        >{count}</Badge>
+                                                    }
+                                                >
+                                                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                                </Button>
+                                            );
+                                        })}
+                                    </HStack>
+
+                                    {/* Filtered Appointment List */}
+                                    {(() => {
+                                        const filtered = myAppointments.filter(a => {
+                                            const s = a.status.toLowerCase();
+                                            if (statusFilter === 'pending') return s === 'pending' || s === 'waiting' || s === 'confirmed';
+                                            if (statusFilter === 'completed') return s === 'completed' || s === 'complete';
+                                            return s === 'cancelled';
+                                        });
+                                        if (filtered.length === 0) return (
+                                            <VStack py={12} spacing={4}>
+                                                <Text fontSize="5xl">
+                                                    {statusFilter === 'pending' ? '📅' : statusFilter === 'completed' ? '✅' : '❌'}
+                                                </Text>
+                                                <Text color="gray.500" fontWeight="600" fontSize="md">
+                                                    No {statusFilter} appointments
+                                                </Text>
+
+                                            </VStack>
+                                        );
+                                        return (
+                                            <VStack align="stretch" spacing={4}>
+                                                {filtered.map(apt => (
+                                                    <Box
+                                                        key={apt.id}
+                                                        bg="white"
+                                                        border="2px solid"
+                                                        borderColor="gray.200"
+                                                        borderRadius="2xl"
+                                                        p={6}
+                                                        transition="all 0.3s"
+                                                        _hover={{
+                                                            boxShadow: 'xl',
+                                                            transform: 'translateY(-2px)',
+                                                            borderColor: 'teal.300'
+                                                        }}
+                                                    >
+                                                        <Flex justify="space-between" align="start" mb={4}>
+                                                            <Heading size="md" color="gray.900" fontWeight="700">{apt.service_type}</Heading>
+                                                            <Badge
+                                                                colorScheme={getDisplayStatusColor(apt)}
+                                                                borderRadius="full"
+                                                                px={4} py={2}
+                                                                fontSize="sm"
                                                                 fontWeight="700"
-                                                                leftIcon={<Icon as={FiRefreshCw} />}
-                                                                borderRadius="lg"
-                                                                _hover={{
-                                                                    transform: 'translateY(-1px)',
-                                                                    boxShadow: 'md'
-                                                                }}
-                                                                transition="all 0.2s"
+                                                                textTransform="uppercase"
                                                             >
-                                                                Reschedule
-                                                            </Button>
+                                                                {getDisplayStatus(apt)}
+                                                            </Badge>
+                                                        </Flex>
+                                                        <HStack spacing={6} mb={4} fontSize="md" color="gray.600" fontWeight="600">
+                                                            <HStack>
+                                                                <Icon as={FiCalendar} boxSize={5} />
+                                                                <Text>{new Date(apt.appointment_date).toLocaleDateString()}</Text>
+                                                            </HStack>
+                                                            <HStack>
+                                                                <Icon as={FiClock} boxSize={5} />
+                                                                <Text>{apt.appointment_time}</Text>
+                                                            </HStack>
+                                                        </HStack>
+                                                        {/* Past appointment → Reschedule */}
+                                                        {['pending', 'waiting'].includes(apt.status.toLowerCase()) && isAppointmentPast(apt) && (
+                                                            <HStack spacing={3}>
+                                                                <Button
+                                                                    onClick={() => handleReschedule(apt)}
+                                                                    colorScheme="orange" variant="solid" size="md"
+                                                                    fontWeight="700" leftIcon={<Icon as={FiRefreshCw} />}
+                                                                    borderRadius="lg"
+                                                                    _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}
+                                                                    transition="all 0.2s"
+                                                                >
+                                                                    Reschedule
+                                                                </Button>
+                                                                <Button
+                                                                    onClick={() => handleCancelClick(apt.id)}
+                                                                    colorScheme="red" variant="ghost" size="md" fontWeight="700"
+                                                                    _hover={{ bg: 'red.50' }}
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                            </HStack>
+                                                        )}
+                                                        {/* Future pending → Cancel only */}
+                                                        {apt.status.toLowerCase() === 'pending' && !isAppointmentPast(apt) && (
                                                             <Button
                                                                 onClick={() => handleCancelClick(apt.id)}
-                                                                colorScheme="red"
-                                                                variant="ghost"
-                                                                size="md"
-                                                                fontWeight="700"
+                                                                colorScheme="red" variant="ghost" size="md" fontWeight="700"
                                                                 _hover={{ bg: 'red.50' }}
                                                             >
-                                                                Cancel
+                                                                Cancel Appointment
                                                             </Button>
-                                                        </HStack>
-                                                    )}
-                                                    {/* Future appointment with pending status → Cancel only */}
-                                                    {apt.status.toLowerCase() === 'pending' && !isAppointmentPast(apt) && (
-                                                        <Button
-                                                            onClick={() => handleCancelClick(apt.id)}
-                                                            colorScheme="red"
-                                                            variant="ghost"
-                                                            size="md"
-                                                            fontWeight="700"
-                                                            _hover={{
-                                                                bg: 'red.50'
-                                                            }}
-                                                        >
-                                                            Cancel Appointment
-                                                        </Button>
-                                                    )}
-                                                </Box>
-                                            ))}
-                                        </VStack>
-                                    ) : (
-                                        <VStack py={16} spacing={5}>
-                                            <Text fontSize="6xl">📅</Text>
-                                            <Text color="gray.600" fontSize="lg" fontWeight="600">No appointments yet</Text>
-                                            <Button
-                                                onClick={() => setView('book')}
-                                                bgGradient="linear(to-r, green.500, teal.500)"
-                                                color="white"
-                                                size="lg"
-                                                fontWeight="700"
-                                                borderRadius="xl"
-                                                px={8}
-                                                _hover={{
-                                                    transform: 'translateY(-2px)',
-                                                    boxShadow: 'xl'
-                                                }}
-                                            >
-                                                Book Your First Appointment
-                                            </Button>
-                                        </VStack>
-                                    )}
+                                                        )}
+                                                    </Box>
+                                                ))}
+                                            </VStack>
+                                        );
+                                    })()}
                                 </VStack>
                             )}
                         </Box>

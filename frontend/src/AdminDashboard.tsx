@@ -52,7 +52,6 @@ import {
     FiSearch,
     FiUser,
     FiUserPlus,
-    FiRefreshCw,
     FiFileText,
     FiMessageSquare
 } from 'react-icons/fi';
@@ -286,7 +285,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
     // Auto-refresh State
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const handleViewActivity = (activity: any) => {
         setSelectedActivity(activity);
@@ -488,8 +486,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     };
 
     // Refresh all live data
-    const refreshAll = async (showSpinner = false) => {
-        if (showSpinner) setIsRefreshing(true);
+    const refreshAll = async () => {
         await Promise.all([
             fetchUsers(),
             fetchMedicalStaff(),
@@ -499,13 +496,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             fetchContactTickets()
         ]);
         setLastUpdated(new Date());
-        if (showSpinner) setIsRefreshing(false);
     };
 
     // Initial load + 30-second polling interval
     React.useEffect(() => {
-        refreshAll(true);
-        const interval = setInterval(() => refreshAll(false), 30000);
+        refreshAll();
+        const interval = setInterval(() => refreshAll(), 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -890,6 +886,69 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </ModalBody>
                     </>
                 );
+            case 'all-logs':
+                return (
+                    <>
+                        <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiBarChart2} boxSize={6} />
+                                <Text>All System Activity Logs</Text>
+                            </HStack>
+                        </ModalHeader>
+                        <ModalBody py={6}>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
+                                <Table variant="simple" size="sm">
+                                    <Thead bg="gray.50">
+                                        <Tr>
+                                            <Th py={4} color="gray.600">User/System</Th>
+                                            <Th py={4} color="gray.600">Action</Th>
+                                            <Th py={4} color="gray.600">Time</Th>
+                                            <Th py={4} color="gray.600">Type</Th>
+                                            <Th py={4} color="gray.600">Details</Th>
+                                        </Tr>
+                                    </Thead>
+                                    <Tbody>
+                                        {recentActivities.length > 0 ? (
+                                            recentActivities.map((activity, index) => (
+                                                <Tr key={index} _hover={{ bg: 'gray.50', transition: '0.2s' }}>
+                                                    <Td fontWeight="bold" color="teal.700">{activity.user}</Td>
+                                                    <Td>{activity.action}</Td>
+                                                    <Td color="gray.500" fontSize="sm">{activity.time}</Td>
+                                                    <Td>
+                                                        <Badge
+                                                            colorScheme={
+                                                                activity.type === 'UPDATE' ? 'blue' :
+                                                                    activity.type === 'NEW' ? 'green' :
+                                                                        activity.type === 'COMPLETE' || activity.type === 'COMPLETED' ? 'orange' : 'gray'
+                                                            }
+                                                            borderRadius="full" px={3}
+                                                        >
+                                                            {activity.type}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td>
+                                                        <Button size="xs" colorScheme="gray" variant="outline"
+                                                            onClick={() => { setSelectedCard('activity'); handleViewActivity(activity); }}
+                                                        >View</Button>
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={5} py={10}>
+                                                    <VStack color="gray.400" spacing={3}>
+                                                        <Icon as={FiBarChart2} boxSize={12} color="gray.300" />
+                                                        <Text fontSize="md" fontWeight="500">No activity logs found.</Text>
+                                                    </VStack>
+                                                </Td>
+                                            </Tr>
+                                        )}
+                                    </Tbody>
+                                </Table>
+                            </Box>
+                        </ModalBody>
+                    </>
+                );
             default:
                 return (
                     <>
@@ -925,38 +984,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
                         <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                             <Flex justify="space-between" align="center" mb={6}>
-                                <HStack spacing={3}>
-                                    <Heading size="md" color="teal.800">Recent System Activities</Heading>
-                                    <HStack spacing={1} align="center">
-                                        <Box
-                                            w="8px" h="8px" borderRadius="full" bg="green.400"
-                                            sx={{
-                                                animation: 'pulse-dot 2s infinite',
-                                                '@keyframes pulse-dot': {
-                                                    '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-                                                    '50%': { opacity: 0.4, transform: 'scale(0.7)' },
-                                                },
-                                            }}
-                                        />
-                                        <Text fontSize="xs" color="green.500" fontWeight="600">LIVE</Text>
-                                    </HStack>
-                                </HStack>
+                                <Heading size="md" color="teal.800">Recent System Activities</Heading>
                                 <HStack spacing={3}>
                                     {lastUpdated && (
                                         <Text fontSize="xs" color="gray.400">
                                             Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                         </Text>
                                     )}
-                                    <Button
-                                        size="sm" colorScheme="teal" variant="ghost"
-                                        leftIcon={isRefreshing ? <Spinner size="xs" /> : <FiActivity />}
-                                        onClick={() => refreshAll(true)}
-                                        isLoading={isRefreshing}
-                                        loadingText="Refreshing"
-                                    >
-                                        Refresh
-                                    </Button>
-                                    <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiBarChart2 />}>View All Logs</Button>
+                                    <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiBarChart2 />} onClick={() => handleCardClick('all-logs')}>View All Logs</Button>
                                 </HStack>
                             </Flex>
                             <Box overflowX="auto">
@@ -964,7 +999,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     <Thead>
                                         <Tr>
                                             <Th>User/System</Th>
-                                            <Th>Action</Th>
                                             <Th>Time</Th>
                                             <Th>Type</Th>
                                             <Th>Details</Th>
@@ -974,7 +1008,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         {recentActivities.map((activity, index) => (
                                             <Tr key={index}>
                                                 <Td fontWeight="bold">{activity.user}</Td>
-                                                <Td>{activity.action}</Td>
                                                 <Td color="gray.500" fontSize="sm">{activity.time}</Td>
                                                 <Td>
                                                     <Badge
@@ -1048,7 +1081,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         <option value="role">Role</option>
                                         <option value="date">Date Joined</option>
                                     </Select>
-                                    <Button size="sm" colorScheme="orange" leftIcon={<FiActivity />} onClick={fetchUsers}>Refresh List</Button>
                                     <Button
                                         size="sm" colorScheme="red" variant="outline"
                                         leftIcon={<Icon as={FiFileText} />}
@@ -1393,10 +1425,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 <Badge ml="auto" colorScheme="purple" variant="subtle" px={3} py={1} borderRadius="full">
                                     AI-Assisted
                                 </Badge>
-                                <Button size="xs" leftIcon={<Icon as={FiRefreshCw} />} variant="ghost" colorScheme="purple"
-                                    onClick={fetchPredictiveInsights} isLoading={predictiveLoading}>
-                                    Refresh
-                                </Button>
                             </HStack>
 
                             {/* Legend */}
@@ -1588,9 +1616,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         </Button>
                                     </HStack>
                                 </HStack>
-                                <Button size="sm" colorScheme="teal" variant="outline" leftIcon={<Icon as={FiRefreshCw} />} onClick={fetchContactTickets}>
-                                    Refresh
-                                </Button>
                             </Flex>
                             <Box overflowX="auto">
                                 <Table variant="simple">
@@ -1741,7 +1766,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 </Box>
             </Box>
 
-            <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
+            <Modal isOpen={isOpen} onClose={onClose} size={selectedCard === 'all-logs' ? '5xl' : 'xl'} scrollBehavior="inside">
                 <ModalOverlay />
                 <ModalContent>
                     <ModalHeader>{selectedCard && selectedCard.charAt(0).toUpperCase() + selectedCard.slice(1)} Details</ModalHeader>

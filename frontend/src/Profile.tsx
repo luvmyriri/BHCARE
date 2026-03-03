@@ -307,8 +307,8 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
               <AvatarBadge boxSize="1.25em" bg="green.500" />
             </Avatar>
             <Box ml={4}>
-              <Heading size="md" color="teal.800">{user.first_name} {user.last_name} <Badge colorScheme="green" ml={2}>VERIFIED</Badge></Heading>
-              <Text fontSize="sm" color="gray.500">Member ID: {user?.id} • <Button variant="link" colorScheme="teal" size="sm" onClick={handlePhotoClick}>Edit Photo</Button></Text>
+              <Heading size="md" color="teal.800">{user.first_name} {user.last_name} <Badge colorScheme="green" ml={2}></Badge></Heading>
+              <Text fontSize="sm" color="gray.500">Member ID: {`PTNT${user?.created_at ? new Date(user.created_at).getFullYear() : new Date().getFullYear()}${String(user?.id ?? '').padStart(3, '0')}`} • <Button variant="link" colorScheme="teal" size="sm" onClick={handlePhotoClick}>Edit Photo</Button></Text>
               <input
                 type="file"
                 ref={fileInputRef}

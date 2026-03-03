@@ -130,7 +130,6 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const { t } = useLanguage();
   const toast = useToast();
   const [mode, setMode] = useState<'login' | 'register' | 'guide'>(initialMode);
-  const [activePortal, setActivePortal] = useState<'patient' | 'staff' | 'admin' | 'superadmin'>('patient');
   const [pendingUser, setPendingUser] = useState<any>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [newPw, setNewPw] = useState('');
@@ -1159,12 +1158,12 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   padding: '14px 16px',
                   transition: 'all 0.2s'
                 }}>
-                  <span style={{ fontSize: '16px', marginRight: '12px', opacity: 0.5 }}>✉️</span>
+                  <span style={{ fontSize: '16px', marginRight: '12px', opacity: 0.5 }}></span>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="juan.delacruz@gmail.com"
+
                     required
                     autoComplete="off"
                     style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: '#1a202c', fontWeight: 500 }}
@@ -1185,10 +1184,10 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   padding: '12px 16px',
                   transition: 'all 0.2s'
                 }}>
-                  <span style={{ fontSize: '16px', marginRight: '12px', opacity: 0.5 }}>🔒</span>
+                  <span style={{ fontSize: '16px', marginRight: '12px', opacity: 0.5 }}></span>
                   <input
                     type={loginPwVisible ? 'text' : 'password'}
-                    placeholder="••••••••"
+
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
