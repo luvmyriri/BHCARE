@@ -346,15 +346,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
                   </FormControl>
                   <FormControl>
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">SUFFIX</FormLabel>
-                    <Select value={form.suffix} onChange={updateField('suffix')} bg="white">
-                      <option value="">None</option>
-                      <option value="Jr.">Jr.</option>
-                      <option value="Sr.">Sr.</option>
-                      <option value="II">II</option>
-                      <option value="III">III</option>
-                      <option value="IV">IV</option>
-                      <option value="V">V</option>
-                    </Select>
+                    <Input value={form.suffix || 'None'} bg="gray.100" isReadOnly />
                   </FormControl>
                 </SimpleGrid>
                 <HStack>

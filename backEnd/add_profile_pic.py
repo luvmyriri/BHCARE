@@ -14,7 +14,7 @@ try:
     )
     cur = conn.cursor()
     
-    # Check if column exists first to be safe
+   
     cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'profile_picture'")
     if cur.fetchone():
         print("Column profile_picture already exists")

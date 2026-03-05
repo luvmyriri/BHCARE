@@ -673,6 +673,14 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 .form-scroll {
   flex: 1;
   display: block;
+  overflow-y: auto;
+  max-height: 90vh;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.form-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .auth-form-row {
