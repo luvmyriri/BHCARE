@@ -197,6 +197,52 @@ def send_staff_creation_email(mail, recipient_email, first_name, role, temporary
     
     mail.send(msg)
 
+def send_walkin_patient_credentials_email(mail, recipient_email, first_name, temporary_password):
+    """Send an email with the auto-generated temporary password to a new walk-in patient"""
+    
+    msg = Message(
+        subject="Welcome to BHCare - Your Patient Portal Credentials",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+                    
+                    <h2 style="color: #2c5282; text-align: center;">Patient Account Created</h2>
+                    
+                    <p>Hello <strong>{first_name}</strong>,</p>
+                    
+                    <p>Your walk-in registration at the clinic was successful! We have also created a patient portal account for you so you can access your medical records and book future appointments online.</p>
+                    
+                    <p>Please use this temporary password to log into your account for the first time:</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <span style="display: inline-block; padding: 15px 30px; background: #f0f4f8; color: #2c5282; border: 2px solid #38b2ac; border-radius: 8px; font-weight: bold; font-size: 24px; letter-spacing: 2px;">{temporary_password}</span>
+                    </div>
+                    
+                    <p style="text-align: center; color: #d69e2e; font-size: 14px;"><strong>You will be prompted to change your password upon your first login.</strong></p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="http://localhost:5173" style="display: inline-block; padding: 12px 24px; background: #38b2ac; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">Access the Portal</a>
+                    </div>
+                    
+                    <p>When logging in, make sure you are on the Patient portal.</p>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+    
+    mail.send(msg)
+
 
 def send_document_ready_email(mail, recipient_email, first_name, document_type):
     """Send an email notifying the patient that their requested document is ready"""
@@ -234,4 +280,83 @@ def send_document_ready_email(mail, recipient_email, first_name, document_type):
         """
     )
     
+    mail.send(msg)
+
+
+def send_ticket_confirmation_email(mail, recipient_email, name, subject, ticket_id):
+    """Send a confirmation email to someone who just submitted a contact ticket"""
+
+    msg = Message(
+        subject=f"We received your message – BHCare Health Center",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+
+                    <h2 style="color: #2c5282; text-align: center;">Message Received!</h2>
+
+                    <p>Hello <strong>{name}</strong>,</p>
+
+                    <p>Thank you for reaching out to us. We have received your message and our team will review it shortly.</p>
+
+                    <div style="margin: 20px 0; padding: 15px; background: #e6fffa; border-left: 4px solid #319795; color: #234e52;">
+                        <p style="margin: 0;"><strong>Subject:</strong> {subject}</p>
+                    </div>
+
+                    <p>We aim to respond within 1–2 business days. If your concern is urgent, please visit the health center directly during clinic hours.</p>
+
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+
+    mail.send(msg)
+
+
+def send_ticket_resolved_email(mail, recipient_email, name, subject, ticket_id):
+    """Send an email to notify the submitter that their ticket has been resolved"""
+
+    msg = Message(
+        subject=f"Your inquiry has been resolved – BHCare Health Center",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+
+                    <h2 style="color: #2c5282; text-align: center;">Ticket Resolved ✅</h2>
+
+                    <p>Hello <strong>{name}</strong>,</p>
+
+                    <p>We are writing to let you know that your inquiry has been reviewed and resolved by our team.</p>
+
+                    <div style="margin: 20px 0; padding: 15px; background: #f0fdf4; border-left: 4px solid #38a169; color: #1a4731;">
+                        <p style="margin: 0;"><strong>Subject:</strong> {subject}</p>
+                        <p style="margin: 8px 0 0;"><strong>Status:</strong> Resolved</p>
+                    </div>
+
+                    <p>If you have follow-up questions or the issue persists, please do not hesitate to contact us again through our website or visit the health center in person.</p>
+
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+
     mail.send(msg)

@@ -1,0 +1,47 @@
+﻿--- USERS TABLE ---
+id | integer | Nullable: NO
+email | character varying | Nullable: NO
+password_hash | character varying | Nullable: NO
+first_name | character varying | Nullable: NO
+middle_name | character varying | Nullable: YES
+last_name | character varying | Nullable: NO
+date_of_birth | date | Nullable: NO
+gender | character varying | Nullable: NO
+contact_number | character varying | Nullable: NO
+barangay | character varying | Nullable: NO
+city | character varying | Nullable: NO
+province | character varying | Nullable: NO
+house_number | character varying | Nullable: YES
+block_number | character varying | Nullable: YES
+lot_number | character varying | Nullable: YES
+street_name | character varying | Nullable: YES
+subdivision | character varying | Nullable: YES
+zip_code | character varying | Nullable: YES
+full_address | text | Nullable: YES
+id_image_path | character varying | Nullable: YES
+id_image | bytea | Nullable: YES
+ocr_text | text | Nullable: YES
+created_at | timestamp without time zone | Nullable: YES
+philhealth_id | character varying | Nullable: YES
+role | character varying | Nullable: YES
+profile_picture | text | Nullable: YES
+status | character varying | Nullable: YES
+suffix | character varying | Nullable: YES
+patient_number | character varying | Nullable: YES
+requires_password_change | boolean | Nullable: YES
+
+--- APPOINTMENTS TABLE ---
+id | integer | Nullable: NO
+user_id | integer | Nullable: YES
+appointment_date | date | Nullable: NO
+appointment_time | time without time zone | Nullable: NO
+service_type | character varying | Nullable: NO
+doctor_preference | character varying | Nullable: YES
+reason | text | Nullable: YES
+status | character varying | Nullable: NO
+notes | text | Nullable: YES
+created_at | timestamp without time zone | Nullable: NO
+updated_at | timestamp without time zone | Nullable: NO
+cancelled_at | timestamp without time zone | Nullable: YES
+cancellation_reason | text | Nullable: YES
+queue_number | integer | Nullable: YES

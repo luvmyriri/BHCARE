@@ -36,6 +36,8 @@ import {
     FiMic,
     FiSearch,
     FiActivity,
+    FiUserPlus,
+    FiCalendar,
 } from 'react-icons/fi';
 
 interface MedicalStaffDashboardProps {
@@ -87,6 +89,12 @@ const PageHero = ({ title, description, badge }: any) => (
     </Box>
 );
 
+// PSGC Interfaces
+interface PSGCRegion { code: string; name: string; }
+interface PSGCProvince { code: string; name: string; }
+interface PSGCCity { code: string; name: string; }
+interface PSGCBarangay { code: string; name: string; }
+
 const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout }) => {
     const [activeTab, setActiveTab] = useState('queue');
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
@@ -94,12 +102,207 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
     const [searchQuery, setSearchQuery] = useState('');
     const toast = useToast();
 
-    // Polling for queue updates
+    // Walk-in Registration State
+    const [firstName, setFirstName] = useState('');
+    const [middleName, setMiddleName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [email, setEmail] = useState('');
+    const [dob, setDob] = useState('');
+    const [gender, setGender] = useState('');
+    const [contact, setContact] = useState('+63');
+
+    // Address State
+    const [regions, setRegions] = useState<PSGCRegion[]>([]);
+    const [provinces, setProvinces] = useState<PSGCProvince[]>([]);
+    const [cities, setCities] = useState<PSGCCity[]>([]);
+    const [barangays, setBarangayList] = useState<PSGCBarangay[]>([]);
+    const [selectedRegion, setSelectedRegion] = useState('');
+    const [selectedProvince, setSelectedProvince] = useState('');
+    const [selectedCity, setSelectedCity] = useState('');
+    const [barangay, setBarangay] = useState('');
+    const [city, setCity] = useState('');
+    const [province, setProvince] = useState('');
+    const [houseNumber, setHouseNumber] = useState('');
+    const [streetName, setStreetName] = useState('');
+
+    const [isRegistering, setIsRegistering] = useState(false);
+
+    // Form states for Appointment
+    const [appointmentUserId, setAppointmentUserId] = useState<number | ''>('');
+    const [appointmentService, setAppointmentService] = useState('');
+    const [appointmentDate, setAppointmentDate] = useState('');
+    const [appointmentTime, setAppointmentTime] = useState('');
+    const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+    const [services, setServices] = useState<any[]>([]);
+    const [patients, setPatients] = useState<any[]>([]);
+    const [isBooking, setIsBooking] = useState(false);
+
+    // Fetch Base Data
     useEffect(() => {
         fetchQueue();
+        fetchServices();
+        fetchPatients();
         const interval = setInterval(fetchQueue, 30000); // Poll every 30s
         return () => clearInterval(interval);
     }, []);
+
+    // PSGC Initial Load
+    useEffect(() => {
+        fetch('https://psgc.cloud/api/regions')
+            .then(res => res.json())
+            .then(data => setRegions(data))
+            .catch(err => console.error('Failed to load regions', err));
+    }, []);
+
+    useEffect(() => {
+        if (!selectedRegion) {
+            setProvinces([]); setSelectedProvince('');
+            setCities([]); setSelectedCity('');
+            setBarangayList([]); setBarangay(''); return;
+        }
+        if (selectedRegion === '1300000000') {
+            setProvinces([]); setSelectedProvince('');
+            fetch(`https://psgc.cloud/api/regions/${selectedRegion}/cities-municipalities`)
+                .then(res => res.json())
+                .then(data => setCities(data));
+        } else {
+            fetch(`https://psgc.cloud/api/regions/${selectedRegion}/provinces`)
+                .then(res => res.json())
+                .then(data => setProvinces(data));
+        }
+    }, [selectedRegion]);
+
+    useEffect(() => {
+        if (selectedRegion !== '1300000000') {
+            if (!selectedProvince) {
+                setCities([]); setSelectedCity('');
+                setBarangayList([]); setBarangay(''); return;
+            }
+            fetch(`https://psgc.cloud/api/provinces/${selectedProvince}/cities-municipalities`)
+                .then(res => res.json())
+                .then(data => setCities(data));
+        }
+    }, [selectedProvince, selectedRegion]);
+
+    useEffect(() => {
+        if (!selectedCity) {
+            setBarangayList([]); setBarangay(''); return;
+        }
+        fetch(`https://psgc.cloud/api/cities-municipalities/${selectedCity}/barangays`)
+            .then(res => res.json())
+            .then(data => setBarangayList(data));
+    }, [selectedCity]);
+
+    const fetchServices = async () => {
+        try {
+            const res = await fetch('/api/services');
+            if (res.ok) setServices(await res.json());
+        } catch (e) { console.error('Error fetching services:', e); }
+    };
+
+    const fetchPatients = async () => {
+        try {
+            const res = await fetch('/api/doctor/patients');
+            if (res.ok) setPatients(await res.json());
+        } catch (e) { console.error('Error fetching patients:', e); }
+    };
+
+    const fetchAvailableSlots = async (date: string, serviceType: string) => {
+        if (!date) return;
+        try {
+            const res = await fetch(`/api/available-slots?date=${date}&service_type=${encodeURIComponent(serviceType)}`);
+            if (res.ok) setAvailableSlots(await res.json());
+        } catch (e) { console.error('Error fetching slots:', e); }
+    };
+
+    const handleWalkinRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsRegistering(true);
+        try {
+            const payload = {
+                first_name: firstName,
+                middle_name: middleName,
+                last_name: lastName,
+                email: email,
+                date_of_birth: dob,
+                gender,
+                contact_number: contact,
+                barangay,
+                city,
+                province,
+                house_number: houseNumber,
+                street_name: streetName
+            };
+
+            const res = await fetch('/api/register-walkin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                toast({ title: 'Success', description: 'Walk-in registered. You can now book their appointment.', status: 'success' });
+
+                // Clear form
+                setFirstName(''); setMiddleName(''); setLastName(''); setEmail(''); setDob(''); setGender(''); setContact('+63');
+                setBarangay(''); setCity(''); setProvince(''); setHouseNumber(''); setStreetName('');
+
+                // Refresh patients list so they appear in dropdown
+                await fetchPatients();
+
+                // Switch to appointment tab and set the new ID
+                setAppointmentUserId(data.user_id);
+                setActiveTab('walkin-appointment');
+            } else {
+                toast({ title: 'Error', description: data.error || 'Failed to register', status: 'error' });
+            }
+        } catch (error) {
+            toast({ title: 'Error', description: 'Network error', status: 'error' });
+        } finally {
+            setIsRegistering(false);
+        }
+    };
+
+    const handleWalkinAppointment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!appointmentUserId || !appointmentService || !appointmentDate || !appointmentTime) {
+            toast({ title: 'Validation Error', description: 'Please fill all fields', status: 'warning' });
+            return;
+        }
+
+        setIsBooking(true);
+        try {
+            const res = await fetch('/api/appointments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: appointmentUserId,
+                    service_type: appointmentService,
+                    appointment_date: appointmentDate,
+                    appointment_time: appointmentTime,
+                    doctor_preference: 'Any Available Doctor',
+                    reason: 'Walk-in Consultation'
+                })
+            });
+
+            if (res.ok) {
+                toast({ title: 'Success', description: 'Appointment booked successfully.', status: 'success' });
+                setAppointmentUserId(''); setAppointmentService(''); setAppointmentDate(''); setAppointmentTime('');
+                setActiveTab('queue');
+                fetchQueue();
+            } else {
+                const data = await res.json();
+                toast({ title: 'Error', description: data.error || 'Booking failed', status: 'error' });
+            }
+        } catch (error) {
+            toast({ title: 'Error', description: 'Network error', status: 'error' });
+        } finally {
+            setIsBooking(false);
+        }
+    };
+
+    // Keep existing polling hook below but remove duplicate fetchQueue inside it
 
     const fetchQueue = async () => {
         try {
@@ -217,6 +420,12 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                     <NavItem icon={FiList} active={activeTab === 'queue'} onClick={() => setActiveTab('queue')}>
                         Queue Management
                     </NavItem>
+                    <NavItem icon={FiUserPlus} active={activeTab === 'walkin-register'} onClick={() => setActiveTab('walkin-register')}>
+                        Walk-in Registration
+                    </NavItem>
+                    <NavItem icon={FiCalendar} active={activeTab === 'walkin-appointment'} onClick={() => setActiveTab('walkin-appointment')}>
+                        Walk-in Appointment
+                    </NavItem>
                 </VStack>
 
                 <Box pos="absolute" bottom="8" w="full" px={4}>
@@ -245,6 +454,12 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                             <VStack spacing={2} align="stretch" px={4}>
                                 <NavItem icon={FiList} active={activeTab === 'queue'} onClick={() => { setActiveTab('queue'); onSidebarClose(); }}>
                                     Queue Management
+                                </NavItem>
+                                <NavItem icon={FiUserPlus} active={activeTab === 'walkin-register'} onClick={() => { setActiveTab('walkin-register'); onSidebarClose(); }}>
+                                    Walk-in Registration
+                                </NavItem>
+                                <NavItem icon={FiCalendar} active={activeTab === 'walkin-appointment'} onClick={() => { setActiveTab('walkin-appointment'); onSidebarClose(); }}>
+                                    Walk-in Appointment
                                 </NavItem>
                             </VStack>
                             <Box pos="absolute" bottom="8" w="full" px={4}>
@@ -365,6 +580,205 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                         </Box>
                     </VStack>
                 )}
+
+                {activeTab === 'walkin-register' && (
+                    <VStack align="stretch" spacing={6}>
+                        <PageHero
+                            badge="REGISTRATION"
+                            title="Register Walk-in Patient"
+                            description="Create a medical record for a new patient who walked into the clinic."
+                        />
+                        <Box bg="white" p={{ base: 4, md: 8 }} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <form onSubmit={handleWalkinRegister}>
+                                <VStack spacing={6} align="stretch" w="full">
+                                    <Heading size="md" color="teal.800">Personal Information</Heading>
+                                    <Flex gap={4} direction={{ base: 'column', md: 'row' }}>
+                                        <Box flex={1}>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>First Name *</Text>
+                                            <Input required placeholder="First Name" value={firstName} onChange={e => setFirstName(e.target.value)} />
+                                        </Box>
+                                        <Box flex={1}>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Middle Name</Text>
+                                            <Input placeholder="Middle Name" value={middleName} onChange={e => setMiddleName(e.target.value)} />
+                                        </Box>
+                                        <Box flex={1}>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Last Name *</Text>
+                                            <Input required placeholder="Last Name" value={lastName} onChange={e => setLastName(e.target.value)} />
+                                        </Box>
+                                    </Flex>
+                                    <Flex gap={4} direction={{ base: 'column', lg: 'row' }} align="flex-start">
+                                        <Box flex={1} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Date of Birth *</Text>
+                                            <Input required type="date" max={new Date().toISOString().split('T')[0]} value={dob} onChange={e => setDob(e.target.value)} />
+                                        </Box>
+                                        <Box flex={1} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Gender *</Text>
+                                            <Box as="select" required value={gender} onChange={e => setGender(e.target.value)} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">Select Gender</option>
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                            </Box>
+                                        </Box>
+                                        <Box flex={1.5} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Email Address (Optional)</Text>
+                                            <Input type="email" placeholder="patient@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+                                            <Text fontSize="xs" color="gray.500" mt={1}>Patient receives temporary password here to access the portal.</Text>
+                                        </Box>
+                                        <Box flex={1} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Contact No. *</Text>
+                                            <Input required placeholder="+639..." value={contact} onChange={e => setContact(e.target.value)} />
+                                        </Box>
+                                    </Flex>
+
+                                    <Divider />
+                                    <Heading size="md" color="teal.800">Address Information</Heading>
+                                    <Flex gap={4} direction={{ base: 'column', lg: 'row' }}>
+                                        <Box flex={1} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Region *</Text>
+                                            <Box as="select" required value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">Select Region</option>
+                                                <option value="1300000000">NCR - National Capital Region</option>
+                                                {regions.filter(r => r.code !== '1300000000').map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
+                                            </Box>
+                                        </Box>
+                                        <Box flex={1} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Province *</Text>
+                                            <Box as="select" required={selectedRegion !== '1300000000'} disabled={!provinces.length && selectedRegion !== '1300000000'} value={selectedProvince} onChange={e => { setSelectedProvince(e.target.value); setProvince(e.target.options[e.target.selectedIndex].text); }} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">{selectedRegion === '1300000000' ? 'Metro Manila' : 'Select Province'}</option>
+                                                {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                                            </Box>
+                                        </Box>
+                                        <Box flex={1} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>City *</Text>
+                                            <Box as="select" required disabled={!cities.length} value={selectedCity} onChange={e => { setSelectedCity(e.target.value); setCity(e.target.options[e.target.selectedIndex].text); }} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">Select City</option>
+                                                {cities.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                                            </Box>
+                                        </Box>
+                                        <Box flex={1} w="full">
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Barangay *</Text>
+                                            <Box as="select" required disabled={!barangays.length} value={barangay} onChange={e => setBarangay(e.target.value)} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">Select Barangay</option>
+                                                {barangays.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                                            </Box>
+                                        </Box>
+                                    </Flex>
+                                    <Flex gap={4} direction={{ base: 'column', md: 'row' }}>
+                                        <Box flex={1}>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>House/Block/Lot</Text>
+                                            <Input placeholder="House/Block/Lot No." value={houseNumber} onChange={e => setHouseNumber(e.target.value)} />
+                                        </Box>
+                                        <Box flex={1}>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Street Name</Text>
+                                            <Input placeholder="Street Name" value={streetName} onChange={e => setStreetName(e.target.value)} />
+                                        </Box>
+                                    </Flex>
+
+                                    <Button
+                                        type="submit"
+                                        colorScheme="teal"
+                                        size="lg"
+                                        mt={4}
+                                        isLoading={isRegistering}
+                                        loadingText="Registering..."
+                                        alignSelf="flex-start"
+                                        px={12}
+                                    >
+                                        Register Patient
+                                    </Button>
+                                </VStack>
+                            </form>
+                        </Box>
+                    </VStack>
+                )}
+
+                {
+                    activeTab === 'walkin-appointment' && (
+                        <VStack align="stretch" spacing={6}>
+                            <PageHero
+                                badge="APPOINTMENTS"
+                                title="Walk-in Appointment Bookings"
+                                description="Book an appointment slot for a registered patient who walked in today."
+                            />
+                            <Box bg="white" p={{ base: 4, md: 8 }} borderRadius="2xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                                <form onSubmit={handleWalkinAppointment}>
+                                    <VStack spacing={6} align="stretch" w="full">
+                                        <Heading size="md" color="teal.800">Booking Details</Heading>
+
+                                        <Box>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Select Patient *</Text>
+                                            <Box as="select" required value={appointmentUserId} onChange={e => setAppointmentUserId(Number(e.target.value))} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">-- Choose Patient --</option>
+                                                {patients.map(p => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.last_name}, {p.first_name} ({p.p_id})
+                                                    </option>
+                                                ))}
+                                            </Box>
+                                            <Text fontSize="xs" color="gray.500" mt={1}>If not listed, please register them first in the Walk-in Registration tab.</Text>
+                                        </Box>
+
+                                        <Box>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Service Type *</Text>
+                                            <Box as="select" required value={appointmentService} onChange={e => {
+                                                setAppointmentService(e.target.value);
+                                                fetchAvailableSlots(appointmentDate, e.target.value); // Re-fetch slots when service changes
+                                            }} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">-- Choose Service --</option>
+                                                {services.map(s => (
+                                                    <option key={s.id} value={s.name}>{s.name}</option>
+                                                ))}
+                                            </Box>
+                                        </Box>
+
+                                        <Box>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Date *</Text>
+                                            <Input
+                                                required
+                                                type="date"
+                                                value={appointmentDate}
+                                                min={new Date().toISOString().split('T')[0]} // Allow today
+                                                onChange={e => {
+                                                    setAppointmentDate(e.target.value);
+                                                    setAppointmentTime('');
+                                                    fetchAvailableSlots(e.target.value, appointmentService);
+                                                }}
+                                            />
+                                        </Box>
+
+                                        <Box>
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Time Slot *</Text>
+                                            <Box as="select" required value={appointmentTime} onChange={e => setAppointmentTime(e.target.value)} disabled={!appointmentDate || !appointmentService || availableSlots.length === 0} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                <option value="">
+                                                    {!appointmentDate ? "Select a date first" :
+                                                        !appointmentService ? "Select a service first" :
+                                                            availableSlots.length === 0 ? "No slots available" :
+                                                                "-- Select Time Slot --"}
+                                                </option>
+                                                {availableSlots.map((slot, index) => (
+                                                    <option key={index} value={slot.time}>{slot.display}</option>
+                                                ))}
+                                            </Box>
+                                        </Box>
+
+                                        <Button
+                                            type="submit"
+                                            colorScheme="blue"
+                                            size="lg"
+                                            mt={4}
+                                            isLoading={isBooking}
+                                            loadingText="Booking..."
+                                            alignSelf="flex-start"
+                                            px={12}
+                                        >
+                                            Book Appointment
+                                        </Button>
+                                    </VStack>
+                                </form>
+                            </Box>
+                        </VStack>
+                    )
+                }
             </Box>
         </Flex>
     );

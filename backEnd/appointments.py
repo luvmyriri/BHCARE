@@ -460,53 +460,6 @@ def reschedule_appointment(appointment_id):
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-@appointments_bp.route('/api/queue/walk-in', methods=['POST'])
-def add_walk_in():
-    """Security adds a walk-in patient to the queue"""
-    try:
-        data = request.get_json()
-        first_name = data.get('first_name')
-        last_name = data.get('last_name')
-        service_type = data.get('service_type', 'Consultation')
-        
-        if not first_name or not last_name:
-            return jsonify({"error": "First name and last name are required"}), 400
-            
-        conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        
-        # Check if user exists (optional, walk-ins can be unregistered)
-        # For simplicity, we'll create a transient entry or link to existing
-        # Here we just log it as an appointment for 'today'
-        today = date.today().isoformat()
-        now_time = datetime.now().strftime('%H:%M')
-        
-        # We need a user_id. If not provided, we can use a generic 'Walk-in' user 
-        # or just allow null if the schema supports it.
-        # Assuming for this simplified flow we find or use a placeholder user_id=0 or similar
-        # OR better: Security provides the patient's name and we just put it in the queue.
-        # Let's assume we want to support unregistered walk-ins by allowing user_id to be NULL 
-        # (if DB allows) or mapping them to a special user.
-        
-        # ACTUALLY: Let's just create a new appt.
-        # Check if DB allows NULL user_id for appointments. If not, we'll need to handle that.
-        # For now, let's assume we'll just try to insert and see.
-        
-        cursor.execute("""
-            INSERT INTO appointments (user_id, appointment_date, appointment_time, service_type, status, reason)
-            VALUES (NULL, %s, %s, %s, 'waiting', 'Walk-in')
-            RETURNING id
-        """, (today, now_time, service_type))
-        # Note: If this fails due to NOT NULL user_id, I'll need to create a placeholder user.
-        
-        appt_id = cursor.fetchone()['id']
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return jsonify({"message": "Walk-in added to queue", "appointment_id": appt_id}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
         return jsonify({"error": str(e)}), 500
 
 

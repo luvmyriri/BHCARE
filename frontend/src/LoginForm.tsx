@@ -274,6 +274,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const [registerPwVisible, setRegisterPwVisible] = useState(false);
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
 
   const [idFront, setIdFront] = useState<File | null>(null);
@@ -954,6 +956,13 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault(); setError('');
     const newErrors: Record<string, boolean> = {};
+
+    // Terms & Conditions check
+    if (!agreedToTerms) {
+      setError('You must agree to the Terms & Conditions and Privacy Policy to register.');
+      setTimeout(scrollToError, 100);
+      return;
+    }
 
     // Required Fields Check
     if (!firstName) newErrors.firstName = true;
@@ -1981,7 +1990,54 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                       {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7' }}>{error}</div>}
 
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '24px' }}>
+                      {/* Terms & Conditions Checkbox */}
+                      <div style={{ marginTop: '20px', marginBottom: '4px' }}>
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          color: '#4a5568',
+                          lineHeight: '1.5'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={agreedToTerms}
+                            onChange={(e) => setAgreedToTerms(e.target.checked)}
+                            style={{
+                              marginTop: '2px',
+                              width: '16px',
+                              height: '16px',
+                              accentColor: '#38b2ac',
+                              flexShrink: 0,
+                              cursor: 'pointer'
+                            }}
+                          />
+                          <span>
+                            I have read and agree to the{' '}
+                            <button
+                              type="button"
+                              onClick={() => setShowTermsModal(true)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#38b2ac',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: '13px',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              Terms &amp; Conditions and Privacy Policy
+                            </button>
+                            {' '}of BHCare Health Center.
+                          </span>
+                        </label>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' }}>
                         <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '14px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '14px' }}>
                           ← Back
                         </button>
@@ -2078,6 +2134,112 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
       {/* FORGOT PASSWORD MODAL */}
 
+
+      {/* TERMS & CONDITIONS MODAL */}
+      {showTermsModal && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease'
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowTermsModal(false); }}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '640px',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '24px 28px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#1a202c' }}>Terms &amp; Conditions</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#718096' }}>BHCare Health Center — Barangay 174, Caloocan City</p>
+              </div>
+              <button
+                onClick={() => setShowTermsModal(false)}
+                style={{ background: '#f7fafc', border: '1px solid #e2e8f0', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', fontSize: '18px', color: '#4a5568', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >×</button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div style={{ overflowY: 'auto', padding: '24px 28px', flex: 1, fontSize: '13px', color: '#4a5568', lineHeight: '1.7' }}>
+              <p style={{ fontSize: '12px', color: '#718096', marginBottom: '20px' }}>Effective Date: January 1, 2026</p>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>1. Acceptance of Terms</h3>
+              <p>By registering for an account on the BHCare Health Portal, you agree to be bound by these Terms &amp; Conditions and our Privacy Policy. If you do not agree, you must not register or use this portal.</p>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px', marginTop: '16px' }}>2. Use of the Portal</h3>
+              <p>This portal is intended exclusively for residents and patients of Barangay 174 Health Center. You agree to:</p>
+              <ul style={{ paddingLeft: '20px', marginTop: '6px' }}>
+                <li>Provide accurate, current, and complete information during registration.</li>
+                <li>Maintain the security of your account credentials and not share them with others.</li>
+                <li>Use the portal only for lawful purposes related to accessing health services.</li>
+                <li>Notify us immediately of any unauthorized use of your account.</li>
+              </ul>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px', marginTop: '16px' }}>3. Medical Information Disclaimer</h3>
+              <p>Information available through this portal is for administrative and record-keeping purposes only. It does not constitute medical advice. Always consult a qualified health professional for medical concerns.</p>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px', marginTop: '16px' }}>4. Privacy Policy — Data Collection &amp; Use</h3>
+              <p>In compliance with the <strong>Republic Act No. 10173 (Data Privacy Act of 2012)</strong>, BHCare Health Center collects and processes your personal information, including:</p>
+              <ul style={{ paddingLeft: '20px', marginTop: '6px' }}>
+                <li>Personal details (name, date of birth, gender, contact number)</li>
+                <li>Address information</li>
+                <li>Government ID details (PhilHealth ID, etc.)</li>
+                <li>Appointment and medical record data</li>
+              </ul>
+              <p style={{ marginTop: '10px' }}>This information is collected solely for the purpose of providing barangay health services and is stored securely. Your data will <strong>not</strong> be sold, shared, or disclosed to third parties without your consent, except as required by law.</p>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px', marginTop: '16px' }}>5. Your Rights Under RA 10173</h3>
+              <p>You have the right to:</p>
+              <ul style={{ paddingLeft: '20px', marginTop: '6px' }}>
+                <li>Be informed of how your data is collected and processed.</li>
+                <li>Access your personal data stored in our system.</li>
+                <li>Correct inaccurate information in your records.</li>
+                <li>Request the deletion of your account and associated data.</li>
+              </ul>
+              <p style={{ marginTop: '10px' }}>To exercise these rights, please visit or contact the Barangay 174 Health Center directly.</p>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px', marginTop: '16px' }}>6. Account Termination</h3>
+              <p>We reserve the right to suspend or terminate accounts that violate these terms, provide false information, or misuse the portal.</p>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px', marginTop: '16px' }}>7. Changes to These Terms</h3>
+              <p>BHCare Health Center reserves the right to modify these Terms at any time. Continued use of the portal after changes constitutes acceptance of the revised Terms.</p>
+
+              <h3 style={{ color: '#2c5282', fontSize: '14px', fontWeight: 700, marginBottom: '6px', marginTop: '16px' }}>8. Contact</h3>
+              <p>For questions about these Terms or your data, please contact the BHCare Health Center at Barangay 174, Caloocan City or email us at <strong>bhcarehealthcenter@gmail.com</strong>.</p>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 28px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowTermsModal(false)}
+                style={{ padding: '10px 20px', background: '#edf2f7', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: '#4a5568', fontSize: '13px' }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => { setAgreedToTerms(true); setShowTermsModal(false); }}
+                style={{ padding: '10px 24px', background: '#38b2ac', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, color: 'white', fontSize: '13px', boxShadow: '0 4px 12px rgba(56,178,172,0.3)' }}
+              >
+                ✓ I Agree
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MULTI-STEP RESET PASSWORD MODAL */}
       {

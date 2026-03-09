@@ -24,7 +24,10 @@ from email_config import (
     send_password_reset_email,
     send_registration_success_email,
     send_staff_creation_email,
-    send_document_ready_email
+    send_document_ready_email,
+    send_ticket_confirmation_email,
+    send_ticket_resolved_email,
+    send_walkin_patient_credentials_email
 )
 
 load_dotenv()
@@ -1918,6 +1921,114 @@ def reset_password():
 
 
 
+@app.route("/api/register-walkin", methods=["POST"])
+def register_walkin():
+    """Register a walk-in patient with an optional real email for temporary password or a generated placeholder email."""
+    try:
+        data = request.json
+        first_name = data.get('first_name', '').strip()
+        middle_name = data.get('middle_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        email = data.get('email', '').strip()
+        dob_str = data.get('date_of_birth')
+        gender = data.get('gender')
+        contact = data.get('contact_number')
+        barangay = data.get('barangay')
+        city = data.get('city')
+        province = data.get('province')
+        
+        # Additional address fields (optional)
+        house_number = data.get('house_number', '')
+        block_number = data.get('block_number', '')
+        lot_number = data.get('lot_number', '')
+        street_name = data.get('street_name', '')
+        subdivision = data.get('subdivision', '')
+        zip_code = data.get('zip_code', '')
+        
+        if not all([first_name, last_name, dob_str, gender, contact, barangay, city, province]):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Construct full address for easy reference
+        address_parts = [p for p in [house_number, block_number, lot_number, street_name, subdivision, barangay, city, province, zip_code] if p]
+        full_address = ", ".join(address_parts)
+        
+        import secrets
+        import string
+        from datetime import datetime
+        
+        if email:
+            # Use the provided email
+            registration_email = email
+            send_email = True
+        else:
+            # Generate a unique pseudo-email for the walkin patient
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            registration_email = f"{first_name.lower()}.{last_name.lower()}.{timestamp}@walkin.bhcare.local".replace(" ", "")
+            send_email = False
+        
+        # Auto-generate a secure random password
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        random_password = ''.join(secrets.choice(alphabet) for i in range(12))
+        hashed_password = bcrypt.generate_password_hash(random_password).decode('utf-8')
+        
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Check if email is already registered
+        if send_email:
+            cur.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s)", (registration_email,))
+            if cur.fetchone():
+                return jsonify({"error": "This email address is already registered."}), 400
+        
+        # Generate unique patient number
+        year = datetime.now().year
+        cur.execute("SELECT patient_number FROM users WHERE patient_number IS NOT NULL")
+        taken = {row[0] for row in cur.fetchall()}
+        patient_number = generate_patient_number(year, taken)
+
+        cur.execute("""
+            INSERT INTO users (
+                email, password_hash, first_name, middle_name, last_name, role, 
+                contact_number, date_of_birth, gender, full_address, barangay, 
+                city, province, house_number, block_number, lot_number, 
+                street_name, subdivision, zip_code, patient_number, 
+                requires_password_change, status
+            )
+            VALUES (%s, %s, %s, %s, %s, 'Patient', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, 'Active')
+            RETURNING id, patient_number
+        """, (
+            registration_email, hashed_password, first_name, middle_name, last_name,
+            contact, dob_str, gender, full_address, barangay,
+            city, province, house_number, block_number, lot_number,
+            street_name, subdivision, zip_code, patient_number
+        ))
+        
+        new_user = cur.fetchone()
+        new_user_id = new_user[0]
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        if send_email:
+            try:
+                # Dispatch credentials
+                send_walkin_patient_credentials_email(mail, registration_email, first_name, random_password)
+            except Exception as e:
+                print(f"Warning: Registration succeeded, but email failed: {e}")
+        
+        return jsonify({
+            "message": "Walk-in patient registered successfully",
+            "user_id": new_user_id,
+            "patient_number": patient_number,
+            "email": registration_email
+        }), 201
+        
+    except Exception as e:
+        print(f"Error registering walk-in: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/medical-staff", methods=["GET"])
 def get_medical_staff():
     """Get all medical staff members with details"""
@@ -3319,6 +3430,13 @@ def submit_contact_form():
         )
         ticket_id = cur.fetchone()['id']
         conn.commit()
+
+        # Send confirmation email to submitter (fail silently)
+        try:
+            send_ticket_confirmation_email(mail, email, name or 'there', subject or 'General Inquiry', ticket_id)
+        except Exception as email_err:
+            print(f"Non-fatal: Failed to send ticket confirmation email: {email_err}")
+
         return jsonify({"message": "Message sent successfully", "ticket_id": ticket_id}), 201
     except Exception as e:
         conn.rollback()
@@ -3366,8 +3484,25 @@ def update_contact_ticket(ticket_id):
         )
         updated = cur.fetchone()
         conn.commit()
-        
+
         if updated:
+            # If resolved, email the submitter (fail silently)
+            if new_status == 'Resolved':
+                try:
+                    cur2 = conn.cursor(cursor_factory=RealDictCursor)
+                    cur2.execute("SELECT email, name, subject FROM contact_tickets WHERE id = %s", (ticket_id,))
+                    ticket = cur2.fetchone()
+                    cur2.close()
+                    if ticket and ticket.get('email'):
+                        send_ticket_resolved_email(
+                            mail,
+                            ticket['email'],
+                            ticket.get('name') or 'there',
+                            ticket.get('subject') or 'General Inquiry',
+                            ticket_id
+                        )
+                except Exception as email_err:
+                    print(f"Non-fatal: Failed to send ticket resolved email: {email_err}")
             return jsonify({"message": "Ticket updated successfully"}), 200
         else:
             return jsonify({"error": "Ticket not found"}), 404
