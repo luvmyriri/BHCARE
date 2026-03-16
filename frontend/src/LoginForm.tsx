@@ -1,6 +1,6 @@
 import { useState, FC, ReactNode, InputHTMLAttributes, SelectHTMLAttributes, FormEvent, ChangeEvent, useEffect } from 'react';
 import { useLanguage } from './contexts/LanguageContext';
-import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiEye, FiEyeOff, FiCheck, FiCircle, FiCamera, FiAlertTriangle, FiCreditCard, FiUser, FiCalendar, FiMail, FiHome, FiMapPin, FiMap, FiLock, FiShield, FiKey } from 'react-icons/fi';
 import { useToast } from '@chakra-ui/react';
 
 type Option = { code: string; name: string };
@@ -85,7 +85,7 @@ const Select: FC<
             textTransform: 'none',
             letterSpacing: '0'
           }}>
-            ✓ Auto
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><FiCheck size={12} /> Auto</span>
           </span>
         )}
       </label>
@@ -1410,7 +1410,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   <div style={{ marginBottom: '20px' }}>
                     <Select
                       label="Select ID Type (Required)"
-                      icon="🪪"
+                      icon={<FiCreditCard />}
                       options={[
                         { code: "Driver's License", name: "Driver's License" },
                         { code: "PhilHealth ID", name: "PhilHealth ID" },
@@ -1435,7 +1435,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     background: 'rgba(235, 248, 255, 0.5)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
-                      <span style={{ fontSize: '20px' }}>📸</span>
+                      <span style={{ fontSize: '20px', display: 'flex', alignItems: 'center' }}><FiCamera /></span>
                       <h3 style={{ color: '#2d3748', fontSize: '15px', fontWeight: 700, margin: 0 }}>
                         Automated Registration
                       </h3>
@@ -1648,7 +1648,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       marginTop: '12px',
                       border: '1px solid #c6f6d5'
                     }}>
-                      ✓ Detected: {detectedIDType}
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><FiCheck size={14} /> Detected: {detectedIDType}</span>
                     </div>
                   )
                   }
@@ -1698,7 +1698,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <Input
                       label="First Name"
-                      icon="👤"
+                      icon={<FiUser />}
                       placeholder="Juan"
                       value={firstName}
                       onChange={(e) => handleInputChange('firstName', e.target.value.replace(/[0-9]/g, ''), setFirstName)}
@@ -1709,7 +1709,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     />
                     <Input
                       label="Last Name"
-                      icon="👤"
+                      icon={<FiUser />}
                       placeholder="Dela Cruz"
                       value={lastName}
                       onChange={(e) => handleInputChange('lastName', e.target.value.replace(/[0-9]/g, ''), setLastName)}
@@ -1719,10 +1719,10 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       required
                     />
 
-                    <Input label={t.middleName} icon="👤" confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value.replace(/[0-9]/g, '')))} />
+                    <Input label={t.middleName} icon={<FiUser />} confidence={confidence.middle_name} value={middleName} onChange={(e) => setMiddleName(formatName(e.target.value.replace(/[0-9]/g, '')))} />
                     <Select
                       label="Suffix (Optional)"
-                      icon="👤"
+                      icon={<FiUser />}
                       confidence={confidence.suffix}
                       options={[
                         { code: 'Jr.', name: 'Jr.' },
@@ -1737,7 +1737,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     />
                     <Input
                       label={t.dob}
-                      icon="📅"
+                      icon={<FiCalendar />}
                       type="date"
                       confidence={confidence.dob}
                       value={dob}
@@ -1748,7 +1748,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     />
                     <Select
                       label={t.gender}
-                      icon="⚧"
+                      icon={<FiUser />}
                       confidence={confidence.gender}
                       options={[
                         { code: 'Male', name: t.male },
@@ -1766,7 +1766,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <Input
                       label="PhilHealth ID (Optional)"
-                      icon="🆔"
+                      icon={<FiCreditCard />}
                       value={philhealthId}
                       onChange={(e) => setPhilhealthId(formatPhilHealthId(e.target.value))}
                       placeholder="XX-XXXXXXXXX-X"
@@ -1776,7 +1776,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <Input
                       label="Email Address"
-                      icon="✉️"
+                      icon={<FiMail />}
                       type="email"
                       placeholder="juan.delacruz@gmail.com"
                       value={email}
@@ -1791,7 +1791,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <Select
                       label="Region"
-                      icon="🗺️"
+                      icon={<FiMap />}
                       options={regions.map(r => ({ code: r.code, name: r.name }))}
                       value={selectedRegion}
                       onChange={(e) => {
@@ -1804,7 +1804,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <Select
                       label="Province"
-                      icon="📍"
+                      icon={<FiMapPin />}
                       options={provinces.map(p => ({ code: p.code, name: p.name }))}
                       value={selectedProvince}
                       onChange={(e) => {
@@ -1821,7 +1821,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <Select
                       label="City / Municipality"
-                      icon="🏙️"
+                      icon={<FiHome />}
                       options={cities.map(c => ({ code: c.code, name: c.name }))}
                       value={selectedCity}
                       onChange={(e) => {
@@ -1843,7 +1843,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <Select
                       label="Barangay"
-                      icon="🏡"
+                      icon={<FiHome />}
                       options={barangays.map(b => ({ code: b.code, name: b.name }))}
                       value={selectedBarangay}
                       onChange={(e) => {
@@ -1869,18 +1869,18 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
                     <div className="auth-form-row">
                       <div style={{ flex: 1 }}>
-                        <Input label="House No." icon="🏠" confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
+                        <Input label="House No." icon={<FiHome />} confidence={confidence.house_number} value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <Input label="ZIP Code" icon="📮" confidence={confidence.zip_code} value={zipCode} onChange={(e) => setZipCode(e.target.value.replace(/\D/g, '').slice(0, 4))} type="tel" maxLength={4} inputMode="numeric" placeholder="1400" />
+                        <Input label="ZIP Code" icon={<FiMapPin />} confidence={confidence.zip_code} value={zipCode} onChange={(e) => setZipCode(e.target.value.replace(/\D/g, '').slice(0, 4))} type="tel" maxLength={4} inputMode="numeric" placeholder="1400" />
                       </div>
                     </div>
 
-                    <Input label="Block" icon="📍" confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
-                    <Input label="Lot" icon="📍" confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
+                    <Input label="Block" icon={<FiMapPin />} confidence={confidence.block_number} value={blockNumber} onChange={(e) => setBlockNumber(e.target.value)} />
+                    <Input label="Lot" icon={<FiMapPin />} confidence={confidence.lot_number} value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
 
-                    <Input label="Street" icon="🛣️" confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
-                    <Input label="Village / Subdivision" icon="🏘️" confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
+                    <Input label="Street" icon={<FiMap />} confidence={confidence.street_name} value={streetName} onChange={(e) => setStreetName(e.target.value)} />
+                    <Input label="Village / Subdivision" icon={<FiHome />} confidence={confidence.subdivision} value={subdivision} onChange={(e) => setSubdivision(e.target.value)} />
 
                     <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
                       <label style={{ fontSize: '11px', fontWeight: 600, color: '#4a5568', display: 'block', marginBottom: '8px' }}>{t.createPw}</label>
@@ -1894,7 +1894,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         marginBottom: '16px',
                         position: 'relative'
                       }}>
-                        <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                        <span style={{ fontSize: '16px', marginRight: '8px' }}><FiLock /></span>
                         <input
                           type={registerPwVisible ? 'text' : 'password'}
                           value={password}
@@ -1946,14 +1946,14 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       {/* Password Criteria Checklist */}
                       <div style={{ fontSize: '11px', color: '#718096', marginTop: '-4px', marginBottom: '16px', paddingLeft: '4px' }}>
                         <div style={{ display: 'flex', gap: '12px' }}>
-                          <span style={{ color: passwordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                            {passwordCriteria.length ? '✓' : '○'} 8+ Chars
+                          <span style={{ color: passwordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {passwordCriteria.length ? <FiCheck size={14} /> : <FiCircle size={14} />} 8+ Chars
                           </span>
-                          <span style={{ color: passwordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                            {passwordCriteria.upper ? '✓' : '○'} Upper (A-Z)
+                          <span style={{ color: passwordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {passwordCriteria.upper ? <FiCheck size={14} /> : <FiCircle size={14} />} Upper (A-Z)
                           </span>
-                          <span style={{ color: passwordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                            {passwordCriteria.symbol ? '✓' : '○'} Symbol (-_+ =)
+                          <span style={{ color: passwordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {passwordCriteria.symbol ? <FiCheck size={14} /> : <FiCircle size={14} />} Symbol (-_+ =)
                           </span>
                         </div>
                       </div>
@@ -1967,7 +1967,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         borderRadius: '12px',
                         padding: '12px 16px'
                       }}>
-                        <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                        <span style={{ fontSize: '16px', marginRight: '8px' }}><FiLock /></span>
                         <input
                           type={confirmPwVisible ? 'text' : 'password'}
                           value={confirmPassword}
@@ -2234,7 +2234,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 onClick={() => { setAgreedToTerms(true); setShowTermsModal(false); }}
                 style={{ padding: '10px 24px', background: '#38b2ac', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, color: 'white', fontSize: '13px', boxShadow: '0 4px 12px rgba(56,178,172,0.3)' }}
               >
-                ✓ I Agree
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}><FiCheck size={14} /> I Agree</span>
               </button>
             </div>
           </div>
@@ -2306,7 +2306,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 fontSize: '40px',
                 color: '#38B2AC'
               }}>
-                {resetStep === 'email' ? '🔒' : resetStep === 'verify' ? '🛡️' : '🔑'}
+                {resetStep === 'email' ? <FiLock /> : resetStep === 'verify' ? <FiShield /> : <FiKey />}
               </div>
 
               {/* --- STEP 1: EMAIL --- */}
@@ -2500,7 +2500,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       marginBottom: '12px',
                       position: 'relative'
                     }}>
-                      <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                      <span style={{ fontSize: '16px', marginRight: '8px' }}><FiLock /></span>
                       <input
                         type={resetPwVisible ? 'text' : 'password'}
                         value={newPassword}
@@ -2552,14 +2552,14 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                     {/* Password Criteria Checklist */}
                     <div style={{ fontSize: '11px', color: '#718096', marginBottom: '20px', paddingLeft: '4px' }}>
                       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <span style={{ color: resetPasswordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                          {resetPasswordCriteria.length ? '✓' : '○'} 8+ Chars
+                        <span style={{ color: resetPasswordCriteria.length ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {resetPasswordCriteria.length ? <FiCheck size={14} /> : <FiCircle size={14} />} 8+ Chars
                         </span>
-                        <span style={{ color: resetPasswordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                          {resetPasswordCriteria.upper ? '✓' : '○'} Upper (A-Z)
+                        <span style={{ color: resetPasswordCriteria.upper ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {resetPasswordCriteria.upper ? <FiCheck size={14} /> : <FiCircle size={14} />} Upper (A-Z)
                         </span>
-                        <span style={{ color: resetPasswordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600 }}>
-                          {resetPasswordCriteria.symbol ? '✓' : '○'} Symbol (-_+ =)
+                        <span style={{ color: resetPasswordCriteria.symbol ? '#38a169' : '#e53e3e', transition: 'color 0.2s', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {resetPasswordCriteria.symbol ? <FiCheck size={14} /> : <FiCircle size={14} />} Symbol (-_+ =)
                         </span>
                       </div>
                     </div>
@@ -2577,7 +2577,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                       borderRadius: '10px',
                       padding: '10px 12px'
                     }}>
-                      <span style={{ fontSize: '16px', marginRight: '8px' }}>🔒</span>
+                      <span style={{ fontSize: '16px', marginRight: '8px' }}><FiLock /></span>
                       <input
                         type={resetConfirmPwVisible ? 'text' : 'password'}
                         value={confirmNewPassword}
@@ -2676,8 +2676,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 />
               </div>
               {changePwError && (
-                <div style={{ background: '#FFF5F5', color: '#C53030', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', fontWeight: 600 }}>
-                  ⚠️ {changePwError}
+                <div style={{ background: '#FFF5F5', color: '#C53030', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FiAlertTriangle style={{ flexShrink: 0 }} /> {changePwError}
                 </div>
               )}
               <button

@@ -22,7 +22,7 @@ import {
     ModalBody,
     ModalCloseButton,
 } from '@chakra-ui/react';
-import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw, FiList, FiActivity, FiXCircle } from 'react-icons/fi';
 
 interface Service {
     id: number;
@@ -154,6 +154,25 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                 isClosable: true,
             });
             return;
+        }
+
+        // Prevent booking past time slots for today
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        if (selectedDate === todayStr) {
+            const [hours, minutes] = selectedTime.split(':').map(Number);
+            const slotTime = new Date();
+            slotTime.setHours(hours, minutes, 0, 0);
+            if (slotTime <= today) {
+                toast({
+                    title: 'Time Slot Unavailable',
+                    description: 'This time slot has already passed. Please select a future time.',
+                    status: 'warning',
+                    duration: 4000,
+                    isClosable: true,
+                });
+                return;
+            }
         }
 
         setLoading(true);
@@ -657,7 +676,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                     }}
                                     transition="all 0.2s"
                                 >
-                                    📅 Book Appointment
+                                    <Icon as={FiCalendar} mr={2} /> Book Appointment
                                 </Button>
                                 <Button
                                     flex={1}
@@ -674,7 +693,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                     }}
                                     transition="all 0.2s"
                                 >
-                                    📋 My Appointments
+                                    <Icon as={FiList} mr={2} /> My Appointments
                                 </Button>
                             </HStack>
 
@@ -775,7 +794,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                         boxShadow={selectedService?.id === service.id ? 'lg' : 'sm'}
                                                     >
                                                         <HStack align="start" spacing={4}>
-                                                            <Text fontSize="5xl">🏥</Text>
+                                                            <Icon as={FiActivity} boxSize={10} color="teal.500" />
                                                             <VStack align="start" flex={1} spacing={2}>
                                                                 <Heading size="md" color="gray.900" fontWeight="700">{service.name}</Heading>
                                                                 <Text fontSize="sm" color="gray.600" lineHeight="tall">{service.description}</Text>
@@ -837,7 +856,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                                                 <HStack mb={3} spacing={2}>
                                                                                     <Icon as={FiClock} color="orange.500" boxSize={5} />
                                                                                     <Text fontSize="md" fontWeight="700" color="gray.700">
-                                                                                        🌅 Morning (8 AM - 12 PM)
+                                                                                        Morning (8 AM - 12 PM)
                                                                                     </Text>
                                                                                 </HStack>
                                                                                 <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
@@ -871,7 +890,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                                                 <HStack mb={3} spacing={2}>
                                                                                     <Icon as={FiClock} color="orange.500" boxSize={5} />
                                                                                     <Text fontSize="md" fontWeight="700" color="gray.700">
-                                                                                        ☀️ Afternoon (12 PM - 5 PM)
+                                                                                        Afternoon (12 PM - 5 PM)
                                                                                     </Text>
                                                                                 </HStack>
                                                                                 <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
@@ -905,7 +924,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                                                 <HStack mb={3} spacing={2}>
                                                                                     <Icon as={FiClock} color="orange.500" boxSize={5} />
                                                                                     <Text fontSize="md" fontWeight="700" color="gray.700">
-                                                                                        🌙 Evening (After 5 PM)
+                                                                                        Evening (After 5 PM)
                                                                                     </Text>
                                                                                 </HStack>
                                                                                 <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
@@ -1098,7 +1117,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                     }}
                                                     transition="all 0.2s"
                                                 >
-                                                    Confirm Booking ✓
+                                                    Confirm Booking
                                                 </Button>
                                             </HStack>
                                         </VStack>
@@ -1159,9 +1178,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                         });
                                         if (filtered.length === 0) return (
                                             <VStack py={12} spacing={4}>
-                                                <Text fontSize="5xl">
-                                                    {statusFilter === 'pending' ? '📅' : statusFilter === 'completed' ? '✅' : '❌'}
-                                                </Text>
+                                                <Box fontSize="5xl">
+                                                    {statusFilter === 'pending' ? <Icon as={FiCalendar} color="gray.400" /> : statusFilter === 'completed' ? <Icon as={FiCheckCircle} color="green.400" /> : <Icon as={FiXCircle} color="red.400" />}
+                                                </Box>
                                                 <Text color="gray.500" fontWeight="600" fontSize="md">
                                                     No {statusFilter} appointments
                                                 </Text>

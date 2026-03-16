@@ -1,5 +1,6 @@
 import { motion, useInView, Variants } from 'framer-motion';
 import { useRef } from 'react';
+import { FiActivity, FiUsers, FiSmile, FiHeart, FiTarget, FiClock } from 'react-icons/fi';
 import './services.css';
 
 const container: Variants = {
@@ -30,49 +31,49 @@ function Services({ onServiceClick }: ServicesProps) {
       title: 'Consultation',
       desc: 'General medical consultation and health assessment.',
       schedule: 'Monday to Friday',
-      icon: '🩺'
+      icon: <FiActivity size={32} color="#319795" />
     },
     {
       title: 'Prenatal Check Up',
       desc: 'Regular check-ups for expectant mothers.',
       schedule: 'Tuesday and Thursday',
-      icon: '🤰'
+      icon: <FiHeart size={32} color="#D53F8C" />
     },
     {
       title: 'Vaccination (Bakuna)',
       desc: 'Immunization services for children and adults.',
       schedule: 'Wednesday and Friday',
-      icon: '💉'
+      icon: <FiUsers size={32} color="#3182CE" />
     },
     {
       title: 'Dental Services',
       desc: 'Dental check-ups and treatments.',
       schedule: 'Monday, Wednesday, Friday',
-      icon: '🦷'
+      icon: <FiSmile size={32} color="#D69E2E" />
     },
     {
       title: 'Family Planning',
       desc: 'Reproductive health and family planning services.',
       schedule: 'Monday to Friday 1 PM',
-      icon: '👨‍👩‍👧‍👦'
+      icon: <FiUsers size={32} color="#38A169" />
     },
     {
       title: 'Dots Center',
       desc: 'TB DOTS (Directly Observed Treatment, Short-course) services.',
       schedule: 'Monday to Friday 1 PM',
-      icon: '🏥'
+      icon: <FiActivity size={32} color="#E53E3E" />
     },
     {
       title: 'Cervical Screening',
       desc: 'Screening for cervical cancer prevention.',
       schedule: 'Monday 8 AM',
-      icon: '🔬'
+      icon: <FiTarget size={32} color="#805AD5" />
     },
     {
       title: 'Nutrition Counseling',
       desc: 'Guidance on healthy eating and nutrition.',
       schedule: 'Monday to Friday',
-      icon: '🥗'
+      icon: <FiHeart size={32} color="#DD6B20" />
     },
   ];
 
@@ -130,8 +131,8 @@ function Services({ onServiceClick }: ServicesProps) {
             <div className="service-icon">{s.icon}</div>
             <h3>{s.title}</h3>
             <p>{s.desc}</p>
-            <div className="service-schedule" style={{ fontSize: '0.9em', color: '#4fd1c5', marginTop: '0.5rem', fontWeight: 600 }}>
-              🕒 {s.schedule}
+            <div className="service-schedule" style={{ fontSize: '0.9em', color: '#4fd1c5', marginTop: '0.5rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+              <FiClock size={14} /> {s.schedule}
             </div>
           </motion.div>
         ))}

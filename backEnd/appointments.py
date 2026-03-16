@@ -92,6 +92,11 @@ def get_available_slots():
                 current_time = start_time
                 
                 while current_time < end_time:
+                    # Skip past time slots when the date is today
+                    if appointment_date == date.today() and current_time <= datetime.now():
+                        current_time += timedelta(minutes=30)
+                        continue
+
                     # Check if this specific time is available
                     cursor.execute("""
                         SELECT COUNT(*) as count
@@ -220,6 +225,16 @@ def create_appointment():
         service_type = data['service_type']
         doctor_preference = data.get('doctor_preference')
         reason = data.get('reason')
+        
+        # Reject booking if the slot is in the past (today + past time)
+        try:
+            parsed_date = datetime.strptime(appointment_date, '%Y-%m-%d').date()
+            parsed_time = datetime.strptime(appointment_time, '%H:%M').time()
+            slot_datetime = datetime.combine(parsed_date, parsed_time)
+            if parsed_date == date.today() and slot_datetime <= datetime.now():
+                return jsonify({"error": "Cannot book a time slot that has already passed"}), 400
+        except ValueError:
+            pass  # If parsing fails, let it fall through to DB validation
         
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)

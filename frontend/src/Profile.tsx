@@ -44,7 +44,9 @@ import {
   FiSave,
   FiLock,
   FiEye,
-  FiEyeOff
+  FiEyeOff,
+  FiCheckCircle,
+  FiCircle
 } from 'react-icons/fi';
 
 export default function Profile({ user, onClose, onUpdated }: { user: any; onClose: () => void; onUpdated: (u: any) => void }) {
@@ -331,24 +333,24 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
             <Box flex={1} p={8}>
               <SectionHeader title="Personal Identity" icon={FiUser} />
               <VStack spacing={4} align="stretch">
-                <SimpleGrid columns={4} spacing={2}>
-                  <FormControl isRequired>
-                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">FIRST NAME</FormLabel>
+                <HStack spacing={3} align="flex-start" w="full">
+                  <FormControl isRequired flex={3}>
+                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500" whiteSpace="nowrap">FIRST NAME</FormLabel>
                     <Input value={form.first_name} onChange={updateField('first_name')} bg="gray.100" isReadOnly />
                   </FormControl>
-                  <FormControl>
-                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">MIDDLE</FormLabel>
+                  <FormControl flex={3}>
+                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500" whiteSpace="nowrap">MIDDLE NAME</FormLabel>
                     <Input value={form.middle_name} onChange={updateField('middle_name')} bg="gray.100" isReadOnly />
                   </FormControl>
-                  <FormControl isRequired>
-                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">LAST NAME</FormLabel>
+                  <FormControl isRequired flex={3}>
+                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500" whiteSpace="nowrap">LAST NAME</FormLabel>
                     <Input value={form.last_name} onChange={updateField('last_name')} bg="gray.100" isReadOnly />
                   </FormControl>
-                  <FormControl>
-                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">SUFFIX</FormLabel>
+                  <FormControl flex={1.5}>
+                    <FormLabel fontSize="xs" fontWeight="bold" color="gray.500" whiteSpace="nowrap">SUFFIX</FormLabel>
                     <Input value={form.suffix || 'None'} bg="gray.100" isReadOnly />
                   </FormControl>
-                </SimpleGrid>
+                </HStack>
                 <HStack>
                   <FormControl w="50%">
                     <FormLabel fontSize="xs" fontWeight="bold" color="gray.500">GENDER</FormLabel>
@@ -425,9 +427,15 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
                   {form.password && (
                     <Box>
                       <HStack spacing={4} mt={2}>
-                        <Badge colorScheme={hasMinLen ? "green" : "gray"} variant="outline">{hasMinLen ? "✓" : "○"} 8+ Chars</Badge>
-                        <Badge colorScheme={hasUpper ? "green" : "gray"} variant="outline">{hasUpper ? "✓" : "○"} Upper (A-Z)</Badge>
-                        <Badge colorScheme={hasSymbol ? "green" : "gray"} variant="outline">{hasSymbol ? "✓" : "○"} Symbol</Badge>
+                        <Badge bg="transparent" outline="1px solid" outlineColor={hasMinLen ? "green.500" : "gray.300"} color={hasMinLen ? "green.600" : "gray.500"} display="flex" alignItems="center" gap={1} textTransform="none">
+                          <Icon as={hasMinLen ? FiCheckCircle : FiCircle} /> 8+ Chars
+                        </Badge>
+                        <Badge bg="transparent" outline="1px solid" outlineColor={hasUpper ? "green.500" : "gray.300"} color={hasUpper ? "green.600" : "gray.500"} display="flex" alignItems="center" gap={1} textTransform="none">
+                          <Icon as={hasUpper ? FiCheckCircle : FiCircle} /> Upper (A-Z)
+                        </Badge>
+                        <Badge bg="transparent" outline="1px solid" outlineColor={hasSymbol ? "green.500" : "gray.300"} color={hasSymbol ? "green.600" : "gray.500"} display="flex" alignItems="center" gap={1} textTransform="none">
+                          <Icon as={hasSymbol ? FiCheckCircle : FiCircle} /> Symbol
+                        </Badge>
                       </HStack>
                     </Box>
                   )}

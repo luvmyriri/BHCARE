@@ -69,7 +69,7 @@ export const RESOURCES = {
         logout: "Logout",
 
         // Dashboard Content
-        welcomeUser: "Welcome back, {name}! 👋",
+        welcomeUser: "Welcome back, {name}!",
         healthPriority: "Your health is our priority. Manage your appointments, health records, and profile details right here.",
         upcomingAppointments: "Upcoming Appointments",
         healthScore: "Health Score",
@@ -166,7 +166,7 @@ export const RESOURCES = {
         logout: "Mag-logout",
 
         // Dashboard Content
-        welcomeUser: "Maligayang pagbabalik, {name}! 👋",
+        welcomeUser: "Maligayang pagbabalik, {name}!",
         healthPriority: "Ang iyong kalusugan ay aming priyoridad. Pamahalaan ang iyong mga appointment, medikal na rekord, at mga detalye ng profile dito.",
         upcomingAppointments: "Mga Paparating na Appointment",
         healthScore: "Marka ng Kalusugan",

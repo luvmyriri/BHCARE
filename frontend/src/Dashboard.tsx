@@ -46,7 +46,9 @@ import {
     FiFileText,
     FiLogOut,
     FiUser,
-    FiMenu
+    FiMenu,
+    FiClock,
+    FiSmartphone
 } from 'react-icons/fi';
 import { useLanguage } from './contexts/LanguageContext';
 import Profile from './Profile';
@@ -548,10 +550,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                             bgGradient="linear(to-br, teal.400, teal.600)"
                                             align="center"
                                             justify="center"
-                                            fontSize="3xl"
                                             color="white"
                                         >
-                                            📅
+                                            <Icon as={FiCalendar} boxSize={7} />
                                         </Flex>
                                         <Heading size="md" color="teal.800">{t.bookNewAppointment}</Heading>
                                         <Text color="gray.600" fontSize="sm">
@@ -597,10 +598,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                             bgGradient="linear(to-br, green.400, teal.500)"
                                             align="center"
                                             justify="center"
-                                            fontSize="3xl"
                                             color="white"
                                         >
-                                            📋
+                                            <Icon as={FiFileText} boxSize={7} />
                                         </Flex>
                                         <Heading size="md" color="teal.800">{t.viewMyAppointments}</Heading>
                                         <Text color="gray.600" fontSize="sm">
@@ -627,7 +627,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
                                 <Box p={6} bg="teal.50" borderRadius="xl" border="1px solid" borderColor="teal.100">
                                     <HStack spacing={3} mb={2}>
-                                        <Text fontSize="2xl">⏰</Text>
+                                        <Icon as={FiClock} boxSize={5} color="teal.500" />
                                         <Heading size="sm" color="teal.800">{t.quickEasy}</Heading>
                                     </HStack>
                                     <Text fontSize="sm" color="teal.700">
@@ -636,7 +636,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 </Box>
                                 <Box p={6} bg="blue.50" borderRadius="xl" border="1px solid" borderColor="blue.100">
                                     <HStack spacing={3} mb={2}>
-                                        <Text fontSize="2xl">🏥</Text>
+                                        <Icon as={FiActivity} boxSize={5} color="blue.500" />
                                         <Heading size="sm" color="blue.800">{t.multipleServices}</Heading>
                                     </HStack>
                                     <Text fontSize="sm" color="blue.700">
@@ -645,7 +645,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 </Box>
                                 <Box p={6} bg="green.50" borderRadius="xl" border="1px solid" borderColor="green.100">
                                     <HStack spacing={3} mb={2}>
-                                        <Text fontSize="2xl">📱</Text>
+                                        <Icon as={FiSmartphone} boxSize={5} color="green.500" />
                                         <Heading size="sm" color="green.800">{t.instantConfirmation}</Heading>
                                     </HStack>
                                     <Text fontSize="sm" color="green.800">
@@ -883,10 +883,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             size="sm"
                             variant="outline"
                             colorScheme="teal"
-                            leftIcon={<span>{language === 'en' ? '🇺🇸' : '🇵🇭'}</span>}
                             mr={2}
                         >
-                            {language === 'en' ? 'EN' : 'TL'}
+                            {language === 'en' ? 'US EN' : 'PH TL'}
                         </Button>
                         <NotificationBell userId={user?.id} />
                         <VStack align="end" spacing={0} mr={2} overflow="hidden">

@@ -1566,10 +1566,8 @@ def update_user(user_id):
             'house_number', 'block_number', 'lot_number', 'street_name', 'subdivision', 'zip_code', 'status', 'suffix'
         ]
         
-        # Fields that should be NULL instead of empty string
+        # Fields that should be NULL instead of empty string (mainly dates or unique constrained optional fields)
         nullable_fields = ['date_of_birth', 'middle_name', 'philhealth_id', 'email',
-                          'house_number', 'block_number', 'lot_number', 'street_name', 
-                          'subdivision', 'zip_code', 'barangay', 'city', 'province',
                           'contact_number', 'suffix']
         
         for key in allowed_fields:
