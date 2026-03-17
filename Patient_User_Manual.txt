@@ -1,0 +1,65 @@
+BHCare Patient Portal User Manual
+
+Welcome to the BHCare Patient Portal. This guide explains how to use the system for the Barangay 174 Health Center.
+
+Table of Contents
+1. Registration and Login
+2. Dashboard Overview
+3. Booking Appointments
+4. Medical Records
+5. Document Requests
+6. Settings and Security
+
+1. Registration and Login
+
+Registration
+- Go to the signup page and click Register.
+- You can upload an ID to fill details automatically or type them manually.
+- Use a valid email and mobile number.
+- Create a password and complete registration.
+- You will receive an email with your Patient ID (example: PTNT2026001).
+
+Login
+- Use your registered email and password to sign in.
+
+2. Dashboard Overview
+
+Once logged in, the home screen shows:
+- Next Appointment: Details of your upcoming visit.
+- Recent Records: A summary of your latest medical visit.
+- Sidebar: Access all sections from the left menu.
+
+3. Booking Appointments
+
+- Click Appointments in the menu.
+- Click Book New Appointment.
+- Select the service you need (Consultation, Dental, etc.).
+- Choose an available date and time.
+- Enter the reason for your visit and submit.
+
+4. Medical Records
+
+- Click Medical Records in the menu.
+- View a history of your past visits.
+- Click a record to see the diagnosis and prescriptions from the doctor.
+
+5. Document Requests
+
+- Click Document Requests in the menu.
+- Click New Request.
+- Select the document type (Medical Certificate, Clearance, etc.).
+- Enter the purpose and submit.
+- The status will update once the staff prepares the document.
+
+6. Settings and Security
+
+Reset Password
+- If forgotten, click Forgot Password on the login screen.
+- Enter your email to receive a reset link.
+
+Update Profile
+- Click Settings in the menu.
+- Update your contact info or address and save.
+
+Help
+For emergencies, proceed directly to the Health Center. For system help, contact the front desk.

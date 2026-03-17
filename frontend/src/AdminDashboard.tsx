@@ -37,8 +37,21 @@ import {
     InputGroup,
     InputLeftElement,
     FormControl,
-    FormLabel
+    FormLabel,
 } from '@chakra-ui/react';
+import {
+    ResponsiveContainer,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    CartesianGrid,
+    PieChart,
+    Pie,
+    Cell,
+} from 'recharts';
 import {
     FiGrid,
     FiUsers,
@@ -57,17 +70,13 @@ import {
 } from 'react-icons/fi';
 import {
     SimpleGrid,
-    Stat,
-    StatLabel,
-    StatNumber,
-    StatHelpText,
-    StatArrow,
     Progress,
     Spinner,
 } from '@chakra-ui/react';
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
 
 interface AdminDashboardProps {
     user: any;
@@ -76,34 +85,135 @@ interface AdminDashboardProps {
 
 // ── Export Utilities ────────────────────────────────────────────────────────
 
-/** Generic CSV download */
-const downloadCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
-    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const csv = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+const BRAND_NAME = 'BHCare - Barangay 174 Health Center';
+
+// CSV export removed; using branded Excel export for the "CSV" button.
+
+/** Load logo as base64 for PDF */
+const loadLogoBase64 = async (): Promise<string | null> => {
+    try {
+        const res = await fetch('/images/Logo.png');
+        const blob = await res.blob();
+        return await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result as string);
+            r.onerror = reject;
+            r.readAsDataURL(blob);
+        });
+    } catch {
+        return null;
+    }
 };
 
-/** Generic PDF download using jsPDF + autoTable */
-const downloadPDF = (filename: string, title: string, headers: string[], rows: (string | number)[][]) => {
+/** Generic PDF download with BHCare branding and logo */
+const downloadPDF = async (filename: string, title: string, headers: string[], rows: (string | number)[][]) => {
     const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(16);
-    doc.text(title, 14, 16);
-    doc.setFontSize(9);
-    doc.setTextColor(120);
-    doc.text(`Brgy. 174 Health Center  ·  Generated: ${new Date().toLocaleString()}`, 14, 23);
+    let startY = 16;
+
+    const logoBase64 = await loadLogoBase64();
+    if (logoBase64) {
+        doc.addImage(logoBase64, 'PNG', 14, 8, 18, 18);
+        doc.setFontSize(16);
+        doc.setTextColor(0);
+        doc.text(title, 36, 18);
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(`${BRAND_NAME}  ·  Generated: ${new Date().toLocaleString()}`, 36, 24);
+        startY = 32;
+    } else {
+        doc.setFontSize(16);
+        doc.text(title, 14, 16);
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(`${BRAND_NAME}  ·  Generated: ${new Date().toLocaleString()}`, 14, 23);
+        startY = 28;
+    }
+
     autoTable(doc, {
         head: [headers],
         body: rows.map(r => r.map(c => String(c ?? ''))),
-        startY: 28,
+        startY,
         styles: { fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [0, 128, 128], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 250, 250] },
     });
     doc.save(filename);
+};
+
+/** Generic Excel download with BHCare branding and logo */
+const downloadExcel = async (filename: string, title: string, headers: string[], rows: (string | number)[][]) => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Report', { views: [{ showGridLines: true }] });
+
+    let logoBase64: string | null = null;
+    try {
+        const res = await fetch('/images/Logo.png');
+        const blob = await res.blob();
+        logoBase64 = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result as string);
+            r.onerror = reject;
+            r.readAsDataURL(blob);
+        });
+    } catch { /* skip logo */ }
+
+    let row = 1;
+    if (logoBase64) {
+        try {
+            const base64Data = logoBase64.replace(/^data:image\/\w+;base64,/, '');
+            const imageId = wb.addImage({ base64: base64Data, extension: 'png' });
+            ws.addImage(imageId, { tl: { col: 0.2, row: 0.2 }, ext: { width: 48, height: 48 } } as any);
+        } catch { /* skip logo on error */ }
+        ws.getCell('C1').value = title;
+        ws.getCell('C1').font = { bold: true, size: 14 };
+        ws.getCell('C2').value = `${BRAND_NAME}`;
+        ws.getCell('C2').font = { size: 10 };
+        ws.getCell('C2').fill = { type: 'pattern', pattern: 'none' };
+        ws.getCell('C3').value = `Generated: ${new Date().toLocaleString()}`;
+        ws.getCell('C3').font = { size: 9 };
+        ws.getCell('C3').fill = { type: 'pattern', pattern: 'none' };
+        row = 6;
+    } else {
+        ws.getCell('A1').value = title;
+        ws.getCell('A1').font = { bold: true, size: 14 };
+        ws.getCell('A2').value = `${BRAND_NAME}  ·  Generated: ${new Date().toLocaleString()}`;
+        ws.getCell('A2').font = { size: 10 };
+        row = 4;
+    }
+
+    const headerRow = ws.getRow(row);
+    headers.forEach((h, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h;
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF008080' } };
+        cell.alignment = { vertical: 'middle' };
+        cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    });
+    headerRow.height = 22;
+    row++;
+
+    rows.forEach((r, idx) => {
+        const dataRow = ws.getRow(row);
+        r.forEach((val, j) => {
+            const cell = dataRow.getCell(j + 1);
+            cell.value = val;
+            cell.fill = idx % 2 === 0 ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5FAFA' } } : { type: 'pattern', pattern: 'none' };
+            cell.border = { bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        });
+        row++;
+    });
+
+    headers.forEach((h, i) => { ws.getColumn(i + 1).width = Math.max(h.length + 2, 12); });
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.replace(/\.(csv|pdf)$/, '.xlsx');
+    a.click();
+    URL.revokeObjectURL(url);
 };
 
 const NavItem = ({ icon, children, active, onClick }: any) => {
@@ -484,6 +594,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             console.error(err);
         }
     };
+
+    const confirmResolveTicket = (id: number) => {
+        const toastId = `resolve-ticket-${id}`;
+        if (toast.isActive(toastId)) return;
+
+        toast({
+            id: toastId,
+            position: 'top',
+            duration: 8000,
+            isClosable: true,
+            status: 'warning',
+            render: ({ onClose }) => (
+                <Box
+                    bg="white"
+                    border="1px solid"
+                    borderColor="orange.200"
+                    boxShadow="lg"
+                    borderRadius="xl"
+                    p={4}
+                    maxW="420px"
+                >
+                    <Text fontWeight="800" color="orange.700" mb={1}>
+                        Confirm resolve
+                    </Text>
+                    <Text fontSize="sm" color="gray.600" mb={3}>
+                        Mark this ticket as resolved? This will move it to the Resolved list.
+                    </Text>
+                    <HStack justify="flex-end">
+                        <Button size="sm" variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button
+                            size="sm"
+                            colorScheme="teal"
+                            onClick={async () => {
+                                onClose();
+                                await handleResolveTicket(id);
+                            }}
+                        >
+                            Yes, resolve
+                        </Button>
+                    </HStack>
+                </Box>
+            ),
+        });
+    };
+
+    const CHART_COLORS = ['#38b2ac', '#ed8936', '#3182ce', '#805ad5', '#48bb78', '#e53e3e'];
 
     // Refresh all live data
     const refreshAll = async () => {
@@ -1084,13 +1242,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     <Button
                                         size="sm" colorScheme="red" variant="outline"
                                         leftIcon={<Icon as={FiFileText} />}
-                                        onClick={() => {
+                                        onClick={async () => {
                                             const headers = ['First Name', 'Last Name', 'Email', 'Date Joined'];
                                             const rows = filteredUsers.map((u: any) => [
                                                 u.first_name, u.last_name, u.email,
                                                 u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
                                             ]);
-                                            downloadPDF('users_report.pdf', 'Registered Users Report', headers, rows);
+                                            await downloadPDF('users_report.pdf', 'Registered Users Report', headers, rows);
                                         }}
                                     >
                                         PDF
@@ -1098,50 +1256,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     <Button
                                         size="sm" colorScheme="green" variant="outline"
                                         leftIcon={<Icon as={FiFileText} />}
-                                        onClick={() => {
+                                        onClick={async () => {
                                             const headers = ['First Name', 'Last Name', 'Email', 'Date Joined'];
                                             const rows = filteredUsers.map((u: any) => [
                                                 u.first_name, u.last_name, u.email,
                                                 u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
                                             ]);
-                                            downloadCSV('users_report.csv', headers, rows);
+                                            await downloadExcel('users_report.xlsx', 'Registered Users Report', headers, rows);
                                         }}
                                     >
                                         CSV
                                     </Button>
                                 </HStack>
                             </Flex>
-                            <Box overflowX="auto">
-                                <Table variant="simple">
-                                    <Thead>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.100">
+                                <Table variant="simple" size="md">
+                                    <Thead bg="gray.50">
                                         <Tr>
-                                            <Th>User ID</Th>
-                                            <Th>Name</Th>
-                                            <Th>Email</Th>
-                                            <Th>Role</Th>
-                                            <Th>Joined</Th>
-                                            <Th>Actions</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>User ID</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Name</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Email</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Role</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Joined</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Actions</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
                                         {filteredUsers.length > 0 ? (
-                                            filteredUsers.map((user) => (
-                                                <Tr key={user.id}>
-                                                    <Td><code style={{ fontSize: '0.8em', background: '#f7fafc', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', color: '#4a5568', fontWeight: 600 }}>{formatUserId(user.id, user.role, user.created_at)}</code></Td>
-                                                    <Td fontWeight="600">{user.first_name} {user.last_name}</Td>
-                                                    <Td>{user.email}</Td>
-                                                    <Td>
-                                                        <Badge colorScheme={(user.role || '').toLowerCase().includes('admin') ? 'red' : (user.role || '').toLowerCase().includes('medic') || (user.role || '').toLowerCase().includes('staff') ? 'blue' : (user.role || '').toLowerCase().includes('doctor') ? 'purple' : 'green'}>
+                                            filteredUsers.map((user, idx) => (
+                                                <Tr key={user.id} bg={idx % 2 === 0 ? 'white' : 'gray.50'} _hover={{ bg: 'teal.50' }}>
+                                                    <Td py={4}><Text fontFamily="mono" fontSize="sm" fontWeight="600" color="teal.700">{formatUserId(user.id, user.role, user.created_at)}</Text></Td>
+                                                    <Td py={4} fontWeight="600">{user.first_name} {user.last_name}</Td>
+                                                    <Td py={4}>{user.email}</Td>
+                                                    <Td py={4}>
+                                                        <Badge colorScheme={(user.role || '').toLowerCase().includes('admin') ? 'red' : (user.role || '').toLowerCase().includes('medic') || (user.role || '').toLowerCase().includes('staff') ? 'blue' : (user.role || '').toLowerCase().includes('doctor') ? 'purple' : 'green'} fontWeight="600" fontSize="xs" px={2} py={1}>
                                                             {(user.role || 'Patient').toLowerCase().includes('admin') ? 'Administrator' : user.role}
                                                         </Badge>
                                                     </Td>
-                                                    <Td>{user.created_at || 'N/A'}</Td>
-                                                    <Td>
+                                                    <Td py={4}>{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</Td>
+                                                    <Td py={4}>
                                                         <HStack spacing={2}>
                                                             {(user?.role || '').toLowerCase().includes('super') ? (
-                                                                <Button size="xs" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
+                                                                <Button size="sm" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
                                                             ) : (
-                                                                <Button size="xs" colorScheme="gray" variant="outline" onClick={() => handleEditClick(user)}>View</Button>
+                                                                <Button size="sm" colorScheme="teal" variant="outline" onClick={() => handleEditClick(user)}>View</Button>
                                                             )}
                                                         </HStack>
                                                     </Td>
@@ -1149,7 +1307,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={6} textAlign="center">No users found.</Td>
+                                                <Td colSpan={6} textAlign="center" py={10} color="gray.500" fontSize="sm">No users found.</Td>
                                             </Tr>
                                         )}
                                     </Tbody>
@@ -1197,62 +1355,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 </HStack>
                             </Flex>
 
-                            <Box overflowX="auto">
-                                <Table variant="simple">
-                                    <Thead>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.100">
+                                <Table variant="simple" size="md">
+                                    <Thead bg="gray.50">
                                         <Tr>
-                                            <Th>Name</Th>
-                                            <Th>Role</Th>
-                                            <Th>Specialization</Th>
-                                            <Th>Schedule</Th>
-                                            <Th>Status</Th>
-                                            <Th>Actions</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Name</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Role</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Specialization</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Schedule</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Status</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Actions</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
                                         {filteredStaff.length > 0 ? (
-                                            filteredStaff.map((staff) => (
-                                                <Tr key={staff.id}>
-                                                    <Td>
+                                            filteredStaff.map((staff, idx) => (
+                                                <Tr key={staff.id} bg={idx % 2 === 0 ? 'white' : 'gray.50'} _hover={{ bg: 'teal.50' }}>
+                                                    <Td py={4}>
                                                         <HStack>
                                                             <Avatar size="sm" name={`${staff.first_name} ${staff.last_name}`} />
-                                                            <VStack align="start" spacing={0}>
-                                                                <Text fontWeight="600">{staff.first_name} {staff.last_name}</Text>
-                                                            </VStack>
+                                                            <Text fontWeight="600" fontSize="sm">{staff.first_name} {staff.last_name}</Text>
                                                         </HStack>
                                                     </Td>
-                                                    <Td>
-                                                        <Badge colorScheme={
-                                                            staff.role === 'Doctor' ? 'blue' :
-                                                                staff.role === 'Nurse' ? 'green' : 'orange'
-                                                        }>
+                                                    <Td py={4}>
+                                                        <Badge colorScheme={staff.role === 'Doctor' ? 'blue' : staff.role === 'Nurse' ? 'green' : 'orange'} fontWeight="600" fontSize="xs" px={2} py={1}>
                                                             {staff.role}
                                                         </Badge>
                                                     </Td>
-                                                    <Td>
+                                                    <Td py={4}>
                                                         <VStack align="start" spacing={0}>
-                                                            <Text fontSize="sm">{staff.specialization || 'General'}</Text>
+                                                            <Text fontSize="sm" color="gray.800">{staff.specialization || 'General'}</Text>
                                                             {staff.prc_license_number && <Text fontSize="xs" color="gray.500">PRC: {staff.prc_license_number}</Text>}
                                                         </VStack>
                                                     </Td>
-                                                    <Td>
+                                                    <Td py={4}>
                                                         <VStack align="start" spacing={0}>
-                                                            <Text fontSize="sm">{staff.schedule || 'N/A'}</Text>
+                                                            <Text fontSize="sm" color="gray.800">{staff.schedule || 'N/A'}</Text>
                                                             {staff.clinic_room && <Text fontSize="xs" color="gray.500">Rm: {staff.clinic_room}</Text>}
                                                         </VStack>
                                                     </Td>
-                                                    <Td>
-                                                        <Badge variant="subtle" colorScheme="green">Active</Badge>
+                                                    <Td py={4}>
+                                                        <Badge variant="subtle" colorScheme="green" fontWeight="600" fontSize="xs" px={2} py={1}>Active</Badge>
                                                     </Td>
-                                                    <Td>
-                                                        <HStack spacing={1}>
+                                                    <Td py={4}>
+                                                        <HStack spacing={2}>
                                                             {(user?.role || '').toLowerCase().includes('super') ? (
                                                                 <>
-                                                                    <Button size="xs" variant="ghost" onClick={() => handleEditClick(staff)}>Edit</Button>
-                                                                    <Button size="xs" variant="ghost" colorScheme="orange" onClick={() => handleResendCredentials(staff.id)}>Resend</Button>
+                                                                    <Button size="sm" variant="ghost" colorScheme="blue" onClick={() => handleEditClick(staff)}>Edit</Button>
+                                                                    <Button size="sm" variant="ghost" colorScheme="orange" onClick={() => handleResendCredentials(staff.id)}>Resend</Button>
                                                                 </>
                                                             ) : (
-                                                                <Button size="xs" colorScheme="gray" variant="outline" onClick={() => handleEditClick(staff)}>View</Button>
+                                                                <Button size="sm" colorScheme="teal" variant="outline" onClick={() => handleEditClick(staff)}>View</Button>
                                                             )}
                                                         </HStack>
                                                     </Td>
@@ -1260,7 +1413,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={6} textAlign="center" py={4}>No medical staff found.</Td>
+                                                <Td colSpan={6} textAlign="center" py={10} color="gray.500" fontSize="sm">No medical staff found.</Td>
                                             </Tr>
                                         )}
                                     </Tbody>
@@ -1284,11 +1437,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 const immunCount = analyticsData?.immunization?.count ?? 0;
                 const immunPrev = analyticsData?.immunization?.prev_month ?? 0;
                 const immunChange = pct(immunCount, immunPrev);
-                // Show progress toward 95% coverage target (using %) — cap at 100
-                const immunBarPct = Math.min(100, immunCount > 0 ? Math.round((immunCount / (prenatalCount || immunCount)) * 100) : 0);
+                // (legacy) immunBarPct removed in favor of charts
 
                 const tbPct = analyticsData?.tb_treatment?.success_pct ?? 0;
                 const tbTotal = analyticsData?.tb_treatment?.total ?? 0;
+
+                const prenatalCompareData = [
+                    { label: 'Last month', value: prenatalPrev },
+                    { label: 'This month', value: prenatalCount },
+                ];
+
+                const immunCompareData = [
+                    { label: 'Last month', value: immunPrev },
+                    { label: 'This month', value: immunCount },
+                ];
+
+                const immunBreakdown = analyticsData?.immunization?.breakdown
+                    ? Object.entries(analyticsData.immunization.breakdown)
+                        .map(([name, value]) => ({ name, value: Number(value) || 0 }))
+                        .filter((x: any) => x.value > 0)
+                    : [];
+
+                const tbCompleted = analyticsData?.tb_treatment?.completed ?? 0;
+                const tbRemaining = Math.max(0, tbTotal - tbCompleted);
+                const tbPieData = tbTotal > 0
+                    ? [
+                        { name: 'Completed', value: tbCompleted },
+                        { name: 'Not completed', value: tbRemaining },
+                    ]
+                    : [];
 
 
                 return (
@@ -1305,12 +1482,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             <Button
                                 size="sm" colorScheme="red" variant="outline"
                                 leftIcon={<Icon as={FiFileText} />}
-                                onClick={() => {
+                                onClick={async () => {
                                     const headers = ['Service', 'Total Appointments', 'Upcoming', 'Completed'];
                                     const rows = (predictiveData?.top_services || []).map((s: any) => [
                                         s.service, s.total, s.upcoming, s.completed
                                     ]);
-                                    downloadPDF(
+                                    await downloadPDF(
                                         'service_demand_report.pdf',
                                         'Service Demand Report',
                                         headers, rows
@@ -1323,12 +1500,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             <Button
                                 size="sm" colorScheme="green" variant="outline"
                                 leftIcon={<Icon as={FiFileText} />}
-                                onClick={() => {
+                                onClick={async () => {
                                     const headers = ['Service', 'Total Appointments', 'Upcoming', 'Completed'];
                                     const rows = (predictiveData?.top_services || []).map((s: any) => [
                                         s.service, s.total, s.upcoming, s.completed
                                     ]);
-                                    downloadCSV('service_demand_report.csv', headers, rows);
+                                    await downloadExcel('service_demand_report.xlsx', 'Service Demand Report', headers, rows);
                                 }}
                                 isDisabled={!predictiveData}
                             >
@@ -1345,223 +1522,468 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         {/* Summary Cards */}
                         {!analyticsLoading && (
                             <>
-                                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8}>
-                                    {/* Prenatal */}
+                                <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={8}>
+                                    {/* Prenatal chart */}
                                     <Box
-                                        bg="white" p={8} borderRadius="3xl" boxShadow="sm" borderLeft="4px solid" borderColor="teal.500"
-                                        cursor="pointer" transition="all 0.2s" _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
+                                        bg="white"
+                                        p={6}
+                                        borderRadius="3xl"
+                                        boxShadow="sm"
+                                        border="1px solid"
+                                        borderColor="gray.100"
+                                        cursor="pointer"
+                                        transition="all 0.2s"
+                                        _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
                                         onClick={() => { setSelectedCard('prenatal'); onOpen(); }}
                                     >
-                                        <Stat>
-                                            <StatLabel color="gray.500" fontSize="xs" fontWeight="bold" textTransform="uppercase">Prenatal Care Visits</StatLabel>
-                                            <StatNumber fontSize="3xl" color="teal.700">{prenatalCount.toLocaleString()}</StatNumber>
-                                            {prenatalPrev > 0 ? (
-                                                <StatHelpText>
-                                                    <StatArrow type={prenatalChange >= 0 ? 'increase' : 'decrease'} />
-                                                    {Math.abs(prenatalChange)}% vs last month
-                                                </StatHelpText>
-                                            ) : (
-                                                <StatHelpText color="gray.400">No prior month data</StatHelpText>
-                                            )}
-                                        </Stat>
-                                        <Progress value={prenatalBarPct} size="xs" colorScheme="teal" mt={4} borderRadius="full" />
-                                        <Text fontSize="xs" mt={2} color="gray.400">Target: {prenatalTarget.toLocaleString()} visits ({prenatalBarPct}%)</Text>
+                                        <HStack justify="space-between" mb={2}>
+                                            <Box>
+                                                <Text fontSize="xs" fontWeight="800" color="gray.500" textTransform="uppercase" letterSpacing="wide">
+                                                    Prenatal visits
+                                                </Text>
+                                                <Text fontSize="sm" color="gray.600">
+                                                    How many prenatal checkups were recorded
+                                                </Text>
+                                            </Box>
+                                            <Badge colorScheme="teal" variant="subtle" borderRadius="full" px={3}>
+                                                {prenatalCount.toLocaleString()}
+                                            </Badge>
+                                        </HStack>
+                                    <Text fontSize="xs" color="gray.500">
+                                        {prenatalPrev > 0 ? `${Math.abs(prenatalChange)}% ${prenatalChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
+                                    </Text>
+
+                                        <Box h="190px" mt={4}>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={prenatalCompareData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" />
+                                                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                                                    <YAxis tick={{ fontSize: 12 }} />
+                                                    <Tooltip />
+                                                    <Legend />
+                                                    <Bar name="Visits" dataKey="value" fill="#38b2ac" radius={[6, 6, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </Box>
+
+                                        <Progress value={prenatalBarPct} size="sm" colorScheme="teal" mt={4} borderRadius="full" />
+                                        <Text fontSize="xs" mt={2} color="gray.500">
+                                            Progress to target: {prenatalCount.toLocaleString()} of {prenatalTarget.toLocaleString()} visits ({prenatalBarPct}%)
+                                        </Text>
                                     </Box>
 
-                                    {/* Immunization */}
+                                    {/* Immunization chart */}
                                     <Box
-                                        bg="white" p={8} borderRadius="3xl" boxShadow="sm" borderLeft="4px solid" borderColor="orange.500"
-                                        cursor="pointer" transition="all 0.2s" _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
+                                        bg="white"
+                                        p={6}
+                                        borderRadius="3xl"
+                                        boxShadow="sm"
+                                        border="1px solid"
+                                        borderColor="gray.100"
+                                        cursor="pointer"
+                                        transition="all 0.2s"
+                                        _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
                                         onClick={() => { setSelectedCard('immunization'); onOpen(); }}
                                     >
-                                        <Stat>
-                                            <StatLabel color="gray.500" fontSize="xs" fontWeight="bold" textTransform="uppercase">Immunization Appointments</StatLabel>
-                                            <StatNumber fontSize="3xl" color="orange.700">{immunCount.toLocaleString()}</StatNumber>
-                                            {immunPrev > 0 ? (
-                                                <StatHelpText>
-                                                    <StatArrow type={immunChange >= 0 ? 'increase' : 'decrease'} />
-                                                    {Math.abs(immunChange)}% vs last month
-                                                </StatHelpText>
+                                        <HStack justify="space-between" mb={2}>
+                                            <Box>
+                                                <Text fontSize="xs" fontWeight="800" color="gray.500" textTransform="uppercase" letterSpacing="wide">
+                                                    Immunization
+                                                </Text>
+                                                <Text fontSize="sm" color="gray.600">
+                                                    Total immunization appointments (this month)
+                                                </Text>
+                                            </Box>
+                                            <Badge colorScheme="orange" variant="subtle" borderRadius="full" px={3}>
+                                                {immunCount.toLocaleString()}
+                                            </Badge>
+                                        </HStack>
+                                    <Text fontSize="xs" color="gray.500">
+                                        {immunPrev > 0 ? `${Math.abs(immunChange)}% ${immunChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
+                                    </Text>
+
+                                        <Box h="190px" mt={4}>
+                                            {immunBreakdown.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Tooltip />
+                                                        <Legend />
+                                                        <Pie
+                                                            data={immunBreakdown}
+                                                            dataKey="value"
+                                                            nameKey="name"
+                                                            innerRadius={45}
+                                                            outerRadius={75}
+                                                            paddingAngle={2}
+                                                        >
+                                                            {immunBreakdown.map((_: any, idx: number) => (
+                                                                <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                                                            ))}
+                                                        </Pie>
+                                                    </PieChart>
+                                                </ResponsiveContainer>
                                             ) : (
-                                                <StatHelpText color="gray.400">No prior month data</StatHelpText>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={immunCompareData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                                                        <YAxis tick={{ fontSize: 12 }} />
+                                                        <Tooltip />
+                                                        <Legend />
+                                                        <Bar name="Appointments" dataKey="value" fill="#ed8936" radius={[6, 6, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
                                             )}
-                                        </Stat>
-                                        <Progress value={immunBarPct} size="xs" colorScheme="orange" mt={4} borderRadius="full" />
-                                        <Text fontSize="xs" mt={2} color="gray.400">Target: 95% Coverage</Text>
+                                        </Box>
+
+                                        <Text fontSize="xs" mt={2} color="gray.500">
+                                            Tip: Hover the chart to see counts per vaccine/service.
+                                        </Text>
                                     </Box>
 
-                                    {/* TB Treatment */}
-                                    <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" borderLeft="4px solid" borderColor="blue.500">
-                                        <Stat>
-                                            <StatLabel color="gray.500" fontSize="xs" fontWeight="bold" textTransform="uppercase">TB / DOTS Treatment Success</StatLabel>
-                                            <StatNumber fontSize="3xl" color="blue.700">
+                                    {/* TB Treatment chart */}
+                                    <Box
+                                        bg="white"
+                                        p={6}
+                                        borderRadius="3xl"
+                                        boxShadow="sm"
+                                        border="1px solid"
+                                        borderColor="gray.100"
+                                    >
+                                        <HStack justify="space-between" mb={2}>
+                                            <Box>
+                                                <Text fontSize="xs" fontWeight="800" color="gray.500" textTransform="uppercase" letterSpacing="wide">
+                                                    TB treatment success
+                                                </Text>
+                                                <Text fontSize="sm" color="gray.600">
+                                                    How many patients completed treatment
+                                                </Text>
+                                            </Box>
+                                            <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={3}>
                                                 {tbTotal > 0 ? `${tbPct}%` : 'N/A'}
-                                            </StatNumber>
-                                            <StatHelpText color="gray.400">
-                                                {tbTotal > 0
-                                                    ? `${analyticsData.tb_treatment.completed} of ${tbTotal} completed`
-                                                    : 'No TB/DOTS appointments recorded'}
-                                            </StatHelpText>
-                                        </Stat>
-                                        <Progress value={tbTotal > 0 ? tbPct : 0} size="xs" colorScheme="blue" mt={4} borderRadius="full" />
-                                        <Text fontSize="xs" mt={2} color="gray.400">DOH Target: &gt;90%</Text>
+                                            </Badge>
+                                        </HStack>
+
+                                        <Box h="190px" mt={4}>
+                                            {tbPieData.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Tooltip />
+                                                        <Legend />
+                                                        <Pie
+                                                            data={tbPieData}
+                                                            dataKey="value"
+                                                            nameKey="name"
+                                                            innerRadius={45}
+                                                            outerRadius={75}
+                                                            paddingAngle={2}
+                                                        >
+                                                            <Cell fill="#3182ce" />
+                                                            <Cell fill="#e2e8f0" />
+                                                        </Pie>
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <Flex h="100%" align="center" justify="center">
+                                                    <Text color="gray.400" fontSize="sm">
+                                                        No TB/DOTS records yet
+                                                    </Text>
+                                                </Flex>
+                                            )}
+                                        </Box>
+
+                                        <Text fontSize="xs" mt={2} color="gray.500">
+                                            {tbTotal > 0 ? `${tbCompleted} completed out of ${tbTotal} total` : ' '}
+                                        </Text>
                                     </Box>
+
+                                    {/* Service charts: 5 more graphs (total 8) */}
+                                    {((predictiveData?.top_services || []).slice(0, 5)).map((svc: any, idx: number) => {
+                                        const svcChartData = [
+                                            { label: 'Total', value: svc.total, fill: CHART_COLORS[0] },
+                                            { label: 'Upcoming', value: svc.upcoming, fill: CHART_COLORS[1] },
+                                            { label: 'Completed', value: svc.completed, fill: CHART_COLORS[2] },
+                                        ].filter((d: any) => d.value > 0);
+                                        return (
+                                            <Box
+                                                key={`svc-${idx}`}
+                                                bg="white"
+                                                p={6}
+                                                borderRadius="3xl"
+                                                boxShadow="sm"
+                                                border="1px solid"
+                                                borderColor="gray.100"
+                                            >
+                                                <HStack justify="space-between" mb={2}>
+                                                    <Box>
+                                                        <Text fontSize="xs" fontWeight="800" color="gray.500" textTransform="uppercase" letterSpacing="wide">
+                                                            {svc.service}
+                                                        </Text>
+                                                        <Text fontSize="sm" color="gray.600">
+                                                            Appointments (last 90 days)
+                                                        </Text>
+                                                    </Box>
+                                                    <Badge colorScheme="purple" variant="subtle" borderRadius="full" px={3}>
+                                                        {svc.total}
+                                                    </Badge>
+                                                </HStack>
+                                                <Box h="190px" mt={4}>
+                                                    {svcChartData.length > 0 ? (
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <BarChart data={svcChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                                                <CartesianGrid strokeDasharray="3 3" />
+                                                                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                                                                <YAxis tick={{ fontSize: 12 }} />
+                                                                <Tooltip />
+                                                                <Legend />
+                                                                <Bar name="Count" dataKey="value" radius={[6, 6, 0, 0]}>
+                                                                    {svcChartData.map((_: any, i: number) => (
+                                                                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                                                    ))}
+                                                                </Bar>
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
+                                                    ) : (
+                                                        <Flex h="100%" align="center" justify="center">
+                                                            <Text color="gray.400" fontSize="sm">No data yet</Text>
+                                                        </Flex>
+                                                    )}
+                                                </Box>
+                                                <Text fontSize="xs" mt={2} color="gray.500">
+                                                    {svc.upcoming > 0 ? `${svc.upcoming} upcoming · ` : ''}{svc.completed} completed
+                                                </Text>
+                                            </Box>
+                                        );
+                                    })}
                                 </SimpleGrid>
 
                             </>
                         )}
 
-                        {/* ── Predictive Resource Allocation ─────────────────── */}
-                        <Box>
-                            <HStack mb={6} spacing={3} align="center">
-                                <Box p={2} bg="purple.50" borderRadius="lg">
-                                    <Icon as={FiBarChart2} color="purple.500" boxSize={5} />
-                                </Box>
-                                <Box>
-                                    <Text fontWeight="bold" fontSize="lg" color="gray.800">
+                        {/* ── Predictive Resource Allocation (Looker-style) ─────── */}
+                        <Box
+                            bg="white"
+                            borderRadius="2xl"
+                            boxShadow="0 1px 3px rgba(0,0,0,0.06)"
+                            border="1px solid"
+                            borderColor="gray.100"
+                            overflow="hidden"
+                        >
+                            {/* Header */}
+                            <Flex
+                                justify="space-between"
+                                align="center"
+                                px={6}
+                                py={4}
+                                borderBottom="1px solid"
+                                borderColor="gray.100"
+                                bg="gray.50"
+                            >
+                                <HStack spacing={3}>
+                                    <Icon as={FiBarChart2} color="gray.600" boxSize={5} />
+                                    <Text fontWeight="700" fontSize="md" color="gray.800">
                                         Predictive Resource Allocation
                                     </Text>
-                                </Box>
-                                <Badge ml="auto" colorScheme="purple" variant="subtle" px={3} py={1} borderRadius="full">
-                                    AI-Assisted
+                                </HStack>
+                                <Badge
+                                    bg="purple.50"
+                                    color="purple.700"
+                                    fontWeight="600"
+                                    fontSize="xs"
+                                    px={3}
+                                    py={1}
+                                    borderRadius="md"
+                                >
+                                    AI-assisted
                                 </Badge>
-                            </HStack>
+                            </Flex>
 
-                            {/* Legend */}
+                            {/* Compact legend row */}
                             <Flex
-                                wrap="wrap" gap={4} px={4} py={3}
-                                bg="gray.50" borderRadius="xl" mb={2}
+                                wrap="wrap"
+                                gap={6}
+                                px={6}
+                                py={3}
+                                bg="white"
+                                borderBottom="1px solid"
+                                borderColor="gray.100"
                                 align="center"
+                                fontSize="xs"
+                                color="gray.500"
                             >
-                                <Text fontSize="xs" fontWeight="bold" color="gray.500" textTransform="uppercase" letterSpacing="wide" mr={2}>
-                                    Legend:
-                                </Text>
-                                {/* Inventory badges */}
-                                <HStack spacing={1}>
-                                    <Box w={2} h={2} borderRadius="full" bg="red.500" />
-                                    <Badge colorScheme="red" fontSize="2xs" variant="subtle">CRITICAL</Badge>
-                                    <Text fontSize="2xs" color="gray.500">— Out of stock or flagged Critical</Text>
+                                <HStack spacing={2}>
+                                    <Box w="8px" h="8px" borderRadius="sm" bg="red.500" />
+                                    <Text>Critical — Out of stock</Text>
                                 </HStack>
-                                <HStack spacing={1}>
-                                    <Box w={2} h={2} borderRadius="full" bg="orange.400" />
-                                    <Badge colorScheme="orange" fontSize="2xs" variant="subtle">LOW</Badge>
-                                    <Text fontSize="2xs" color="gray.500">— ≤10 units or Low Stock status</Text>
+                                <HStack spacing={2}>
+                                    <Box w="8px" h="8px" borderRadius="sm" bg="orange.400" />
+                                    <Text>Low — &le;10 units</Text>
                                 </HStack>
-                                <HStack spacing={1}>
-                                    <Box w={2} h={2} borderRadius="full" bg="yellow.400" />
-                                    <Badge colorScheme="yellow" fontSize="2xs" variant="subtle">WATCH</Badge>
-                                    <Text fontSize="2xs" color="gray.500">— Related to high-demand services</Text>
+                                <HStack spacing={2}>
+                                    <Box w="8px" h="8px" borderRadius="sm" bg="yellow.400" />
+                                    <Text>Watch — High demand</Text>
                                 </HStack>
-                                <HStack spacing={1}>
-                                    <Badge colorScheme="orange" fontSize="2xs">⚠️ Warning</Badge>
-                                    <Text fontSize="2xs" color="gray.500">— ≥3 appointments this week</Text>
+                                <HStack spacing={2}>
+                                    <Box w="8px" h="8px" borderRadius="sm" bg="blue.400" />
+                                    <Text>Info</Text>
                                 </HStack>
-                                <HStack spacing={1}>
-                                    <Badge colorScheme="blue" fontSize="2xs">ℹ️ Info</Badge>
-                                    <Text fontSize="2xs" color="gray.500">— General scheduling insight</Text>
+                                <HStack spacing={2}>
+                                    <Box w="8px" h="8px" borderRadius="sm" bg="orange.300" />
+                                    <Text>Warning — &ge;3 this week</Text>
                                 </HStack>
                             </Flex>
 
                             {predictiveLoading && (
-                                <Flex justify="center" py={8}>
+                                <Flex justify="center" py={12}>
                                     <Spinner color="purple.500" size="lg" />
                                 </Flex>
                             )}
 
                             {!predictiveLoading && predictiveData && (
-                                <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={6}>
-
-                                    {/* Top Services */}
-                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderTop="4px solid" borderColor="purple.400">
-                                        <Text fontWeight="bold" fontSize="sm" color="purple.700" mb={4} textTransform="uppercase" letterSpacing="wide">
-                                            📊 Service Demand
+                                <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={0} minH="240px">
+                                    {/* Service Demand */}
+                                    <Box
+                                        p={6}
+                                        borderRight={{ lg: '1px solid' }}
+                                        borderBottom={{ base: '1px solid', lg: 'none' }}
+                                        borderColor="gray.100"
+                                    >
+                                        <Text
+                                            fontWeight="700"
+                                            fontSize="xs"
+                                            color="gray.500"
+                                            textTransform="uppercase"
+                                            letterSpacing="wider"
+                                            mb={4}
+                                        >
+                                            Service demand
                                         </Text>
-                                        <VStack align="stretch" spacing={3}>
-                                            {(predictiveData.top_services || []).slice(0, 5).map((svc: any, i: number) => (
-                                                <Box key={i}>
-                                                    <Flex justify="space-between" mb={1}>
-                                                        <Text fontSize="sm" fontWeight="medium" color="gray.700" noOfLines={1}>
-                                                            {svc.service}
-                                                        </Text>
-                                                        <HStack spacing={1}>
-                                                            {svc.upcoming > 0 && (
-                                                                <Badge colorScheme="orange" fontSize="xs">{svc.upcoming} upcoming</Badge>
-                                                            )}
-                                                            <Badge colorScheme="teal" variant="outline" fontSize="xs">{svc.total}</Badge>
-                                                        </HStack>
-                                                    </Flex>
-                                                    <Progress
-                                                        value={Math.min(100, (svc.total / Math.max(...(predictiveData.top_services || []).map((s: any) => s.total), 1)) * 100)}
-                                                        size="xs" colorScheme="purple" borderRadius="full"
-                                                    />
-                                                </Box>
-                                            ))}
+                                        <VStack align="stretch" spacing={4}>
+                                            {(predictiveData.top_services || []).slice(0, 5).map((svc: any, i: number) => {
+                                                const maxTotal = Math.max(...(predictiveData.top_services || []).map((s: any) => s.total), 1);
+                                                const pct = Math.min(100, Math.round((svc.total / maxTotal) * 100));
+                                                const isHigh = svc.upcoming >= 3;
+                                                const isMedium = svc.upcoming >= 1;
+                                                return (
+                                                    <Box key={i}>
+                                                        <Flex justify="space-between" align="center" mb={1}>
+                                                            <Text fontSize="sm" fontWeight="600" color="gray.800" noOfLines={1}>
+                                                                {svc.service}
+                                                            </Text>
+                                                            <HStack spacing={2}>
+                                                                {svc.upcoming > 0 && (
+                                                                    <Text fontSize="xs" fontWeight="600" color={isHigh ? "orange.600" : "gray.600"}>
+                                                                        {svc.upcoming} upcoming
+                                                                    </Text>
+                                                                )}
+                                                                <Text fontSize="xs" color="gray.400">{svc.total} total</Text>
+                                                            </HStack>
+                                                        </Flex>
+                                                        <Box bg="gray.100" borderRadius="full" h="6px" overflow="hidden">
+                                                            <Box
+                                                                bg={isHigh ? "orange.400" : isMedium ? "teal.400" : "gray.300"}
+                                                                w={`${pct}%`}
+                                                                h="100%"
+                                                                borderRadius="full"
+                                                                transition="width 0.3s"
+                                                            />
+                                                        </Box>
+                                                    </Box>
+                                                );
+                                            })}
                                             {(predictiveData.top_services || []).length === 0 && (
-                                                <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
+                                                <Text fontSize="sm" color="gray.400" py={6} textAlign="center">
                                                     No appointment data yet
                                                 </Text>
                                             )}
                                         </VStack>
                                     </Box>
 
-                                    {/* Recommended Inventory */}
-                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderTop="4px solid" borderColor="green.400">
-                                        <Text fontWeight="bold" fontSize="sm" color="green.700" mb={4} textTransform="uppercase" letterSpacing="wide">
-                                            💊 Inventory Forecast
+                                    {/* Inventory Forecast */}
+                                    <Box
+                                        p={6}
+                                        borderRight={{ lg: '1px solid' }}
+                                        borderBottom={{ base: '1px solid', lg: 'none' }}
+                                        borderColor="gray.100"
+                                    >
+                                        <Text
+                                            fontWeight="700"
+                                            fontSize="xs"
+                                            color="gray.500"
+                                            textTransform="uppercase"
+                                            letterSpacing="wider"
+                                            mb={4}
+                                        >
+                                            Inventory forecast
                                         </Text>
-                                        <VStack align="stretch" spacing={2}>
+                                        <VStack align="stretch" spacing={3}>
                                             {(predictiveData.recommended_inventory || []).slice(0, 8).map((inv: any, i: number) => {
                                                 const isOut = inv.stock === 0;
                                                 const isCritical = inv.status === 'Critical' || isOut;
                                                 const isLow = inv.status === 'Low Stock' || inv.stock <= 10;
-                                                const dotColor = isCritical ? "red.500" : isLow ? "orange.400" : "yellow.400";
-                                                const badgeColor = isCritical ? "red" : isLow ? "orange" : "yellow";
-                                                const badgeLabel = isCritical ? "CRITICAL" : isLow ? "LOW" : "WATCH";
+                                                const dotColor = isCritical ? "red.500" : isLow ? "orange.400" : "yellow.500";
+                                                const label = isCritical ? "Critical" : isLow ? "Low" : "Watch";
                                                 return (
-                                                    <Box key={i} py={1} borderBottom="1px solid" borderColor="gray.100" _last={{ borderBottom: 'none' }}>
-                                                        <Flex align="center" gap={2}>
-                                                            <Box w={2} h={2} borderRadius="full" bg={dotColor} flexShrink={0} />
-                                                            <Box flex={1} minW={0}>
-                                                                <Text fontSize="xs" color="gray.800" fontWeight="medium" noOfLines={1}>{inv.item}</Text>
-                                                                <Text fontSize="2xs" color="gray.400">{inv.category} · {inv.stock} {inv.unit} remaining</Text>
+                                                    <Flex key={i} align="center" justify="space-between" py={2} borderBottom="1px solid" borderColor="gray.50" _last={{ borderBottom: 'none' }}>
+                                                        <HStack spacing={3} flex={1} minW={0}>
+                                                            <Box w="6px" h="6px" borderRadius="full" bg={dotColor} flexShrink={0} />
+                                                            <Box>
+                                                                <Text fontSize="sm" fontWeight="500" color="gray.800" noOfLines={1}>{inv.item}</Text>
+                                                                <Text fontSize="xs" color="gray.400">{inv.category} · {inv.stock} {inv.unit}</Text>
                                                             </Box>
-                                                            <Badge colorScheme={badgeColor} fontSize="2xs" variant="subtle" flexShrink={0}>
-                                                                {badgeLabel}
-                                                            </Badge>
-                                                        </Flex>
-                                                    </Box>
+                                                        </HStack>
+                                                        <Text fontSize="xs" fontWeight="600" color={isCritical ? "red.600" : isLow ? "orange.600" : "yellow.700"}>
+                                                            {label}
+                                                        </Text>
+                                                    </Flex>
                                                 );
                                             })}
                                             {(predictiveData.recommended_inventory || []).length === 0 && (
-                                                <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
-                                                    All inventory levels look sufficient
-                                                </Text>
+                                                <Flex align="center" justify="center" py={8} bg="green.50" borderRadius="lg">
+                                                    <Text fontSize="sm" color="green.700" fontWeight="500">
+                                                        All inventory levels sufficient
+                                                    </Text>
+                                                </Flex>
                                             )}
                                         </VStack>
                                     </Box>
 
-                                    {/* Staffing Alerts */}
-                                    <Box bg="white" p={6} borderRadius="2xl" boxShadow="sm" borderTop="4px solid" borderColor="blue.400">
-                                        <Text fontWeight="bold" fontSize="sm" color="blue.700" mb={4} textTransform="uppercase" letterSpacing="wide">
-                                            👥 Staffing Insights
+                                    {/* Staffing Insights */}
+                                    <Box p={6}>
+                                        <Text
+                                            fontWeight="700"
+                                            fontSize="xs"
+                                            color="gray.500"
+                                            textTransform="uppercase"
+                                            letterSpacing="wider"
+                                            mb={4}
+                                        >
+                                            Staffing insights
                                         </Text>
                                         <VStack align="stretch" spacing={3}>
                                             {(predictiveData.staffing_alerts || []).map((alert: any, i: number) => (
-                                                <Box
-                                                    key={i} p={3} borderRadius="lg"
+                                                <Flex
+                                                    key={i}
+                                                    p={3}
+                                                    borderRadius="lg"
                                                     bg={alert.level === 'warning' ? "orange.50" : "blue.50"}
+                                                    align="flex-start"
                                                     borderLeft="3px solid"
                                                     borderColor={alert.level === 'warning' ? "orange.400" : "blue.400"}
                                                 >
-                                                    <HStack spacing={2} align="flex-start">
-                                                        <Text fontSize="sm">{alert.level === 'warning' ? '⚠️' : 'ℹ️'}</Text>
-                                                        <Text fontSize="xs" color="gray.700" lineHeight="tall">{alert.message}</Text>
-                                                    </HStack>
-                                                </Box>
+                                                    <Icon
+                                                        as={alert.level === 'warning' ? FiAlertTriangle : FiActivity}
+                                                        color={alert.level === 'warning' ? "orange.500" : "blue.500"}
+                                                        boxSize={4}
+                                                        mt="2px"
+                                                        mr={2}
+                                                    />
+                                                    <Text fontSize="sm" color="gray.700" lineHeight="tall">{alert.message}</Text>
+                                                </Flex>
                                             ))}
                                             {(predictiveData.staffing_alerts || []).length === 0 && (
-                                                <Text fontSize="sm" color="gray.400" textAlign="center" py={4}>
-                                                    No staffing alerts at this time
+                                                <Text fontSize="sm" color="gray.400" py={6} textAlign="center">
+                                                    No alerts at this time
                                                 </Text>
                                             )}
                                         </VStack>
@@ -1570,9 +1992,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             )}
 
                             {!predictiveLoading && !predictiveData && (
-                                <Box p={8} textAlign="center" bg="white" borderRadius="2xl" boxShadow="sm">
-                                    <Text color="gray.400">Could not load predictive data. Please try refreshing.</Text>
-                                </Box>
+                                <Flex py={12} justify="center" align="center">
+                                    <Text fontSize="sm" color="gray.500">Could not load predictive data. Please try refreshing.</Text>
+                                </Flex>
                             )}
                         </Box>
 
@@ -1592,68 +2014,90 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             description="Review and resolve contact form submissions from the public website."
                         />
                         <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
-                            <Flex justify="space-between" align="center" mb={6}>
-                                <HStack spacing={6}>
+                            <Flex justify="space-between" align="center" mb={6} flexWrap="wrap" gap={4}>
+                                <HStack spacing={6} align="center">
                                     <Heading size="md" color="teal.800">Recent Tickets</Heading>
-                                    <HStack bg="gray.100" p={1} borderRadius="lg">
-                                        <Button
-                                            size="sm"
-                                            variant={ticketFilter === 'open' ? 'solid' : 'ghost'}
-                                            colorScheme={ticketFilter === 'open' ? 'teal' : 'gray'}
-                                            onClick={() => setTicketFilter('open')}
-                                            borderRadius="md"
-                                        >
-                                            Open Inquiries
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant={ticketFilter === 'resolved' ? 'solid' : 'ghost'}
-                                            colorScheme={ticketFilter === 'resolved' ? 'teal' : 'gray'}
-                                            onClick={() => setTicketFilter('resolved')}
-                                            borderRadius="md"
-                                        >
-                                            Resolved
-                                        </Button>
-                                    </HStack>
+                                    <Text fontSize="sm" color="gray.500">Showing {ticketFilter === 'open' ? 'open' : 'resolved'} inquiries</Text>
+                                </HStack>
+                                <HStack bg="gray.100" p={1} borderRadius="lg">
+                                    <Button
+                                        size="sm"
+                                        variant={ticketFilter === 'open' ? 'solid' : 'ghost'}
+                                        colorScheme={ticketFilter === 'open' ? 'teal' : 'gray'}
+                                        onClick={() => setTicketFilter('open')}
+                                        borderRadius="md"
+                                    >
+                                        Open
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant={ticketFilter === 'resolved' ? 'solid' : 'ghost'}
+                                        colorScheme={ticketFilter === 'resolved' ? 'teal' : 'gray'}
+                                        onClick={() => setTicketFilter('resolved')}
+                                        borderRadius="md"
+                                    >
+                                        Resolved
+                                    </Button>
                                 </HStack>
                             </Flex>
-                            <Box overflowX="auto">
-                                <Table variant="simple">
-                                    <Thead>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.100">
+                                <Table variant="simple" size="md">
+                                    <Thead bg="gray.50">
                                         <Tr>
-                                            <Th>Ticket No.</Th>
-                                            <Th>Date</Th>
-                                            <Th>Name</Th>
-                                            <Th>Email</Th>
-                                            <Th>Subject & Message</Th>
-                                            <Th>Status</Th>
-                                            <Th>Actions</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Ticket</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Date</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Contact</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Subject</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Message</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Status</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Action</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
                                         {filteredTickets.length > 0 ? (
-                                            filteredTickets.map(ticket => (
-                                                <Tr key={ticket.id}>
-                                                    <Td>
-                                                        <Badge colorScheme="purple" variant="subtle" fontSize="sm">
-                                                            {`TCKT-${new Date(ticket.created_at).getFullYear()}-${ticket.id.toString().padStart(3, '0')}`}
-                                                        </Badge>
+                                            filteredTickets.map((ticket, idx) => (
+                                                <Tr
+                                                    key={ticket.id}
+                                                    bg={idx % 2 === 0 ? 'white' : 'gray.50'}
+                                                    _hover={{ bg: 'teal.50' }}
+                                                >
+                                                    <Td py={4} whiteSpace="nowrap">
+                                                        <Text fontFamily="mono" fontWeight="600" fontSize="sm" color="teal.700">
+                                                            TCKT-{new Date(ticket.created_at).getFullYear()}-{ticket.id.toString().padStart(3, '0')}
+                                                        </Text>
                                                     </Td>
-                                                    <Td>{new Date(ticket.created_at).toLocaleDateString()}</Td>
-                                                    <Td fontWeight="600">{ticket.name}</Td>
-                                                    <Td>{ticket.email}<br /><Text fontSize="xs" color="gray.500">{ticket.phone}</Text></Td>
-                                                    <Td maxW="300px">
-                                                        <Text fontWeight="bold" noOfLines={1} mb={1}>{ticket.subject}</Text>
-                                                        <Text fontSize="sm" color="gray.600" noOfLines={2}>{ticket.message}</Text>
+                                                    <Td py={4}>
+                                                        <Text fontSize="sm" color="gray.700">{new Date(ticket.created_at).toLocaleDateString()}</Text>
                                                     </Td>
-                                                    <Td>
-                                                        <Badge colorScheme={ticket.status === 'Resolved' ? 'green' : 'orange'}>
+                                                    <Td py={4}>
+                                                        <VStack align="start" spacing={0}>
+                                                            <Text fontWeight="600" fontSize="sm" color="gray.800">{ticket.name}</Text>
+                                                            <Text fontSize="xs" color="gray.500" noOfLines={1}>{ticket.email}</Text>
+                                                            {ticket.phone && (
+                                                                <Text fontSize="xs" color="gray.400">{ticket.phone}</Text>
+                                                            )}
+                                                        </VStack>
+                                                    </Td>
+                                                    <Td py={4} maxW="180px">
+                                                        <Text fontWeight="600" fontSize="sm" color="gray.800" noOfLines={1}>{ticket.subject}</Text>
+                                                    </Td>
+                                                    <Td py={4} maxW="220px">
+                                                        <Text fontSize="sm" color="gray.600" noOfLines={2} lineHeight="tall">{ticket.message}</Text>
+                                                    </Td>
+                                                    <Td py={4}>
+                                                        <Badge
+                                                            colorScheme={ticket.status === 'Resolved' ? 'green' : 'orange'}
+                                                            fontWeight="600"
+                                                            fontSize="xs"
+                                                            px={2}
+                                                            py={1}
+                                                        >
                                                             {ticket.status}
                                                         </Badge>
                                                     </Td>
-                                                    <Td>
+                                                    <Td py={4}>
                                                         {ticket.status !== 'Resolved' && (
-                                                            <Button size="xs" colorScheme="teal" onClick={() => handleResolveTicket(ticket.id)}>
+                                                            <Button size="sm" colorScheme="teal" onClick={() => confirmResolveTicket(ticket.id)}>
                                                                 Mark Resolved
                                                             </Button>
                                                         )}
@@ -1662,7 +2106,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={7} textAlign="center" py={6} color="gray.500">
+                                                <Td colSpan={7} textAlign="center" py={10} color="gray.500" fontSize="sm">
                                                     No {ticketFilter} tickets found.
                                                 </Td>
                                             </Tr>

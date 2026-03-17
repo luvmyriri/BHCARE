@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box,
     Container,
@@ -40,7 +40,14 @@ const ContactForm = () => {
     });
     const [errors, setErrors] = useState<Record<string, boolean>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
     const toast = useToast();
+
+    useEffect(() => {
+        if (cooldown <= 0) return;
+        const id = setTimeout(() => setCooldown((prev) => (prev > 0 ? prev - 1 : 0)), 1000);
+        return () => clearTimeout(id);
+    }, [cooldown]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -93,6 +100,17 @@ const ContactForm = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (cooldown > 0) {
+            toast({
+                title: 'Please wait',
+                description: `You can send another message in ${cooldown}s.`,
+                status: 'warning',
+                duration: 2500,
+                isClosable: true,
+                position: 'top',
+            });
+            return;
+        }
 
         let hasErrors = false;
         const newErrors: Record<string, boolean> = {};
@@ -144,8 +162,8 @@ const ContactForm = () => {
             });
 
             if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || 'Failed to send message');
+                const data = await res.json().catch(() => ({} as any));
+                throw new Error(data.error || `Failed to send message (status ${res.status})`);
             }
 
             toast({
@@ -157,6 +175,7 @@ const ContactForm = () => {
                 position: 'top',
             });
             setFormData({ name: '', email: '', phone: '+63', subject: '', message: '' });
+            setCooldown(60);
         } catch (err: any) {
             toast({
                 title: 'Error',
@@ -318,13 +337,14 @@ const ContactForm = () => {
                                 rightIcon={<SendIcon />}
                                 isLoading={isSubmitting}
                                 loadingText="Sending..."
+                                isDisabled={cooldown > 0}
                                 _hover={{
                                     transform: 'translateY(-2px)',
                                     boxShadow: 'xl',
                                 }}
                                 transition="all 0.2s"
                             >
-                                Send Message
+                                {cooldown > 0 ? `Send again in ${cooldown}s` : 'Send Message'}
                             </Button>
                         </form>
                     </Box>

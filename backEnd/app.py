@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from typing import Set, Optional, List, Any, Dict
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from psycopg2 import sql
@@ -14,7 +15,7 @@ import requests
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import io
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from email_config import (
     init_mail,
     generate_reset_token,
@@ -27,7 +28,8 @@ from email_config import (
     send_document_ready_email,
     send_ticket_confirmation_email,
     send_ticket_resolved_email,
-    send_walkin_patient_credentials_email
+    send_walkin_patient_credentials_email,
+    check_forgot_cooldown,
 )
 
 load_dotenv()
@@ -39,6 +41,10 @@ CORS(app)
 bcrypt = Bcrypt(app)
 mail = init_mail(app)  # Initialize Flask-Mail
 
+# In-memory rate limit for public contact form (email + IP -> last submit datetime).
+# Resets when the server restarts.
+contact_rate_limits = {}
+
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
@@ -47,19 +53,19 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def generate_patient_number(year: int, existing_numbers: set = None) -> str:
-    """Generate a unique patient number: YYYY-LLLDDD (3 uppercase letters + 3 digits)."""
+def generate_patient_number(year: int, existing_numbers: Optional[Set[str]] = None) -> str:
+    """Generate a unique patient number: PTNT-YYYY-XXXX (4 random alphanumeric chars)."""
     if existing_numbers is None:
         existing_numbers = set()
     for _ in range(1000):  # safety limit
-        letters = ''.join(random.choices(string.ascii_uppercase, k=3))
-        digits = ''.join(random.choices(string.digits, k=3))
-        pn = f"{year}-{letters}{digits}"
+        # Random 4-character alphanumeric suffix
+        suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        pn = f"PTNT-{year}-{suffix}"
         if pn not in existing_numbers:
             return pn
-    # Fallback: extend length
-    extras = ''.join(random.choices(string.ascii_uppercase + string.digits, k=3))
-    return f"{year}-{extras}{''.join(random.choices(string.digits, k=4))}"
+    # Fallback: longer random string
+    extras = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    return f"PTNT-{year}-{extras}"
 
 
 def allowed_file(filename):
@@ -179,8 +185,11 @@ class FieldValidator:
                     if fmt == 'text':
                         months = {'JAN':'01','FEB':'02','MAR':'03','APR':'04','MAY':'05','JUN':'06',
                                  'JUL':'07','AUG':'08','SEP':'09','OCT':'10','NOV':'11','DEC':'12'}
-                        m = months[match.group(1)[:3].upper()]
-                        d = match.group(2).zfill(2)
+                        month_name = match.group(1)
+                        m = ""
+                        if month_name:
+                            m = months[month_name[:3].upper()]
+                        d = match.group(2).zfill(2) if match.group(2) else "01"
                         y = match.group(3)
                         return f"{y}-{m}-{d}", conf
                     elif fmt == '%m/%d/%Y':
@@ -442,7 +451,7 @@ class PHIDParser:
                 header_idx = i
                 break
         
-        if header_idx is not None and header_idx + 1 < len(lines):
+        if header_idx is not None and header_idx >= 0 and (header_idx + 1) < len(lines):
             data_line = lines[header_idx + 1]
             
             # DRIVER'S LICENSE SPECIFIC LOGIC (Format: SALVACION, LANCE ALDRIC CUREG)
@@ -847,7 +856,8 @@ class PHIDParser:
             if addr_start_idx != -1:
                  candidates = []
                  for j in range(1, 4):
-                     if addr_start_idx + j < len(lines):
+                     search_idx = (addr_start_idx or 0) + j
+                     if addr_start_idx is not None and search_idx < len(lines):
                          l = lines[addr_start_idx + j].strip()
                          # Stop if we hit a PhilHealth Number or noise
                          if re.match(r'^[\d\s-]+$', l) and len(re.sub(r'[^\d]', '', l)) >= 10:
@@ -938,7 +948,8 @@ class PHIDParser:
             # Merge up to 3 lines after label
             candidates = []
             for j in range(1, 4):
-                if addr_line_idx + j < len(lines):
+                search_idx = (addr_line_idx or 0) + j
+                if addr_line_idx is not None and search_idx < len(lines):
                     l = lines[addr_line_idx + j].strip()
                     # Stop merging if we hit these labels which indicate the end of the address block
                     if any(k in l.upper() for k in ['ID NO', 'DATE OF', 'LICENSE NO', 'EXPIRATION', 'AGENCY CODE']):
@@ -980,7 +991,7 @@ class PHIDParser:
              
         # Post-process Caloocan ZIP Code
         if self.fields.get('city') == 'Caloocan City':
-            ext_zip = self.fields.get('zip_code', '')
+            ext_zip = str(self.fields.get('zip_code') or '')
             if not ext_zip.isdigit() or not (1400 <= int(ext_zip) <= 1428):
                 if self.fields.get('barangay') == 'Barangay 174':
                     self.fields['zip_code'] = '1423'
@@ -1442,13 +1453,10 @@ def register():
 
         hashed = bcrypt.generate_password_hash(password).decode('utf-8')
         
-        # Generate unique patient number
+        # Basic prep
         from datetime import datetime
         year = datetime.now().year
-        # Fetch existing patient numbers to avoid collision
-        cur.execute("SELECT patient_number FROM users WHERE patient_number IS NOT NULL")
-        taken = {row[0] for row in cur.fetchall()}
-        patient_number = generate_patient_number(year, taken)
+        patient_number = None
 
         cur.execute("""
             INSERT INTO users (email, password_hash, first_name, middle_name, last_name, 
@@ -1461,6 +1469,11 @@ def register():
               house_number, block_number, lot_number, street_name, subdivision, zip_code, full_address, suffix, patient_number))
         
         user_id = cur.fetchone()[0]
+        
+        # Unified PTNT update
+        patient_number = f"PTNT{year}{str(user_id).zfill(3)}"
+        cur.execute("UPDATE users SET patient_number = %s WHERE id = %s", (patient_number, user_id))
+        
         conn.commit()
         cur.close()
         conn.close()
@@ -1809,16 +1822,32 @@ def check_philhealth():
 
 @app.route("/api/forgot-password", methods=["POST"])
 def forgot_password():
-    """Send 6-digit verification code to email"""
+    """Send 6-digit verification code to email.
+
+    Always returns a generic success message so we don't reveal whether
+    the email exists, and can return 429 for rate limiting.
+    """
+    GENERIC_SUCCESS = {
+        "message": "If this email is registered, a 6-digit verification code has been sent."
+    }
     try:
-        data = request.json
-        email = data.get('email')
+        data = request.json or {}
+        email = (data.get('email') or '').strip()
         print(f"[FORGOT DEBUG] Received request for email: {email}")
-        
+
         if not email:
             print("[FORGOT DEBUG] Email is required but missing")
             return jsonify({"error": "Email is required"}), 400
-            
+
+        # Cooldown / rate-limiting: may return 429 before we hit the DB
+        allowed, retry_after, msg = check_forgot_cooldown(email)
+        if not allowed:
+            print(f"[FORGOT DEBUG] Rate limit hit for {email}: {msg}")
+            resp = jsonify({"error": msg or "Too many attempts. Please wait before trying again."})
+            if retry_after is not None:
+                resp.headers["Retry-After"] = str(retry_after)
+            return resp, 429
+
         # Check if email exists in DB
         conn = get_db()
         cur = conn.cursor()
@@ -1826,31 +1855,32 @@ def forgot_password():
         user_exists = cur.fetchone()
         cur.close()
         conn.close()
-        
+
         if not user_exists:
-            print(f"[FORGOT DEBUG] Email {email} not found in DB")
+            print(f"[FORGOT DEBUG] Email {email} not found in DB (returning generic success)")
             # Security: Don't reveal if email exists, just pretend it worked
-            # Delay slightly to prevent timing attacks
+            # Small delay to reduce timing side‑channels
             import time
             time.sleep(1)
-            return jsonify({"message": "If this email is registered, a code has been sent."}), 200
-            
+            return jsonify(GENERIC_SUCCESS), 200
+
         print(f"[FORGOT DEBUG] Email {email} found. Generating token...")
         # Generate and store code
         code = generate_reset_token()
         store_reset_token(email, code)
         print(f"[FORGOT DEBUG] Token generated: {code} for {email}")
-        
+
         # Send email
         print(f"[FORGOT DEBUG] Attempting to send email...")
         send_password_reset_email(mail, email, code)
         print(f"[FORGOT DEBUG] Email sent successfully to {email}")
-        
-        return jsonify({"message": "Verification code sent"}), 200
-        
+
+        # Always return the same generic success message
+        return jsonify(GENERIC_SUCCESS), 200
+
     except Exception as e:
         print(f"[FORGOT ERROR] {str(e)}")
-        return jsonify({"error": "An error occurred"}), 500
+        return jsonify({"error": "An error occurred while processing your request."}), 500
 
 @app.route("/api/verify-reset-code", methods=["POST"])
 def verify_reset_code():
@@ -1978,11 +2008,9 @@ def register_walkin():
             if cur.fetchone():
                 return jsonify({"error": "This email address is already registered."}), 400
         
-        # Generate unique patient number
+        # Basic prep
         year = datetime.now().year
-        cur.execute("SELECT patient_number FROM users WHERE patient_number IS NOT NULL")
-        taken = {row[0] for row in cur.fetchall()}
-        patient_number = generate_patient_number(year, taken)
+        patient_number = None
 
         cur.execute("""
             INSERT INTO users (
@@ -1993,7 +2021,7 @@ def register_walkin():
                 requires_password_change, status
             )
             VALUES (%s, %s, %s, %s, %s, 'Patient', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, 'Active')
-            RETURNING id, patient_number
+            RETURNING id
         """, (
             registration_email, hashed_password, first_name, middle_name, last_name,
             contact, dob_str, gender, full_address, barangay,
@@ -2003,6 +2031,10 @@ def register_walkin():
         
         new_user = cur.fetchone()
         new_user_id = new_user[0]
+        
+        # Unified PTNT update
+        patient_number = f"PTNT{year}{str(new_user_id).zfill(3)}"
+        cur.execute("UPDATE users SET patient_number = %s WHERE id = %s", (patient_number, new_user_id))
         
         conn.commit()
         cur.close()
@@ -2093,12 +2125,10 @@ def create_medical_staff():
             conn.close()
             return jsonify({"error": "Email already registered"}), 409
             
-        # Generate unique patient number for staff member
+        # Basic prep
         from datetime import datetime
         year = datetime.now().year
-        cur.execute("SELECT patient_number FROM users WHERE patient_number IS NOT NULL")
-        taken = {row[0] for row in cur.fetchall()}
-        patient_number = generate_patient_number(year, taken)
+        patient_number = None
 
         # 1. Insert into Users Table
         cur.execute("""
@@ -2108,6 +2138,10 @@ def create_medical_staff():
         """, (email, hashed, first_name, last_name, role, contact, patient_number))
         
         new_user_id = cur.fetchone()[0]
+        
+        # Unified PTNT update
+        patient_number = f"PTNT{year}{str(new_user_id).zfill(3)}"
+        cur.execute("UPDATE users SET patient_number = %s WHERE id = %s", (patient_number, new_user_id))
         
         # 2. Insert into Medical Staff Details Table
         cur.execute("""
@@ -2195,8 +2229,11 @@ def get_doctor_patients():
             else:
                 pat['age'] = 'N/A'
                 
-            # P-ID format
-            pat['p_id'] = f"P-{str(pat['id']).zfill(4)}"
+            # P-ID format (Use actual patient_number from database if available)
+            if pat.get('patient_number'):
+                pat['p_id'] = pat['patient_number']
+            else:
+                pat['p_id'] = f"PTNT-2026-{str(pat['id']).zfill(4)}"
             
             patient_list.append(pat)
             
@@ -2580,7 +2617,7 @@ def get_admin_activities():
         cur.close()
         conn.close()
 
-        return jsonify(activities[:10]), 200
+        return jsonify(list(activities[:10])), 200
 
     except Exception as e:
         print(f"Error fetching admin activities: {e}")
@@ -3022,6 +3059,40 @@ def restock_inventory_item():
         print(f"Error restocking inventory item: {e}")
         return jsonify({"error": str(e)}), 500
 
+# Edit inventory item (name/category/unit). Stock should be adjusted via restock.
+@app.route("/api/inventory/<int:item_id>", methods=["PUT"])
+def update_inventory_item(item_id: int):
+    """Update inventory item details"""
+    try:
+        data = request.json or {}
+        item_name = (data.get('item_name') or '').strip()
+        category = (data.get('category') or '').strip()
+        unit = (data.get('unit') or '').strip()
+
+        if not item_name or not category or not unit:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT id FROM inventory WHERE id = %s", (item_id,))
+        exists = cur.fetchone()
+        if not exists:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Item not found"}), 404
+
+        cur.execute(
+            "UPDATE inventory SET item_name = %s, category = %s, unit = %s WHERE id = %s RETURNING id",
+            (item_name, category, unit, item_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Item updated successfully"}), 200
+    except Exception as e:
+        print(f"Error updating inventory item: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # ============= DOCUMENT REQUEST ENDPOINTS =============
 @app.route("/api/documents/user/<int:user_id>", methods=["GET"])
 def get_user_documents(user_id):
@@ -3403,15 +3474,33 @@ def predictive_insights():
 # ============= CONTACT US ENDPOINTS =============
 @app.route('/api/contact', methods=['POST'])
 def submit_contact_form():
-    data = request.json
+    data = request.json or {}
     name = data.get('name')
-    email = data.get('email')
+    email = (data.get('email') or '').strip().lower()
     phone = data.get('phone')
     subject = data.get('subject')
     message = data.get('message')
 
     if not email or not message:
         return jsonify({"error": "Email and message are required"}), 400
+
+    # Simple anti-spam cooldown (in-memory). Resets on server restart.
+    # Keyed by email + IP for better protection.
+    from datetime import datetime
+    key = f"{email}|{request.remote_addr or ''}"
+    now = datetime.now()
+    cooldown_seconds = 60
+    global contact_rate_limits
+
+    prev = contact_rate_limits.get(key)
+    if prev:
+        delta = (now - prev).total_seconds()
+        if delta < cooldown_seconds:
+            retry_after = int(cooldown_seconds - delta)
+            resp = jsonify({"error": f"Please wait {retry_after} seconds before sending another message."})
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp, 429
+    contact_rate_limits[key] = now
 
     conn = get_db_connection()
     if conn is None:

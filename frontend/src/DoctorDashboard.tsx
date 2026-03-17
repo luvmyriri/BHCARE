@@ -228,6 +228,10 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
     const [restockItemId, setRestockItemId] = useState<number | null>(null);
     const [restockQuantity, setRestockQuantity] = useState<number>(0);
 
+    // Inventory Edit State
+    const { isOpen: isEditInventoryOpen, onOpen: onEditInventoryOpen, onClose: onEditInventoryClose } = useDisclosure();
+    const [editInventoryItem, setEditInventoryItem] = useState<any>(null);
+
     const handleRestockItem = async () => {
         if (!restockItemId || restockQuantity <= 0) return;
 
@@ -259,6 +263,91 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         } catch (error) {
             console.error("Error restocking item:", error);
         }
+    };
+
+    const confirmRestockItem = () => {
+        if (!restockItemId || restockQuantity <= 0) return;
+        const toastId = `confirm-restock-${restockItemId}`;
+        if (toast.isActive(toastId)) return;
+        toast({
+            id: toastId,
+            position: 'top',
+            duration: 8000,
+            isClosable: true,
+            status: 'warning',
+            render: ({ onClose }) => (
+                <Box bg="white" border="1px solid" borderColor="orange.200" boxShadow="lg" borderRadius="xl" p={4} maxW="420px">
+                    <Text fontWeight="800" color="orange.700" mb={1}>Confirm restock</Text>
+                    <Text fontSize="sm" color="gray.600" mb={3}>
+                        Add <strong>{restockQuantity}</strong> to this item’s stock?
+                    </Text>
+                    <HStack justify="flex-end">
+                        <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button size="sm" colorScheme="teal" onClick={async () => { onClose(); await handleRestockItem(); }}>
+                            Yes, restock
+                        </Button>
+                    </HStack>
+                </Box>
+            ),
+        });
+    };
+
+    const handleUpdateInventoryItem = async () => {
+        if (!editInventoryItem?.id) return;
+        try {
+            const res = await fetch(`/api/inventory/${editInventoryItem.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    item_name: editInventoryItem.item_name,
+                    category: editInventoryItem.category,
+                    unit: editInventoryItem.unit,
+                })
+            });
+            if (res.ok) {
+                toast({ title: "Item Updated", status: "success", duration: 2500, isClosable: true });
+                const invRes = await fetch('/api/inventory');
+                if (invRes.ok) {
+                    const invData = await invRes.json();
+                    setInventory(invData);
+                }
+                onEditInventoryClose();
+                setEditInventoryItem(null);
+            } else {
+                const data = await res.json().catch(() => ({} as any));
+                toast({ title: "Error", description: data.error || "Failed to update item", status: "error", duration: 3000, isClosable: true });
+            }
+        } catch (error) {
+            console.error("Error updating item:", error);
+            toast({ title: "Error", description: "Failed to update item", status: "error", duration: 3000, isClosable: true });
+        }
+    };
+
+    const confirmUpdateInventoryItem = () => {
+        if (!editInventoryItem?.id) return;
+        const toastId = `confirm-edit-${editInventoryItem.id}`;
+        if (toast.isActive(toastId)) return;
+        toast({
+            id: toastId,
+            position: 'top',
+            duration: 8000,
+            isClosable: true,
+            status: 'warning',
+            render: ({ onClose }) => (
+                <Box bg="white" border="1px solid" borderColor="orange.200" boxShadow="lg" borderRadius="xl" p={4} maxW="460px">
+                    <Text fontWeight="800" color="orange.700" mb={1}>Confirm changes</Text>
+                    <Text fontSize="sm" color="gray.600" mb={3}>
+                        Save updates to <strong>{editInventoryItem.item_name}</strong>?
+                    </Text>
+                    <HStack justify="flex-end">
+                        <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button size="sm" colorScheme="teal" onClick={async () => { onClose(); await handleUpdateInventoryItem(); }}>
+                            Yes, save
+                        </Button>
+                    </HStack>
+                </Box>
+            ),
+        });
     };
 
     // Search & History State
@@ -1069,6 +1158,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                 <Th>Category</Th>
                                                 <Th>Stock</Th>
                                                 <Th>Status</Th>
+                                                <Th>Actions</Th>
                                             </Tr>
                                         </Thead>
                                         <Tbody>
@@ -1083,6 +1173,21 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                                 <Badge colorScheme={item.stock_quantity < 50 ? 'red' : item.stock_quantity < 100 ? 'orange' : 'green'}>
                                                                     {item.status || (item.stock_quantity < 50 ? 'Low Stock' : 'Good')}
                                                                 </Badge>
+                                                            </HStack>
+                                                        </Td>
+                                                        <Td>
+                                                            <HStack justify="flex-end" spacing={2}>
+                                                                <Button
+                                                                    size="xs"
+                                                                    variant="outline"
+                                                                    colorScheme="gray"
+                                                                    onClick={() => {
+                                                                        setEditInventoryItem({ ...item });
+                                                                        onEditInventoryOpen();
+                                                                    }}
+                                                                >
+                                                                    Edit
+                                                                </Button>
                                                                 <Button
                                                                     size="xs"
                                                                     colorScheme="teal"
@@ -1101,7 +1206,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                 ))
                                             ) : (
                                                 <Tr>
-                                                    <Td colSpan={4} textAlign="center" py={4} color="gray.500">
+                                                    <Td colSpan={5} textAlign="center" py={4} color="gray.500">
                                                         Inventory is empty
                                                     </Td>
                                                 </Tr>
@@ -1279,11 +1384,22 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                 </Box>
                                 <Box w="full">
                                     <Text mb={1} fontSize="sm" fontWeight="bold">Unit</Text>
-                                    <Input
+                                    <select
+                                        className="chakra-select css-1"
+                                        style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
                                         value={newInventoryItem.unit}
                                         onChange={(e) => setNewInventoryItem({ ...newInventoryItem, unit: e.target.value })}
-                                        placeholder="e.g. pcs, boxes"
-                                    />
+                                    >
+                                        <option value="" disabled>Select unit</option>
+                                        <option value="pcs">pcs</option>
+                                        <option value="boxes">boxes</option>
+                                        <option value="bottles">bottles</option>
+                                        <option value="packs">packs</option>
+                                        <option value="vials">vials</option>
+                                        <option value="tablets">tablets</option>
+                                        <option value="capsules">capsules</option>
+                                        <option value="tubes">tubes</option>
+                                    </select>
                                 </Box>
                             </HStack>
                         </VStack>
@@ -1321,7 +1437,71 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     </ModalBody>
                     <ModalFooter bg="gray.50" borderTopWidth="1px">
                         <Button variant="ghost" mr={3} onClick={onRestockClose}>Cancel</Button>
-                        <Button colorScheme="teal" onClick={handleRestockItem}>Confirm Restock</Button>
+                        <Button colorScheme="teal" onClick={confirmRestockItem}>Confirm Restock</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* Edit Inventory Modal */}
+            <Modal isOpen={isEditInventoryOpen} onClose={onEditInventoryClose} isCentered>
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius="2xl" overflow="hidden">
+                    <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                        Edit Item
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
+                        <VStack spacing={4}>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Item Name</Text>
+                                <Input
+                                    value={editInventoryItem?.item_name || ''}
+                                    onChange={(e) => setEditInventoryItem((prev: any) => ({ ...(prev || {}), item_name: e.target.value }))}
+                                    placeholder="e.g. Paracetamol 500mg"
+                                />
+                            </Box>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Category</Text>
+                                <select
+                                    className="chakra-select css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
+                                    value={editInventoryItem?.category || 'Medicine'}
+                                    onChange={(e) => setEditInventoryItem((prev: any) => ({ ...(prev || {}), category: e.target.value }))}
+                                >
+                                    <option value="Medicine">Medicine</option>
+                                    <option value="Supplies">Supplies</option>
+                                    <option value="Equipment">Equipment</option>
+                                </select>
+                            </Box>
+                            <Box w="full">
+                                <Text mb={1} fontSize="sm" fontWeight="bold">Unit</Text>
+                                <select
+                                    className="chakra-select css-1"
+                                    style={{ width: '100%', padding: '8px', border: '1px solid #E2E8F0', borderRadius: '0.375rem' }}
+                                    value={editInventoryItem?.unit || ''}
+                                    onChange={(e) => setEditInventoryItem((prev: any) => ({ ...(prev || {}), unit: e.target.value }))}
+                                >
+                                    <option value="" disabled>Select unit</option>
+                                    <option value="pcs">pcs</option>
+                                    <option value="boxes">boxes</option>
+                                    <option value="bottles">bottles</option>
+                                    <option value="packs">packs</option>
+                                    <option value="vials">vials</option>
+                                    <option value="tablets">tablets</option>
+                                    <option value="capsules">capsules</option>
+                                    <option value="tubes">tubes</option>
+                                </select>
+                            </Box>
+                            <Box w="full">
+                                <Text fontSize="xs" color="gray.500">
+                                    Stock is adjusted using <strong>Restock</strong>.
+                                </Text>
+                            </Box>
+                        </VStack>
+                    </ModalBody>
+                    <ModalFooter bg="gray.50" borderTopWidth="1px">
+                        <Button variant="ghost" mr={3} onClick={() => { onEditInventoryClose(); setEditInventoryItem(null); }}>Cancel</Button>
+                        <Button colorScheme="teal" onClick={confirmUpdateInventoryItem}>Save Changes</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>

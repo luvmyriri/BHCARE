@@ -27,6 +27,7 @@ import {
     DrawerOverlay,
     DrawerContent,
     DrawerCloseButton,
+    useOutsideClick,
 } from '@chakra-ui/react';
 import {
     FiList,
@@ -129,6 +130,9 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
 
     // Form states for Appointment
     const [appointmentUserId, setAppointmentUserId] = useState<number | ''>('');
+    const [patientSearchQuery, setPatientSearchQuery] = useState('');
+    const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+    const patientDropdownRef = React.useRef<HTMLDivElement>(null);
     const [appointmentService, setAppointmentService] = useState('');
     const [appointmentDate, setAppointmentDate] = useState('');
     const [appointmentTime, setAppointmentTime] = useState('');
@@ -136,6 +140,24 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
     const [services, setServices] = useState<any[]>([]);
     const [patients, setPatients] = useState<any[]>([]);
     const [isBooking, setIsBooking] = useState(false);
+
+    useOutsideClick({
+        ref: patientDropdownRef,
+        handler: () => setShowPatientDropdown(false),
+    });
+
+    useEffect(() => {
+        if (appointmentUserId) {
+            const p = patients.find(p => p.id === appointmentUserId);
+            if (p) setPatientSearchQuery(`${p.last_name}, ${p.first_name} (${p.p_id})`);
+        } else {
+            setPatientSearchQuery('');
+        }
+    }, [appointmentUserId, patients]);
+
+    const filteredPatients = patients.filter(p => 
+        `${p.last_name}, ${p.first_name} (${p.p_id})`.toLowerCase().includes(patientSearchQuery.toLowerCase())
+    );
 
     // Fetch Base Data
     useEffect(() => {
@@ -161,7 +183,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
             setBarangayList([]); setBarangay(''); return;
         }
         if (selectedRegion === '1300000000') {
-            setProvinces([]); setSelectedProvince('');
+            setProvinces([]); setSelectedProvince(''); setProvince('Metro Manila');
             fetch(`https://psgc.cloud/api/regions/${selectedRegion}/cities-municipalities`)
                 .then(res => res.json())
                 .then(data => setCities(data));
@@ -217,6 +239,13 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
 
     const handleWalkinRegister = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        const finalProvince = selectedRegion === '1300000000' ? 'Metro Manila' : province;
+        if (!firstName || !lastName || !dob || !gender || !contact || !barangay || !city || !finalProvince) {
+            toast({ title: 'Validation Error', description: 'Please fill out all required fields marked with *', status: 'warning' });
+            return;
+        }
+
         setIsRegistering(true);
         try {
             const payload = {
@@ -229,7 +258,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                 contact_number: contact,
                 barangay,
                 city,
-                province,
+                province: finalProvince,
                 house_number: houseNumber,
                 street_name: streetName
             };
@@ -707,13 +736,47 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
 
                                         <Box>
                                             <Text fontSize="sm" fontWeight="600" mb={2}>Select Patient *</Text>
-                                            <Box as="select" required value={appointmentUserId} onChange={e => setAppointmentUserId(Number(e.target.value))} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
-                                                <option value="">-- Choose Patient --</option>
-                                                {patients.map(p => (
-                                                    <option key={p.id} value={p.id}>
-                                                        {p.last_name}, {p.first_name} ({p.p_id})
-                                                    </option>
-                                                ))}
+                                            <Box position="relative" ref={patientDropdownRef}>
+                                                <Input
+                                                    required={!appointmentUserId}
+                                                    placeholder="Type to search patient..."
+                                                    value={patientSearchQuery}
+                                                    onChange={(e) => {
+                                                        setPatientSearchQuery(e.target.value);
+                                                        setShowPatientDropdown(true);
+                                                        if (appointmentUserId !== '') setAppointmentUserId('');
+                                                    }}
+                                                    onClick={() => setShowPatientDropdown(true)}
+                                                    w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}
+                                                    bg="white"
+                                                    autoComplete="off"
+                                                />
+                                                {showPatientDropdown && (
+                                                    <Box 
+                                                        position="absolute" top="100%" left={0} right={0} zIndex={10}
+                                                        bg="white" boxShadow="md" border="1px solid" borderColor="gray.200" borderRadius="md" maxHeight="200px" overflowY="auto" mt={1}
+                                                    >
+                                                        {filteredPatients.length > 0 ? (
+                                                            filteredPatients.map(p => (
+                                                                <Box
+                                                                    key={p.id}
+                                                                    p={2} cursor="pointer"
+                                                                    _hover={{ bg: 'blue.50' }}
+                                                                    bg={appointmentUserId === p.id ? 'blue.100' : 'transparent'}
+                                                                    onClick={() => {
+                                                                        setAppointmentUserId(p.id);
+                                                                        setPatientSearchQuery(`${p.last_name}, ${p.first_name} (${p.p_id})`);
+                                                                        setShowPatientDropdown(false);
+                                                                    }}
+                                                                >
+                                                                    {p.last_name}, {p.first_name} ({p.p_id})
+                                                                </Box>
+                                                            ))
+                                                        ) : (
+                                                            <Box p={3} color="gray.500" fontSize="sm">No patients found.</Box>
+                                                        )}
+                                                    </Box>
+                                                )}
                                             </Box>
                                             <Text fontSize="xs" color="gray.500" mt={1}>If not listed, please register them first in the Walk-in Registration tab.</Text>
                                         </Box>

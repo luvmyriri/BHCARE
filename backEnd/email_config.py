@@ -15,8 +15,17 @@ MAIL_CONFIG = {
     'MAIL_DEFAULT_SENDER': 'bhcarehealthcenter@gmail.com'
 }
 
+# Public URL for logo used in all outbound emails
+LOGO_URL = "http://localhost:3000/images/Logo.png"
+
+from collections import defaultdict
+from typing import Dict, Any
+
 # In-memory storage for reset codes: email -> {code, expires}
-reset_codes = {}
+reset_codes: Dict[str, Dict[str, Any]] = {}
+
+# In-memory rate limiting for forgot-password: email -> { last_requested_at, attempt_count }
+forgot_rate_limits: Dict[str, Dict[str, Any]] = defaultdict(dict)
 
 def init_mail(app):
     """Initialize Flask-Mail with the app"""
@@ -66,6 +75,44 @@ def invalidate_reset_token(token, email=None):
     if email and email in reset_codes:
         del reset_codes[email]
 
+
+def check_forgot_cooldown(email: str, cooldown_seconds: int = 60, max_per_hour: int = 5):
+    """
+    Simple in-memory cooldown for forgot-password.
+
+    Returns:
+        (allowed: bool, retry_after: int | None, message: str | None)
+    """
+    now = datetime.now()
+    info = forgot_rate_limits.get(email, {})
+
+    last = info.get("last_requested_at")
+    count = info.get("count", 0)
+
+    # Per-minute style cooldown between requests
+    if last is not None:
+        delta = (now - last).total_seconds()
+        if delta < cooldown_seconds:
+            retry_after = int(cooldown_seconds - delta)
+            msg = f"Too many attempts. Please wait {retry_after} seconds before requesting another code."
+            return False, retry_after, msg
+
+        # Reset count if we're past an hour window
+        if delta > 3600:
+            count = 0
+
+    # Basic hourly cap
+    if count >= max_per_hour:
+        msg = "You have requested too many codes. Please try again later."
+        return False, cooldown_seconds, msg
+
+    # Update tracking and allow request
+    forgot_rate_limits[email] = {
+        "last_requested_at": now,
+        "count": count + 1,
+    }
+    return True, None, None
+
 def send_password_reset_email(mail, recipient_email, reset_token):
     """Send password reset email with 6-digit code"""
     
@@ -76,7 +123,8 @@ def send_password_reset_email(mail, recipient_email, reset_token):
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
                         <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
                         <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
                     </div>
@@ -123,7 +171,8 @@ def send_registration_success_email(mail, recipient_email, first_name):
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
                         <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
                         <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
                     </div>
@@ -161,7 +210,8 @@ def send_staff_creation_email(mail, recipient_email, first_name, role, temporary
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
                         <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
                         <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
                     </div>
@@ -207,7 +257,8 @@ def send_walkin_patient_credentials_email(mail, recipient_email, first_name, tem
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
                         <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
                         <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
                     </div>
@@ -254,7 +305,8 @@ def send_document_ready_email(mail, recipient_email, first_name, document_type):
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
                         <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
                         <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
                     </div>
@@ -293,7 +345,8 @@ def send_ticket_confirmation_email(mail, recipient_email, name, subject, ticket_
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
                         <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
                         <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
                     </div>
@@ -332,7 +385,8 @@ def send_ticket_resolved_email(mail, recipient_email, name, subject, ticket_id):
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
                         <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
                         <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
                     </div>

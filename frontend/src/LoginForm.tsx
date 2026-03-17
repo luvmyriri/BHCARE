@@ -6,6 +6,24 @@ import { useToast } from '@chakra-ui/react';
 type Option = { code: string; name: string };
 type ConfidenceMap = Record<string, number>;
 
+type JsonValue = any;
+
+async function readJsonSafe(res: Response): Promise<{ data: JsonValue | null; text: string }> {
+  const text = await res.text();
+  if (!text) return { data: null, text: '' };
+  try {
+    return { data: JSON.parse(text), text };
+  } catch {
+    return { data: null, text };
+  }
+}
+
+function errorMessageFromResponse(res: Response, data: any, fallback: string) {
+  const fromBody = data?.error || data?.message;
+  if (typeof fromBody === 'string' && fromBody.trim()) return fromBody;
+  return `${fallback} (status ${res.status})`;
+}
+
 // PSGC Interfaces
 interface PSGCRegion { code: string; name: string; }
 interface PSGCProvince { code: string; name: string; isDistrict?: boolean; }
@@ -149,7 +167,11 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: pendingUser.id, current_password: password, new_password: newPw }),
       });
-      if (!res.ok) { const d = await res.json(); setChangePwError(d.error || 'Failed to change password.'); return; }
+      const { data } = await readJsonSafe(res);
+      if (!res.ok) {
+        setChangePwError(errorMessageFromResponse(res, data, 'Failed to change password.'));
+        return;
+      }
       const updatedUser = { ...pendingUser, requires_password_change: false };
       localStorage.setItem('bh_user', JSON.stringify(updatedUser));
       setShowChangePassword(false);
@@ -345,6 +367,10 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
 
   const handleSendCode = async (e: FormEvent) => {
     e.preventDefault();
+    if (!forgotEmail) {
+      setResetError('Please enter your email address.');
+      return;
+    }
     setResetLoading(true);
     setResetError('');
     setResetMessage('');
@@ -355,15 +381,26 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail }),
       });
+      const { data } = await readJsonSafe(res);
 
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || 'Failed to send code');
+      if (!res.ok) {
+        // Special messaging for rate limiting (HTTP 429)
+        if (res.status === 429) {
+          const msg =
+            data?.error ||
+            'You have requested a code too recently. Please wait a bit and try again.';
+          throw new Error(msg);
+        }
+        throw new Error(errorMessageFromResponse(res, data, 'Failed to send code'));
+      }
 
       setResetStep('verify');
       setTimer(60);
       setCanResend(false);
-      setResetMessage('Code sent successfully!');
+      setResetMessage(
+        data?.message ||
+          "If this email is registered, we've sent a 6-digit verification code."
+      );
     } catch (err: any) {
       setResetError(err.message);
     } finally {
@@ -389,10 +426,9 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, code }),
       });
+      const { data } = await readJsonSafe(res);
 
-      const data = await res.json();
-
-      if (!res.ok || !data.valid) throw new Error(data.error || 'Invalid code');
+      if (!res.ok || !data?.valid) throw new Error(errorMessageFromResponse(res, data, 'Invalid code'));
 
       setResetStep('reset');
       setResetMessage('');
@@ -444,12 +480,11 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, code, password: newPassword }),
       });
+      const { data } = await readJsonSafe(res);
 
-      const data = await res.json();
+      if (!res.ok) throw new Error(errorMessageFromResponse(res, data, 'Failed to reset password'));
 
-      if (!res.ok) throw new Error(data.error || 'Failed to reset password');
-
-      setResetMessage('Password reset successful! Redirecting to login...');
+      setResetMessage(data?.message || 'Password reset successful! Redirecting to login...');
       setTimeout(() => {
         closeResetModal();
       }, 2000);
@@ -657,10 +692,9 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const resText = await res.clone().text();
-      console.log('Login Response:', res.status, res.statusText, resText);
-      if (!res.ok) throw new Error('Invalid email or password');
-      const data = await res.json();
+      const { data, text } = await readJsonSafe(res);
+      console.log('Login Response:', res.status, res.statusText, text);
+      if (!res.ok) throw new Error(errorMessageFromResponse(res, data, 'Invalid email or password'));
       if (data.user) {
         if (data.user.requires_password_change) {
           setPendingUser(data.user);
@@ -1060,8 +1094,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
     setLoading(true);
     try {
       const res = await fetch('/api/register', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
+      const { data } = await readJsonSafe(res);
+      if (!res.ok) throw new Error(errorMessageFromResponse(res, data, 'Registration failed'));
 
       toast({
         title: 'Registration Successful!',

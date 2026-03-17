@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 export default function ForgotPassword() {
@@ -6,6 +6,16 @@ export default function ForgotPassword() {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [cooldown, setCooldown] = useState(0);
+
+    // Simple cooldown timer so users can't spam the button
+    useEffect(() => {
+        if (cooldown <= 0) return;
+        const id = setTimeout(() => {
+            setCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearTimeout(id);
+    }, [cooldown]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -20,14 +30,39 @@ export default function ForgotPassword() {
                 body: JSON.stringify({ email }),
             });
 
-            const data = await res.json();
+            // Safely handle cases where the response body is empty or not valid JSON
+            let data: any = {};
+            const text = await res.text();
 
-            if (!res.ok) {
-                throw new Error(data.error || 'Failed to send reset email');
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    // If parsing fails, fall back to a generic error below
+                }
             }
 
-            setMessage(data.message);
+            if (!res.ok) {
+                // Handle backend rate limiting specifically
+                if (res.status === 429) {
+                    const messageFromServer =
+                        (data && (data.error || data.message)) ||
+                        'You have requested a code too recently. Please wait a bit and try again.';
+                    throw new Error(messageFromServer);
+                }
+                const messageFromServer =
+                    (data && (data.error || data.message)) ||
+                    `Failed to send reset email (status ${res.status})`;
+                throw new Error(messageFromServer);
+            }
+
+            setMessage(
+                data?.message ||
+                "If this email is registered, we've sent a 6-digit verification code."
+            );
             setEmail('');
+            // Start a 60-second cooldown after a successful attempt
+            setCooldown(60);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -154,7 +189,7 @@ export default function ForgotPassword() {
                         </div>
                     )}
 
-                    <button className="auth-button" style={{
+                    <button className="auth-button" disabled={loading || cooldown > 0} style={{
                         width: '100%',
                         padding: '14px',
                         background: '#38b2ac',
@@ -163,11 +198,16 @@ export default function ForgotPassword() {
                         borderRadius: '8px',
                         fontSize: '15px',
                         fontWeight: 700,
-                        cursor: 'pointer',
                         boxShadow: '0 4px 12px rgba(56, 178, 172, 0.3)',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        opacity: loading || cooldown > 0 ? 0.7 : 1,
+                        cursor: loading || cooldown > 0 ? 'not-allowed' : 'pointer'
                     }}>
-                        {loading ? 'Sending...' : 'Send Reset Link'}
+                        {loading
+                            ? 'Sending...'
+                            : cooldown > 0
+                                ? `Resend in ${cooldown}s`
+                                : 'Send Reset Link'}
                     </button>
 
                     <p style={{
