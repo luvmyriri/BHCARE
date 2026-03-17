@@ -1,4 +1,4 @@
-
+# pyre-ignore-all-errors
 from database import get_db_connection
 
 def check_user():

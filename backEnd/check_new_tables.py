@@ -1,6 +1,7 @@
-import psycopg2
+# pyre-ignore-all-errors
+import psycopg2  # type: ignore
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
