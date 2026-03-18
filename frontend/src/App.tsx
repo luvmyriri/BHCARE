@@ -16,6 +16,7 @@ import AdminDashboard from './AdminDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
 import SecurityDashboard from './SecurityDashboard';
 import FloatingActions from './components/FloatingActions';
+import DedicatedLogin from './DedicatedLogin';
 
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -154,7 +155,8 @@ function App() {
   // Otherwise show the landing page or password reset pages
   return (
     <Routes>
-
+      <Route path="/Admin" element={<DedicatedLogin role="Admin" onLoginSuccess={onLoginSuccess} />} />
+      <Route path="/Employee" element={<DedicatedLogin role="Employee" onLoginSuccess={onLoginSuccess} />} />
 
       <Route path="/*" element={
         <div className="app">

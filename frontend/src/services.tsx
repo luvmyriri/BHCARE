@@ -48,7 +48,7 @@ function Services({ onServiceClick }: ServicesProps) {
     {
       title: 'Dental Services',
       desc: 'Dental check-ups and treatments.',
-      schedule: 'Monday, Wednesday, Friday',
+      schedule: 'Monday, Wednesday & Friday',
       icon: <FiSmile size={32} color="#D69E2E" />
     },
     {
@@ -131,7 +131,7 @@ function Services({ onServiceClick }: ServicesProps) {
             <div className="service-icon">{s.icon}</div>
             <h3>{s.title}</h3>
             <p>{s.desc}</p>
-            <div className="service-schedule" style={{ fontSize: '0.9em', color: '#4fd1c5', marginTop: '0.5rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+            <div className="service-schedule" style={{ fontSize: '0.9em', color: '#4fd1c5', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
               <FiClock size={14} /> {s.schedule}
             </div>
           </motion.div>

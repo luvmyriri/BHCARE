@@ -1347,6 +1347,25 @@ def login():
         if user[21] == 'Inactive':
             print(f"[LOGIN FAIL] Account deactivated for user: {email}")
             return jsonify({"error": "Account deactivated. Please contact the administrator."}), 403
+            
+        role = user[20] or "Patient"
+        expected_type = data.get('expected_type', 'patient').lower()
+        
+        # Enforce portal divisions
+        if expected_type == "patient":
+            # Only allow strictly 'Patient' role
+            if role.lower() != "patient":
+                return jsonify({"error": "Invalid credentials"}), 401
+                
+        elif expected_type == "admin":
+            admin_roles = ['admin', 'administrator', 'super admin', 'superadmin']
+            if role.lower() not in admin_roles:
+                return jsonify({"error": "Invalid credentials"}), 401
+                
+        elif expected_type == "employee":
+            employee_roles = ['doctor', 'nurse', 'midwife', 'health worker', 'medical staff', 'security']
+            if role.lower() not in employee_roles:
+                return jsonify({"error": "Invalid credentials"}), 401
         
         # Build complete user object
         user_data = {

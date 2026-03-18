@@ -188,7 +188,19 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         unit: 'pcs'
     });
 
+    const MAX_STOCK = 100;
+
     const handleAddInventoryItem = async () => {
+        if (newInventoryItem.stock_quantity > MAX_STOCK) {
+            toast({
+                title: "Stock Limit Exceeded",
+                description: `Initial stock cannot exceed ${MAX_STOCK} units.`,
+                status: "error",
+                duration: 3000,
+                isClosable: true,
+            });
+            return;
+        }
         try {
             const res = await fetch('/api/inventory', {
                 method: 'POST',
@@ -208,6 +220,12 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     category: 'Medicine',
                     stock_quantity: 0,
                     unit: 'pcs'
+                });
+                toast({
+                    title: "Item Added",
+                    status: "success",
+                    duration: 2500,
+                    isClosable: true,
                 });
             } else {
                 toast({
@@ -234,6 +252,20 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
     const handleRestockItem = async () => {
         if (!restockItemId || restockQuantity <= 0) return;
+
+        // Find current stock for this item
+        const currentItem = inventory.find((item: any) => item.id === restockItemId);
+        const currentStock = currentItem ? currentItem.stock_quantity : 0;
+        if (currentStock + restockQuantity > MAX_STOCK) {
+            toast({
+                title: "Stock Limit Exceeded",
+                description: `Cannot restock: total would be ${currentStock + restockQuantity}. Maximum allowed is ${MAX_STOCK}.`,
+                status: "error",
+                duration: 4000,
+                isClosable: true,
+            });
+            return;
+        }
 
         try {
             const res = await fetch('/api/inventory/restock', {
@@ -468,7 +500,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         switch (selectedCard) {
             case 'soap-form':
                 return (
-                    <Box p={2}>
+                    <ModalBody p={0}>
                         <SoapNoteForm
                             patientId={soapPatientId}
                             doctorEmail={user?.email}
@@ -478,7 +510,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             }}
                             onCancel={onClose}
                         />
-                    </Box>
+                    </ModalBody>
                 );
             case 'patients':
                 return (
@@ -764,7 +796,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="CLINIC ACTIVE"
-                            title={`Dr. ${user?.last_name || 'Medical Officer'}'s Station 🩺`}
+                            title={`Dr. ${user?.last_name || 'Medical Officer'}'s Station `}
                             description={`You have ${patientsQueue.length} appointments scheduled for today. ${patientsQueue.filter(p => p.status === 'waiting' || p.status === 'pending').length} patients are currently in the waiting area.`}
                         />
 
@@ -990,7 +1022,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
                             <Box mt={5} p={3} bg="orange.50" borderRadius="xl" borderLeft="3px solid" borderColor="orange.300">
                                 <Text fontSize="xs" color="orange.700" fontWeight="medium">
-                                    ⚠️ Schedule is subject to change during holidays or special health programs. Contact administration for updates.
+                                    Schedule is subject to change during holidays or special health programs. Contact administration for updates.
                                 </Text>
                             </Box>
                         </Box>
@@ -1137,7 +1169,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         inventory.filter(item => item.stock_quantity < 100).map((item: any) => (
                                             <HStack key={item.id} justify="space-between" p={3} bg={item.stock_quantity < 50 ? 'red.50' : 'orange.50'} borderRadius="lg">
                                                 <Text fontWeight="600" color={item.stock_quantity < 50 ? 'red.700' : 'orange.700'}>{item.item_name}</Text>
-                                                <Badge colorScheme={item.stock_quantity < 50 ? 'red' : 'orange'}>{item.stock_quantity} {item.unit} left</Badge>
+                                                <Badge colorScheme={item.stock_quantity < 50 ? 'red' : 'orange'}>{item.stock_quantity} <Text as="span" fontSize="xs">{item.unit}</Text> left</Badge>
                                             </HStack>
                                         ))
                                     ) : (
@@ -1167,7 +1199,12 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                     <Tr key={item.id}>
                                                         <Td fontWeight="600">{item.item_name}</Td>
                                                         <Td>{item.category}</Td>
-                                                        <Td>{item.stock_quantity} {item.unit}</Td>
+                                                        <Td>
+                                                            <HStack spacing={1}>
+                                                                <Text fontWeight="700" color="gray.800">{item.stock_quantity}</Text>
+                                                                <Text fontSize="xs" color="gray.400">{item.unit}</Text>
+                                                            </HStack>
+                                                        </Td>
                                                         <Td>
                                                             <HStack justify="space-between" align="center">
                                                                 <Badge colorScheme={item.stock_quantity < 50 ? 'red' : item.stock_quantity < 100 ? 'orange' : 'green'}>
@@ -1329,15 +1366,15 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 </Box>
             </Box>
 
-            <Modal isOpen={isOpen} onClose={onClose} size={['docs', 'patients', 'consultations', 'history-view', 'soap'].includes(selectedCard as string) ? '4xl' : 'xl'} isCentered scrollBehavior="inside">
+            <Modal isOpen={isOpen} onClose={onClose} size={['docs', 'patients', 'consultations', 'history-view', 'soap-form'].includes(selectedCard as string) ? '6xl' : 'xl'} isCentered scrollBehavior="inside">
                 <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
                 <ModalContent
-                    borderRadius={['docs', 'patients', 'consultations', 'history-view', 'soap'].includes(selectedCard as string) ? '2xl' : 'md'}
+                    borderRadius={['docs', 'patients', 'consultations', 'history-view', 'soap-form'].includes(selectedCard as string) ? '3xl' : 'md'}
                     overflow="hidden"
-                    bg={selectedCard === 'soap' ? 'transparent' : 'white'}
-                    boxShadow={selectedCard === 'soap' ? 'none' : 'sm'}
+                    bg="white"
+                    boxShadow="xl"
                 >
-                    {selectedCard !== 'soap' && <ModalCloseButton mt={['docs', 'patients', 'consultations', 'history-view'].includes(selectedCard as string) ? 2 : 0} zIndex={10} />}
+                    <ModalCloseButton mt={['docs', 'patients', 'consultations', 'history-view', 'soap-form'].includes(selectedCard as string) ? 2 : 0} zIndex={20} color={selectedCard === 'soap-form' ? 'white' : 'inherit'} />
                     {renderModalContent()}
                 </ModalContent>
             </Modal>
@@ -1375,12 +1412,18 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             </Box>
                             <HStack w="full">
                                 <Box w="full">
-                                    <Text mb={1} fontSize="sm" fontWeight="bold">Initial Stock</Text>
+                                    <Text mb={1} fontSize="sm" fontWeight="bold">Initial Stock <Text as="span" color="gray.400" fontWeight="normal">(max {MAX_STOCK})</Text></Text>
                                     <Input
                                         type="number"
+                                        min={0}
+                                        max={MAX_STOCK}
                                         value={newInventoryItem.stock_quantity}
                                         onChange={(e) => setNewInventoryItem({ ...newInventoryItem, stock_quantity: parseInt(e.target.value) || 0 })}
+                                        borderColor={newInventoryItem.stock_quantity > MAX_STOCK ? 'red.400' : undefined}
                                     />
+                                    {newInventoryItem.stock_quantity > MAX_STOCK && (
+                                        <Text color="red.500" fontSize="xs" mt={1}>⚠ Exceeds maximum stock of {MAX_STOCK}</Text>
+                                    )}
                                 </Box>
                                 <Box w="full">
                                     <Text mb={1} fontSize="sm" fontWeight="bold">Unit</Text>
@@ -1406,7 +1449,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     </ModalBody>
                     <ModalFooter bg="gray.50" borderTopWidth="1px">
                         <Button variant="ghost" mr={3} onClick={onAddInventoryClose}>Cancel</Button>
-                        <Button colorScheme="teal" onClick={handleAddInventoryItem}>Add Item</Button>
+                        <Button colorScheme="teal" onClick={handleAddInventoryItem} isDisabled={newInventoryItem.stock_quantity > MAX_STOCK}>Add Item</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>
@@ -1422,22 +1465,57 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     <ModalBody py={6}>
                         <VStack spacing={4}>
                             <Box w="full">
-                                <Text mb={1} fontSize="sm" fontWeight="bold">Quantity to Add</Text>
-                                <Input
-                                    type="number"
-                                    value={restockQuantity === 0 ? '' : restockQuantity}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setRestockQuantity(val === '' ? 0 : parseInt(val));
-                                    }}
-                                    placeholder="Enter quantity"
-                                />
+                                {(() => {
+                                    const currentItem = inventory.find((item: any) => item.id === restockItemId);
+                                    const currentStock = currentItem ? currentItem.stock_quantity : 0;
+                                    const newTotal = currentStock + restockQuantity;
+                                    const wouldExceed = newTotal > MAX_STOCK;
+                                    return (
+                                        <>
+                                            <Text mb={1} fontSize="sm" fontWeight="bold">Quantity to Add</Text>
+                                            {currentItem && (
+                                                <Text fontSize="xs" color="gray.500" mb={2}>
+                                                    Current stock: <Text as="span" fontWeight="bold" color="teal.600">{currentStock} {currentItem.unit}</Text>
+                                                    {' · '}Max allowed: <Text as="span" fontWeight="bold">{MAX_STOCK}</Text>
+                                                    {' · '}Can add up to: <Text as="span" fontWeight="bold" color="green.600">{Math.max(0, MAX_STOCK - currentStock)}</Text>
+                                                </Text>
+                                            )}
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={currentItem ? Math.max(0, MAX_STOCK - currentItem.stock_quantity) : MAX_STOCK}
+                                                value={restockQuantity === 0 ? '' : restockQuantity}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setRestockQuantity(val === '' ? 0 : parseInt(val));
+                                                }}
+                                                placeholder="Enter quantity"
+                                                borderColor={wouldExceed ? 'red.400' : undefined}
+                                            />
+                                            {wouldExceed && (
+                                                <Text color="red.500" fontSize="xs" mt={1}>
+                                                    ⚠ Adding {restockQuantity} would bring total to {newTotal}, exceeding the limit of {MAX_STOCK}.
+                                                </Text>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </Box>
                         </VStack>
                     </ModalBody>
                     <ModalFooter bg="gray.50" borderTopWidth="1px">
                         <Button variant="ghost" mr={3} onClick={onRestockClose}>Cancel</Button>
-                        <Button colorScheme="teal" onClick={confirmRestockItem}>Confirm Restock</Button>
+                        <Button
+                            colorScheme="teal"
+                            onClick={confirmRestockItem}
+                            isDisabled={(() => {
+                                const currentItem = inventory.find((item: any) => item.id === restockItemId);
+                                const currentStock = currentItem ? currentItem.stock_quantity : 0;
+                                return (currentStock + restockQuantity) > MAX_STOCK || restockQuantity <= 0;
+                            })()}
+                        >
+                            Confirm Restock
+                        </Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>

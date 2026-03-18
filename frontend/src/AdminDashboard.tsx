@@ -1124,7 +1124,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     <VStack align="stretch" spacing={10}>
                         <PageHero
                             badge="ADMIN CONTROL"
-                            title={`Welcome, ${user?.first_name || 'Administrator'} 🛡️`}
+                            title={`Welcome, ${user?.first_name || 'Administrator'} `}
                             description="Complete system oversight and management. Monitor all health center operations, user activities."
                         />
 
@@ -1549,9 +1549,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                 {prenatalCount.toLocaleString()}
                                             </Badge>
                                         </HStack>
-                                    <Text fontSize="xs" color="gray.500">
-                                        {prenatalPrev > 0 ? `${Math.abs(prenatalChange)}% ${prenatalChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
-                                    </Text>
+                                        <Text fontSize="xs" color="gray.500">
+                                            {prenatalPrev > 0 ? `${Math.abs(prenatalChange)}% ${prenatalChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
+                                        </Text>
 
                                         <Box h="190px" mt={4}>
                                             <ResponsiveContainer width="100%" height="100%">
@@ -1598,9 +1598,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                 {immunCount.toLocaleString()}
                                             </Badge>
                                         </HStack>
-                                    <Text fontSize="xs" color="gray.500">
-                                        {immunPrev > 0 ? `${Math.abs(immunChange)}% ${immunChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
-                                    </Text>
+                                        <Text fontSize="xs" color="gray.500">
+                                            {immunPrev > 0 ? `${Math.abs(immunChange)}% ${immunChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
+                                        </Text>
 
                                         <Box h="190px" mt={4}>
                                             {immunBreakdown.length > 0 ? (

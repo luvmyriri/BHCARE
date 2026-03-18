@@ -4,9 +4,9 @@ Professional appointment booking system for Barangay 174 Health Center
 """
 # pyre-ignore-all-errors
 from flask import Blueprint, jsonify, request
-from database import get_db_connection
+from database import get_db_connection  # pyre-ignore[21]
 from datetime import datetime, date, time, timedelta
-import psycopg2.extras
+import psycopg2.extras  # pyre-ignore[21]
 
 appointments_bp = Blueprint('appointments', __name__)
 
@@ -511,12 +511,32 @@ def get_queue():
         cursor.close()
         conn.close()
         
-        # Format time objects to string
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        # Cut-off time is 1 hour from now
+        threshold_time = (now + timedelta(hours=1)).time()
+        
+        filtered_queue = []
+        
+        # Format time objects to string and filter future ones
         for item in queue:
-            if isinstance(item['appointment_time'], (datetime, time)):
-                item['appointment_time'] = item['appointment_time'].strftime('%H:%M')
+            appt_time = item['appointment_time']
+            if isinstance(appt_time, str):
+                 try:
+                     appt_time = datetime.strptime(appt_time, '%H:%M:%S').time()
+                 except Exception:
+                     pass
+            elif hasattr(appt_time, 'time'):
+                 appt_time = appt_time.time()
+
+            # keep if it's already serving/arrived OR if the scheduled time is within 1 hour from now
+            if item['status'] in ('serving', 'arrived') or (isinstance(appt_time, time) and appt_time <= threshold_time):
+                # format the original object for json return
+                if isinstance(item['appointment_time'], (datetime, time)):
+                    item['appointment_time'] = item['appointment_time'].strftime('%H:%M')
+                filtered_queue.append(item)
                 
-        return jsonify(queue), 200
+        return jsonify(filtered_queue), 200
         
     except Exception as e:
         print(f"Error fetching queue: {e}")

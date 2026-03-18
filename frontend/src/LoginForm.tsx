@@ -1,6 +1,6 @@
 import { useState, FC, ReactNode, InputHTMLAttributes, SelectHTMLAttributes, FormEvent, ChangeEvent, useEffect } from 'react';
 import { useLanguage } from './contexts/LanguageContext';
-import { FiEye, FiEyeOff, FiCheck, FiCircle, FiCamera, FiAlertTriangle, FiCreditCard, FiUser, FiCalendar, FiMail, FiHome, FiMapPin, FiMap, FiLock, FiShield, FiKey } from 'react-icons/fi';
+import { FiEye, FiEyeOff, FiCheck, FiCheckCircle, FiCircle, FiCamera, FiAlertTriangle, FiCreditCard, FiUser, FiCalendar, FiMail, FiHome, FiMapPin, FiMap, FiLock, FiShield, FiKey } from 'react-icons/fi';
 import { useToast } from '@chakra-ui/react';
 
 type Option = { code: string; name: string };
@@ -144,7 +144,7 @@ const Select: FC<
   );
 };
 
-function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register' }) {
+function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'patient' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register'; expectedType?: 'patient'|'admin'|'employee' }) {
   const { t } = useLanguage();
   const toast = useToast();
   const [mode, setMode] = useState<'login' | 'register' | 'guide'>(initialMode);
@@ -690,7 +690,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, expected_type: expectedType }),
       });
       const { data, text } = await readJsonSafe(res);
       console.log('Login Response:', res.status, res.statusText, text);
@@ -1285,7 +1285,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                 </a>
               </div>
 
-              {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '12px', borderRadius: '10px', fontSize: '13px', marginBottom: '24px', fontWeight: 600, border: '1px solid #fed7d7' }}>⚠️ {error}</div>}
+              {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '12px', borderRadius: '10px', fontSize: '13px', marginBottom: '24px', fontWeight: 600, border: '1px solid #fed7d7', display: 'flex', alignItems: 'center' }}><FiAlertTriangle style={{ marginRight: '6px' }} /> {error}</div>}
 
               <button className="auth-button" style={{
                 width: '100%',
@@ -2020,9 +2020,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                         </button>
                       </div>
 
-
-
-                      {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7' }}>{error}</div>}
+                      {error && <div style={{ background: '#fff5f5', color: '#c53030', padding: '10px', borderRadius: '8px', fontSize: '12px', marginTop: '16px', fontWeight: 600, border: '1px solid #fed7d7', display: 'flex', alignItems: 'center' }}><FiAlertTriangle style={{ marginRight: '6px' }} /> {error}</div>}
 
                       {/* Terms & Conditions Checkbox */}
                       <div style={{ marginTop: '20px', marginBottom: '4px' }}>
@@ -2462,13 +2460,13 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
                   </div>
 
                   {resetError && (
-                    <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
-                      ⚠️ {resetError}
+                    <div style={{ background: '#FFF5F5', color: '#C53030', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                      <FiAlertTriangle style={{ marginRight: '6px' }} /> {resetError}
                     </div>
                   )}
                   {resetMessage && (
-                    <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600 }}>
-                      ✅ {resetMessage}
+                    <div style={{ background: '#F0FFF4', color: '#276749', padding: '12px', borderRadius: '8px', fontSize: '14px', marginBottom: '24px', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                      <FiCheckCircle style={{ marginRight: '6px' }} /> {resetMessage}
                     </div>
                   )}
 

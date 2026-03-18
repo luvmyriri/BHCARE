@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AppointmentCalendar from './components/AppointmentCalendar';
 import {
     Box,
     Flex,
@@ -781,48 +782,68 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                             <Text fontSize="xs" color="gray.500" mt={1}>If not listed, please register them first in the Walk-in Registration tab.</Text>
                                         </Box>
 
-                                        <Box>
-                                            <Text fontSize="sm" fontWeight="600" mb={2}>Service Type *</Text>
-                                            <Box as="select" required value={appointmentService} onChange={e => {
-                                                setAppointmentService(e.target.value);
-                                                fetchAvailableSlots(appointmentDate, e.target.value); // Re-fetch slots when service changes
-                                            }} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
-                                                <option value="">-- Choose Service --</option>
-                                                {services.map(s => (
-                                                    <option key={s.id} value={s.name}>{s.name}</option>
-                                                ))}
+                                        <Flex gap={4} direction={{ base: 'column', md: 'row' }} align="flex-end">
+                                            <Box flex={2}>
+                                                <Text fontSize="sm" fontWeight="600" mb={2}>Service Type *</Text>
+                                                <Box as="select" required value={appointmentService} onChange={e => {
+                                                    setAppointmentService(e.target.value);
+                                                    fetchAvailableSlots(appointmentDate, e.target.value);
+                                                }} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                    <option value="">-- Choose Service --</option>
+                                                    {services.map(s => (
+                                                        <option key={s.id} value={s.name}>{s.name}</option>
+                                                    ))}
+                                                </Box>
                                             </Box>
-                                        </Box>
 
-                                        <Box>
-                                            <Text fontSize="sm" fontWeight="600" mb={2}>Date *</Text>
-                                            <Input
-                                                required
-                                                type="date"
-                                                value={appointmentDate}
-                                                min={new Date().toISOString().split('T')[0]} // Allow today
-                                                onChange={e => {
-                                                    setAppointmentDate(e.target.value);
-                                                    setAppointmentTime('');
-                                                    fetchAvailableSlots(e.target.value, appointmentService);
-                                                }}
-                                            />
-                                        </Box>
-
-                                        <Box>
-                                            <Text fontSize="sm" fontWeight="600" mb={2}>Time Slot *</Text>
-                                            <Box as="select" required value={appointmentTime} onChange={e => setAppointmentTime(e.target.value)} disabled={!appointmentDate || !appointmentService || availableSlots.length === 0} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
-                                                <option value="">
-                                                    {!appointmentDate ? "Select a date first" :
-                                                        !appointmentService ? "Select a service first" :
-                                                            availableSlots.length === 0 ? "No slots available" :
-                                                                "-- Select Time Slot --"}
-                                                </option>
-                                                {availableSlots.map((slot, index) => (
-                                                    <option key={index} value={slot.time}>{slot.display}</option>
-                                                ))}
+                                            <Box flex={1}>
+                                                <Text fontSize="sm" fontWeight="600" mb={2}>Date *</Text>
+                                                {(() => {
+                                                    const scheduleMap: Record<string, { days: number[]; hint: string }> = {
+                                                        'consultation':    { days: [1,2,3,4,5], hint: 'Monday to Friday' },
+                                                        'prenatal':        { days: [2,4],       hint: 'Tuesday & Thursday' },
+                                                        'vaccination':     { days: [3,5],       hint: 'Wednesday & Friday' },
+                                                        'bakuna':          { days: [3,5],       hint: 'Wednesday & Friday' },
+                                                        'dental':          { days: [1,3,5],     hint: 'Monday, Wednesday & Friday' },
+                                                        'family planning': { days: [1,2,3,4,5], hint: 'Monday to Friday' },
+                                                        'dots':            { days: [1,2,3,4,5], hint: 'Monday to Friday' },
+                                                        'cervical':        { days: [1],         hint: 'Monday only' },
+                                                        'nutrition':       { days: [1,2,3,4,5], hint: 'Monday to Friday' },
+                                                    };
+                                                    const key = Object.keys(scheduleMap).find(k => appointmentService.toLowerCase().includes(k));
+                                                    const rule = key ? scheduleMap[key] : null;
+                                                    return (
+                                                        <AppointmentCalendar
+                                                            value={appointmentDate}
+                                                            onChange={(date) => {
+                                                                setAppointmentDate(date);
+                                                                setAppointmentTime('');
+                                                                if (date) fetchAvailableSlots(date, appointmentService);
+                                                                else setAvailableSlots([]);
+                                                            }}
+                                                            allowedDays={rule?.days}
+                                                            scheduleHint={rule?.hint}
+                                                            minDate={new Date().toISOString().split('T')[0]}
+                                                        />
+                                                    );
+                                                })()}
                                             </Box>
-                                        </Box>
+
+                                            <Box flex={1}>
+                                                <Text fontSize="sm" fontWeight="600" mb={2}>Time Slot *</Text>
+                                                <Box as="select" required value={appointmentTime} onChange={e => setAppointmentTime(e.target.value)} disabled={!appointmentDate || !appointmentService || availableSlots.length === 0} w="full" h="40px" borderRadius="md" border="1px solid" borderColor="gray.200" px={3}>
+                                                    <option value="">
+                                                        {!appointmentDate ? "Select a date first" :
+                                                            !appointmentService ? "Select a service first" :
+                                                                availableSlots.length === 0 ? "No slots available" :
+                                                                    "-- Select Time Slot --"}
+                                                    </option>
+                                                    {availableSlots.map((slot, index) => (
+                                                        <option key={index} value={slot.time}>{slot.display}</option>
+                                                    ))}
+                                                </Box>
+                                            </Box>
+                                        </Flex>
 
                                         <Button
                                             type="submit"

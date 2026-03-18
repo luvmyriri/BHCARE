@@ -39,6 +39,8 @@
   box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.6);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .service-card:hover {
@@ -73,6 +75,13 @@
   font-size: 0.9rem;
   color: #4b5563;
   line-height: 1.5;
+  flex: 1;
+}
+
+/* Schedule — always pinned to the bottom */
+.service-schedule {
+  margin-top: auto;
+  padding-top: 0.75rem;
 }
 
 /* Responsive */
