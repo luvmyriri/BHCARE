@@ -1,9 +1,4 @@
 # pyre-ignore-all-errors
-"""
-Appointment Management API Endpoints
-Professional appointment booking system for Barangay 174 Health Center
-"""
-# pyre-ignore-all-errors
 from flask import Blueprint, jsonify, request
 from database import get_db_connection  # pyre-ignore[21]
 from datetime import datetime, date, time, timedelta
