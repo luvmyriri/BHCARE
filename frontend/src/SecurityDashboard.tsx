@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNotification } from './contexts/NotificationContext';
 import {
     FiHome,
     FiLogOut,
@@ -39,7 +40,7 @@ import {
     FormLabel,
     Input,
     Select,
-    useToast,
+    // useToast, // Removed useToast
     SimpleGrid,
     Drawer,
     DrawerBody,
@@ -168,7 +169,7 @@ const SecurityDashboard: React.FC<SecurityDashboardProps> = ({ user, onLogout })
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
     const [visitorName, setVisitorName] = useState('');
     const [purpose, setPurpose] = useState('');
-    const toast = useToast();
+    const { showNotification } = useNotification();
 
     useEffect(() => {
         fetchStats();
@@ -207,15 +208,15 @@ const SecurityDashboard: React.FC<SecurityDashboardProps> = ({ user, onLogout })
             const res = await fetch(`/api/appointments/${appointmentId}/check-in`, { method: 'POST' });
             if (res.ok) {
                 const data = await res.json();
-                toast({
-                    title: 'Queue Number Generated',
-                    description: `Patient is now #${String(data.queue_number).padStart(3, '0')}`,
-                    status: 'success',
-                });
+                showNotification(
+                    'Queue Number Generated',
+                    `Patient is now #${String(data.queue_number).padStart(3, '0')}`,
+                    'success'
+                );
                 fetchQueue();
             }
         } catch (e) {
-            toast({ title: 'Check-in Failed', status: 'error' });
+            showNotification('Error', 'Check-in Failed', 'error');
         }
     };
 
@@ -255,12 +256,11 @@ const SecurityDashboard: React.FC<SecurityDashboardProps> = ({ user, onLogout })
                 }
             }
 
-            toast({
-                title: 'Check-in Successful',
-                description: medicalPurposes.includes(purpose) ? 'Added to medical queue' : 'Visitor logged',
-                status: 'success',
-                duration: 3000
-            });
+            showNotification(
+                'Check-in Successful',
+                medicalPurposes.includes(purpose) ? 'Added to medical queue' : 'Visitor logged',
+                'success'
+            );
 
             setVisitorName('');
             setPurpose('');
@@ -268,7 +268,7 @@ const SecurityDashboard: React.FC<SecurityDashboardProps> = ({ user, onLogout })
             fetchStats();
             fetchQueue();
         } catch (e) {
-            toast({ title: 'Check-in Failed', status: 'error' });
+            showNotification('Error', 'Check-in Failed', 'error');
         }
     };
 

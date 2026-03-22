@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNotification } from './contexts/NotificationContext';
 
 type FieldProps = {
   label: string;
@@ -21,6 +22,7 @@ function Field({ label, icon, value, onChange, type = 'text' }: FieldProps) {
 }
 
 export default function Profile({ user, onClose, onUpdated }: { user: any; onClose: () => void; onUpdated: (u: any) => void }) {
+  const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
@@ -131,7 +133,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
       const updated = { ...user, first_name: form.first_name, last_name: form.last_name };
       localStorage.setItem('bh_user', JSON.stringify(updated));
       if (typeof onUpdated === 'function') onUpdated(updated);
-      alert('Profile updated');
+      showNotification('Success', 'Profile updated', 'success');
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -141,7 +143,7 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
 
   const checkEligibility = async () => {
     if (!form.philhealth_id || form.philhealth_id.length < 12) {
-      alert("Please enter a valid PhilHealth ID first.");
+      showNotification('Warning', "Please enter a valid PhilHealth ID first.", 'warning');
       return;
     }
 
@@ -156,10 +158,10 @@ export default function Profile({ user, onClose, onUpdated }: { user: any; onClo
       if (data.success) {
         setEligibilityResult(data.data);
       } else {
-        alert(data.message || "Eligibility check failed");
+        showNotification('Error', data.message || "Eligibility check failed", 'error');
       }
     } catch (e) {
-      alert("Connection error");
+      showNotification('Error', "Connection error", 'error');
     } finally {
       setLoading(false);
     }

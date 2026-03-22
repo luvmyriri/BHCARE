@@ -1,4 +1,24 @@
 import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Button,
+    Heading,
+    Text,
+    VStack,
+    HStack,
+    Input,
+    Textarea,
+    useToast,
+    Card,
+    CardBody,
+    Badge,
+    Icon,
+    Flex,
+    SimpleGrid,
+    Stack,
+    Divider,
+} from '@chakra-ui/react';
+import { FiCalendar, FiClock, FiCheck, FiArrowRight } from 'react-icons/fi';
 
 interface Service {
     id: number;
@@ -24,10 +44,10 @@ interface Appointment {
 
 interface AppointmentsProps {
     user: any;
-    onClose: () => void;
 }
 
-const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
+const Appointments: React.FC<AppointmentsProps> = ({ user }) => {
+    const toast = useToast();
     const [step, setStep] = useState(1);
     const [services, setServices] = useState<Service[]>([]);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -59,6 +79,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
             setServices(data);
         } catch (error) {
             console.error('Error fetching services:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to load services',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+            });
         }
     };
 
@@ -84,7 +111,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const handleBookAppointment = async () => {
         if (!selectedService || !selectedDate || !selectedTime) {
-            alert('Please complete all fields');
+            toast({
+                title: 'Missing Information',
+                description: 'Please complete all fields',
+                status: 'warning',
+                duration: 3000,
+                isClosable: true,
+            });
             return;
         }
 
@@ -103,7 +136,13 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
             });
 
             if (response.ok) {
-                alert('Appointment booked successfully!');
+                toast({
+                    title: 'Appointment Booked!',
+                    description: 'Your appointment has been successfully scheduled.',
+                    status: 'success',
+                    duration: 5000,
+                    isClosable: true,
+                });
                 setStep(1);
                 setSelectedService(null);
                 setSelectedDate('');
@@ -113,10 +152,22 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
                 setView('my-appointments');
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to book appointment');
+                toast({
+                    title: 'Booking Failed',
+                    description: error.error || 'Failed to book appointment',
+                    status: 'error',
+                    duration: 3000,
+                    isClosable: true,
+                });
             }
         } catch (error) {
-            alert('Error booking appointment');
+            toast({
+                title: 'Error',
+                description: 'An error occurred while booking',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+            });
         } finally {
             setLoading(false);
         }
@@ -135,11 +186,23 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
             });
 
             if (response.ok) {
-                alert('Appointment cancelled successfully');
+                toast({
+                    title: 'Cancelled',
+                    description: 'Appointment cancelled successfully',
+                    status: 'success',
+                    duration: 3000,
+                    isClosable: true,
+                });
                 fetchMyAppointments();
             }
         } catch (error) {
-            alert('Error cancelling appointment');
+            toast({
+                title: 'Error',
+                description: 'Error cancelling appointment',
+                status: 'error',
+                duration: 3000,
+                isClosable: true,
+            });
         }
     };
 
@@ -157,134 +220,131 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'pending': return 'bg-blue-100 text-blue-800';
-            case 'confirmed': return 'bg-green-100 text-green-800';
-            case 'cancelled': return 'bg-red-100 text-red-800';
-            case 'completed': return 'bg-gray-100 text-gray-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'pending': return 'blue';
+            case 'confirmed': return 'green';
+            case 'cancelled': return 'red';
+            case 'completed': return 'gray';
+            default: return 'gray';
         }
     };
 
     return (
-        <div className="auth-card" style={{ maxWidth: '900px', width: '95%', padding: '30px', margin: '20px auto' }}>
+        <Box bg="white" borderRadius="xl" p={6} boxShadow="sm" minH="500px">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <button
-                    onClick={onClose}
-                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
-                >
-                    <span>←</span>
-                    <span>Back</span>
-                </button>
-                <h2 className="text-3xl font-bold text-gray-900">Appointments</h2>
-                <div className="w-20"></div>
-            </div>
+            <Flex alignItems="center" justifyContent="space-between" mb={6}>
+                <Heading size="lg" color="teal.800">Appointments</Heading>
+            </Flex>
 
             {/* View Toggle */}
-            <div className="flex gap-2 mb-8 bg-gray-100 p-1 rounded-lg">
-                <button
-                    className={`flex-1 py-2 px-4 rounded-md font-medium transition ${view === 'book'
-                        ? 'bg-white text-primary shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    onClick={() => setView('book')}
-                >
-                    Book Appointment
-                </button>
-                <button
-                    className={`flex-1 py-2 px-4 rounded-md font-medium transition ${view === 'my-appointments'
-                        ? 'bg-white text-primary shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    onClick={() => setView('my-appointments')}
-                >
-                    My Appointments
-                </button>
-            </div>
+            <Flex justifyContent="center" mb={8}>
+                <Box bg="gray.100" p={1} borderRadius="lg">
+                    <Button
+                        variant={view === 'book' ? 'solid' : 'ghost'}
+                        colorScheme={view === 'book' ? 'teal' : 'gray'}
+                        size="md"
+                        onClick={() => setView('book')}
+                        mr={1}
+                    >
+                        Book Appointment
+                    </Button>
+                    <Button
+                        variant={view === 'my-appointments' ? 'solid' : 'ghost'}
+                        colorScheme={view === 'my-appointments' ? 'teal' : 'gray'}
+                        size="md"
+                        onClick={() => setView('my-appointments')}
+                    >
+                        My Appointments
+                    </Button>
+                </Box>
+            </Flex>
 
             {view === 'book' ? (
-                <div>
+                <Box w="full">
                     {/* Step Indicator */}
-                    <div className="flex items-center justify-center mb-12">
-                        <div className="flex items-center gap-4">
-                            {/* Step 1 */}
-                            <div className="flex flex-col items-center">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 1 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                                    }`}>
-                                    1
-                                </div>
-                                <span className="text-xs mt-2 text-gray-600">Service</span>
-                            </div>
-
-                            <div className={`w-16 h-0.5 ${step >= 2 ? 'bg-primary' : 'bg-gray-200'}`}></div>
-
-                            {/* Step 2 */}
-                            <div className="flex flex-col items-center">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 2 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                                    }`}>
-                                    2
-                                </div>
-                                <span className="text-xs mt-2 text-gray-600">Date & Time</span>
-                            </div>
-
-                            <div className={`w-16 h-0.5 ${step >= 3 ? 'bg-primary' : 'bg-gray-200'}`}></div>
-
-                            {/* Step 3 */}
-                            <div className="flex flex-col items-center">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 3 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                                    }`}>
-                                    3
-                                </div>
-                                <span className="text-xs mt-2 text-gray-600">Confirm</span>
-                            </div>
-                        </div>
-                    </div>
+                    <Flex justifyContent="center" mb={10} alignItems="center">
+                        {[
+                            { step: 1, label: 'Service' },
+                            { step: 2, label: 'Date & Time' },
+                            { step: 3, label: 'Confirm' }
+                        ].map((s, index) => (
+                            <React.Fragment key={s.step}>
+                                <VStack spacing={2}>
+                                    <Flex
+                                        w={10}
+                                        h={10}
+                                        borderRadius="full"
+                                        bg={step >= s.step ? 'teal.500' : 'gray.200'}
+                                        color={step >= s.step ? 'white' : 'gray.500'}
+                                        alignItems="center"
+                                        justifyContent="center"
+                                        fontWeight="bold"
+                                        transition="all 0.3s"
+                                    >
+                                        {s.step}
+                                    </Flex>
+                                    <Text fontSize="xs" color="gray.600" fontWeight="medium">{s.label}</Text>
+                                </VStack>
+                                {index < 2 && (
+                                    <Box w={20} h="2px" bg={step > s.step ? 'teal.500' : 'gray.200'} mx={2} mt="-1.5rem" />
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </Flex>
 
                     {/* Step 1: Select Service */}
                     {step === 1 && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-semibold text-gray-900">Select a Service</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <VStack spacing={6} align="stretch" as={Box} width="100%">
+                            <Heading size="md" textAlign="center" mb={2}>Select a Service</Heading>
+                            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
                                 {services.map(service => (
-                                    <div
+                                    <Card
                                         key={service.id}
                                         onClick={() => setSelectedService(service)}
-                                        className={`p-6 rounded-xl border-2 cursor-pointer transition ${selectedService?.id === service.id
-                                            ? 'border-primary bg-green-50'
-                                            : 'border-gray-200 hover:border-primary hover:bg-gray-50'
-                                            }`}
+                                        cursor="pointer"
+                                        variant="outline"
+                                        borderColor={selectedService?.id === service.id ? 'teal.500' : 'gray.200'}
+                                        borderWidth={2}
+                                        bg={selectedService?.id === service.id ? 'teal.50' : 'white'}
+                                        _hover={{ borderColor: 'teal.500', transform: 'translateY(-2px)' }}
+                                        transition="all 0.2s"
                                     >
-                                        <div className="flex items-start gap-4">
-                                            <div className="text-4xl">🏥</div>
-                                            <div className="flex-1">
-                                                <h4 className="font-semibold text-lg text-gray-900">{service.name}</h4>
-                                                <p className="text-sm text-gray-600 mt-1">{service.description}</p>
-                                                <span className="inline-block mt-3 text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-700">
-                                                    {service.duration_minutes} mins
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                        <CardBody>
+                                            <Flex gap={4}>
+                                                <Text fontSize="3xl">🏥</Text>
+                                                <Box>
+                                                    <Heading size="sm" mb={1}>{service.name}</Heading>
+                                                    <Text fontSize="sm" color="gray.600" mb={3}>{service.description}</Text>
+                                                    <Badge colorScheme="teal" borderRadius="full">
+                                                        {service.duration_minutes} mins
+                                                    </Badge>
+                                                </Box>
+                                            </Flex>
+                                        </CardBody>
+                                    </Card>
                                 ))}
-                            </div>
-                            <button
-                                disabled={!selectedService}
+                            </SimpleGrid>
+                            <Button
+                                isDisabled={!selectedService}
                                 onClick={() => setStep(2)}
-                                className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-green-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                colorScheme="teal"
+                                size="lg"
+                                rightIcon={<FiArrowRight />}
+                                width="full"
+                                mt={4}
                             >
-                                Next →
-                            </button>
-                        </div>
+                                Next Step
+                            </Button>
+                        </VStack>
                     )}
 
                     {/* Step 2: Select Date & Time */}
                     {step === 2 && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-semibold text-gray-900">Choose Date & Time</h3>
+                        <VStack spacing={6} align="stretch">
+                            <Heading size="md" textAlign="center">Choose Date & Time</Heading>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
-                                <input
+                            <Box>
+                                <Text mb={2} fontWeight="medium">Select Date</Text>
+                                <Input
                                     type="date"
                                     value={selectedDate}
                                     onChange={(e) => {
@@ -293,159 +353,188 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose }) => {
                                     }}
                                     min={getMinDate()}
                                     max={getMaxDate()}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    size="lg"
+                                    borderColor="gray.300"
+                                    _focus={{ borderColor: 'teal.500', ring: 'none' }}
                                 />
-                            </div>
+                            </Box>
 
                             {selectedDate && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">Available Time Slots</label>
+                                <Box>
+                                    <Text mb={3} fontWeight="medium">Available Time Slots</Text>
                                     {availableSlots.length > 0 ? (
-                                        <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                                        <SimpleGrid columns={{ base: 3, md: 4 }} spacing={3}>
                                             {availableSlots.map((slot, index) => (
-                                                <button
+                                                <Button
                                                     key={index}
                                                     onClick={() => setSelectedTime(slot.time)}
-                                                    className={`py-3 px-4 rounded-lg font-medium transition ${selectedTime === slot.time
-                                                        ? 'bg-primary text-white'
-                                                        : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-primary'
-                                                        }`}
+                                                    variant={selectedTime === slot.time ? 'solid' : 'outline'}
+                                                    colorScheme="teal"
+                                                    fontWeight="medium"
                                                 >
                                                     {slot.display}
-                                                </button>
+                                                </Button>
                                             ))}
-                                        </div>
+                                        </SimpleGrid>
                                     ) : (
-                                        <p className="text-gray-500 text-center py-8">No available slots for this date</p>
+                                        <Flex direction="column" align="center" justify="center" p={8} bg="gray.50" borderRadius="lg">
+                                            <Text color="gray.500">No available slots for this date</Text>
+                                        </Flex>
                                     )}
-                                </div>
+                                </Box>
                             )}
 
-                            <div className="flex gap-3">
-                                <button
+                            <HStack spacing={4} pt={4}>
+                                <Button
                                     onClick={() => setStep(1)}
-                                    className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+                                    variant="outline"
+                                    size="lg"
+                                    width="full"
                                 >
-                                    ← Back
-                                </button>
-                                <button
-                                    disabled={!selectedDate || !selectedTime}
+                                    Back
+                                </Button>
+                                <Button
+                                    isDisabled={!selectedDate || !selectedTime}
                                     onClick={() => setStep(3)}
-                                    className="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-green-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                    colorScheme="teal"
+                                    size="lg"
+                                    width="full"
+                                    rightIcon={<FiArrowRight />}
                                 >
-                                    Next →
-                                </button>
-                            </div>
-                        </div>
+                                    Next Step
+                                </Button>
+                            </HStack>
+                        </VStack>
                     )}
 
                     {/* Step 3: Confirm */}
                     {step === 3 && (
-                        <div className="space-y-6">
-                            <h3 className="text-2xl font-semibold text-gray-900">Confirm Appointment</h3>
+                        <VStack spacing={6} align="stretch">
+                            <Heading size="md" textAlign="center">Confirm Appointment</Heading>
 
-                            <div className="bg-gray-50 rounded-xl p-6 space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Service:</span>
-                                    <span className="font-semibold text-gray-900">{selectedService?.name}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Date:</span>
-                                    <span className="font-semibold text-gray-900">
-                                        {new Date(selectedDate).toLocaleDateString('en-US', {
-                                            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                                        })}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Time:</span>
-                                    <span className="font-semibold text-gray-900">
-                                        {availableSlots.find(s => s.time === selectedTime)?.display}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Duration:</span>
-                                    <span className="font-semibold text-gray-900">{selectedService?.duration_minutes} minutes</span>
-                                </div>
-                            </div>
+                            <Card variant="filled" bg="teal.50">
+                                <CardBody>
+                                    <Stack spacing={4}>
+                                        <Flex justify="space-between">
+                                            <Text color="gray.600">Service</Text>
+                                            <Text fontWeight="bold">{selectedService?.name}</Text>
+                                        </Flex>
+                                        <Divider borderColor="teal.200" />
+                                        <Flex justify="space-between">
+                                            <Text color="gray.600">Date</Text>
+                                            <Text fontWeight="bold">
+                                                {new Date(selectedDate).toLocaleDateString('en-US', {
+                                                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                                                })}
+                                            </Text>
+                                        </Flex>
+                                        <Divider borderColor="teal.200" />
+                                        <Flex justify="space-between">
+                                            <Text color="gray.600">Time</Text>
+                                            <Text fontWeight="bold">
+                                                {availableSlots.find(s => s.time === selectedTime)?.display}
+                                            </Text>
+                                        </Flex>
+                                        <Divider borderColor="teal.200" />
+                                        <Flex justify="space-between">
+                                            <Text color="gray.600">Duration</Text>
+                                            <Text fontWeight="bold">{selectedService?.duration_minutes} minutes</Text>
+                                        </Flex>
+                                    </Stack>
+                                </CardBody>
+                            </Card>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Reason for Visit (Optional)</label>
-                                <textarea
+                            <Box>
+                                <Text mb={2} fontWeight="medium">Reason for Visit (Optional)</Text>
+                                <Textarea
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}
                                     placeholder="Describe your symptoms or reason for visit..."
                                     rows={4}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                                    resize="none"
+                                    borderColor="gray.300"
+                                    _focus={{ borderColor: 'teal.500', ring: 'none' }}
                                 />
-                            </div>
+                            </Box>
 
-                            <div className="flex gap-3">
-                                <button
+                            <HStack spacing={4} pt={4}>
+                                <Button
                                     onClick={() => setStep(2)}
-                                    className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+                                    variant="outline"
+                                    size="lg"
+                                    width="full"
                                 >
-                                    ← Back
-                                </button>
-                                <button
+                                    Back
+                                </Button>
+                                <Button
                                     onClick={handleBookAppointment}
-                                    disabled={loading}
-                                    className="flex-1 py-3 bg-primary text-white rounded-lg font-medium hover:bg-green-600 transition disabled:bg-gray-400"
+                                    isLoading={loading}
+                                    loadingText="Booking..."
+                                    colorScheme="teal"
+                                    size="lg"
+                                    width="full"
+                                    leftIcon={<FiCheck />}
                                 >
-                                    {loading ? 'Booking...' : 'Confirm Booking'}
-                                </button>
-                            </div>
-                        </div>
+                                    Confirm Booking
+                                </Button>
+                            </HStack>
+                        </VStack>
                     )}
-                </div>
+                </Box>
             ) : (
-                <div>
-                    <h3 className="text-2xl font-semibold text-gray-900 mb-6">My Appointments</h3>
+                /* My Appointments View */
+                <Box>
+                    <Heading size="md" mb={6}>My Appointments</Heading>
                     {myAppointments.length > 0 ? (
-                        <div className="space-y-4">
+                        <VStack spacing={4} align="stretch">
                             {myAppointments.map(apt => (
-                                <div key={apt.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <h4 className="text-lg font-semibold text-gray-900">{apt.service_type}</h4>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(apt.status)}`}>
-                                            {apt.status}
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-6 text-sm text-gray-600 mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <span>📅</span>
-                                            <span>{new Date(apt.appointment_date).toLocaleDateString()}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span>🕐</span>
-                                            <span>{apt.appointment_time}</span>
-                                        </div>
-                                    </div>
-                                    {apt.status === 'pending' && (
-                                        <button
-                                            onClick={() => handleCancelAppointment(apt.id)}
-                                            className="text-red-600 hover:text-red-700 text-sm font-medium"
-                                        >
-                                            Cancel Appointment
-                                        </button>
-                                    )}
-                                </div>
+                                <Card key={apt.id} variant="outline" _hover={{ shadow: 'md' }}>
+                                    <CardBody>
+                                        <Flex justify="space-between" align="start">
+                                            <Box>
+                                                <Heading size="sm" mb={2}>{apt.service_type}</Heading>
+                                                <HStack spacing={4} color="gray.600" fontSize="sm" mb={3}>
+                                                    <Flex align="center" gap={2}>
+                                                        <Icon as={FiCalendar} />
+                                                        <Text>{new Date(apt.appointment_date).toLocaleDateString()}</Text>
+                                                    </Flex>
+                                                    <Flex align="center" gap={2}>
+                                                        <Icon as={FiClock} />
+                                                        <Text>{apt.appointment_time}</Text>
+                                                    </Flex>
+                                                </HStack>
+                                            </Box>
+                                            <Badge colorScheme={getStatusColor(apt.status)} fontSize="sm" px={2} py={1} borderRadius="full">
+                                                {apt.status}
+                                            </Badge>
+                                        </Flex>
+                                        {apt.status === 'pending' && (
+                                            <Flex justify="flex-end" mt={2}>
+                                                <Button
+                                                    size="sm"
+                                                    colorScheme="red"
+                                                    variant="ghost"
+                                                    onClick={() => handleCancelAppointment(apt.id)}
+                                                >
+                                                    Cancel Appointment
+                                                </Button>
+                                            </Flex>
+                                        )}
+                                    </CardBody>
+                                </Card>
                             ))}
-                        </div>
+                        </VStack>
                     ) : (
-                        <div className="text-center py-12">
-                            <p className="text-gray-500 mb-4">No appointments yet</p>
-                            <button
-                                onClick={() => setView('book')}
-                                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-green-600 transition"
-                            >
+                        <Flex direction="column" align="center" justify="center" py={12} bg="gray.50" borderRadius="xl">
+                            <Text color="gray.500" mb={4}>No appointments yet</Text>
+                            <Button colorScheme="teal" onClick={() => setView('book')}>
                                 Book Your First Appointment
-                            </button>
-                        </div>
+                            </Button>
+                        </Flex>
                     )}
-                </div>
+                </Box>
             )}
-        </div>
+        </Box>
     );
 };
 

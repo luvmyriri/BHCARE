@@ -1,723 +1,91 @@
-:root {
-  --primary: #ffb7a5;
-  --primary-dark: #f08b6f;
-  --secondary: #98ff98;
-  --secondary-dark: #6ee76e;
-  --text-main: #222222;
-  --bg-page: #fff7f4;
-}
+# PULSO Documentation Update Plan: Matching Progress with Reference (abc.docx)
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+This document outlines the necessary updates and new sections required for the **PULSO** documentation to align with the progress and structure of the reference proposal (**abc.docx**).
 
-html {
-  scroll-behavior: smooth;
-}
+---
 
-body {
-  margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  background: transparent;
-  color: var(--text-main);
-}
+## 1. Structural Updates (Core Missing Parts)
 
-/* App container */
-.app {
-  min-height: 100vh;
-}
+To match the formal structure of the reference proposal, the following sections must be added:
 
-/* Navbar */
-.nav {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 3rem;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid #fcd9ce;
-}
+- [ ] **Title Page**: A formal, dedicated title page with team members, roles, institution details, and submission date.
+- [ ] **Table of Contents**: A structured list of all sections and sub-sections with page numbers (once moved back to Word).
+- [ ] **Figure Table**: A comprehensive list of all figures, diagrams, and mockups used throughout the documentation.
+- [ ] **Approved Proposal Page**: A section acknowledging the status of the proposal.
+- [ ] **Curriculum Vitae (CV)**: Professional profiles for each team member (Lamsen, Garcia, Evangelista, Tabios).
 
-.nav-left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
+---
 
-.logo-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1.5rem;
-}
+## 2. Phase-Based Documentation (The Progress Gap)
 
-.logo-text {
-  font-weight: 600;
-  font-size: 1.1rem;
-  color: #0f172a;
-}
+The reference document follows a strict SDLC (System Development Life Cycle) phase structure. PULSO needs to expand its current sections into these formal phases:
 
-.nav-links {
-  list-style: none;
-  display: flex;
-  gap: 1.5rem;
-}
+### Phase I: Requirement Phase - Data Gathering
+*Currently missing dedicated evidence of data collection.*
+- **Survey Questionnaire**: Create a section describing the Google Forms survey used to validate the need for PULSO in North Caloocan.
+- **Interview Transcripts**: Summaries of interviews with LGU officials or residents.
+- **Data Results Summary**: Graphs or charts showing user willingness and awareness.
 
-.nav-links a {
-  text-decoration: none;
-  color: #111827;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
+### Phase II: System Design Phase (System Planning & Modeling)
+*PULSO has descriptions but lacks the formal artifacts.*
+- **Data Flow Diagram (DFD)**: Visual representation of how a report flows from Citizen -> Gemini AI -> Dispatcher -> Field Crew.
+- **Database Schema / ERD**: A visual diagram of the MySQL database structure.
+- **UI Mockups**: High-fidelity screenshots or mockups of the Command Center, Resident Dashboard, and Offline Mode.
+- **Technology Selection**: A formal justification for using React, Flutter, Python, and Gemini AI.
 
-.nav-links a:hover {
-  color: var(--primary-dark);
-}
+### Phase III: Development Phase (Coding / Construction)
+- **Code Snippets**: "High-level" snippets of the FastAPI backend, Gemini AI integration logic, and the Haversine formula implementation.
+- **Executable Modules**: Description of the "Surgical" Triage module and the GDM (Geospatial Deduplication Module).
 
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
+### Phase IV: Testing Phase (Verification & Validation)
+- **Quality Assurance Reports**: Results of the 75% confidence threshold testing for AI reports.
+- **User Acceptance Testing (UAT)**: Feedback from test users regarding the Heat Map accuracy.
+- **Defense Comments Log**: A table for recording professor feedback and subsequent revisions.
 
-.profile-button {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-}
+### Phase V: Deployment & Maintenance
+- **User Manual**: Step-by-step instructions for Residents and LGU Dispatchers.
+- **Maintenance Strategy**: How the system will be updated for signal dead zones and asset digitization.
 
-.profile-button:hover {
-  background: #f8fafc;
-}
+---
 
-.profile-icon {
-  font-size: 1.1rem;
-}
+## 3. Costing and Technology Matrix
 
-.call-now-btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: 999px;
-  padding: 0.6rem 1.4rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.95rem;
-  box-shadow: 0 10px 20px rgba(240, 139, 111, 0.35);
-}
+Create a dedicated table to itemize API costs and technology specifications.
 
-.call-now-btn:hover {
-  background: var(--primary-dark);
-}
+| Technology/API | Description | Specification | Monthly Cost (Est.) |
+| :--- | :--- | :--- | :--- |
+| **Google Gemini API** | Automated Report Triage | Gemini 1.5/2.0 Flash | $0 (Free Tier) / Paid per tokens |
+| **Google Maps API** | Heatmap and Geo-tagging | Maps JavaScript/Static | ~$200 Cloud Credit / Usage based |
+| **MySQL Database** | Structural Data Storage | Cloud Hosted (e.g., AWS/Azure) | ~$15 - $30 |
+| **Cloud Hosting** | Backend & Frontend Hosting | Python/React environment | ~$20 |
+| **Push Notifications** | Automated Status Loop | Firebase Cloud Messaging | Free / Tiered |
 
-/* Login button */
-.login-button {
-  background: var(--primary);
-  border: none;
-  border-radius: 999px;
-  padding: 0.6rem 1.4rem;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.95rem;
-  box-shadow: 0 10px 20px rgba(240, 139, 111, 0.35);
-}
+---
 
-.login-button:hover {
-  background: var(--primary-dark);
-}
+## 4. References (APA Style)
 
-.logout-button {
-  background: #ef4444;
-  border: none;
-  border-radius: 999px;
-  padding: 0.6rem 1.4rem;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.95rem;
-  box-shadow: 0 10px 20px rgba(239, 68, 68, 0.35);
-}
+Expand the reference list to include academic studies on:
+- Gemini AI in geospatial applications.
+- Urban resilience and predictive maintenance.
+- Data Privacy Act (RA 10173) and Government Procurement (RA 9184).
 
-.logout-button:hover {
-  background: #dc2626;
-}
+---
 
-/* LOGIN MODAL STYLE (Screenshot match) */
-.login-form {
-  max-width: 420px;
-  margin: 0 auto;
-  padding: 20px 10px;
-}
+## 5. Gemini Prompts for Documentation Generation
 
-.login-title {
-  font-size: 1.8rem;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 6px;
-}
+Use these prompts with Gemini to generate the specific content needed for the updates:
 
-.login-subtitle {
-  text-align: center;
-  font-size: 0.95rem;
-  color: #6b7280;
-  margin-bottom: 22px;
-}
+### For Requirement Analysis:
+> "Act as a technical researcher. Based on the PULSO project (a public utility locator using Gemini AI), generate a 10-question survey for Caloocan North residents focusing on infrastructure reporting frustrations, willingness to use an AI app, and trust in LGU response times. Present it as a 'Data Gathering' section for a thesis."
 
-.input-group {
-  display: flex;
-  align-items: center;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 14px;
-  background: #fff;
-}
+### For System Design:
+> "Describe the 'Geospatial Deduplication Module' for the PULSO system. Explain how it uses the Haversine formula and DBSCAN clustering to group duplicate reports. Format this as a technical section for a System Design Document (SDD)."
 
-.input-group input {
-  border: none;
-  outline: none;
-  width: 100%;
-  font-size: 0.95rem;
-  margin-left: 8px;
-}
+### For Ethics & Compliance:
+> "Draft a compliance section for the PULSO proposal that explains how the system adheres to the Philippine Data Privacy Act (RA 10173). Focus on the 'Citizen Reporter' data and GPS coordinate security."
 
-.input-icon {
-  font-size: 1.1rem;
-  opacity: 0.6;
-}
+### For the Conclusion/Roadmap:
+> "Create a 90-day predictive roadmap for PULSO implementation. Divide it into Phase 1: Asset Digitization, Phase 2: Preventive Maintenance, and Phase 3: Predictive Mastery. Use formal academic language."
 
-.login-submit {
-  width: 100%;
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 10px;
-  border: none;
-  background: #2563eb;
-  color: #fff;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.login-submit:hover {
-  background: #1d4ed8;
-}
-
-.login-error {
-  color: #dc2626;
-  font-size: 0.85rem;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.login-footer {
-  margin-top: 18px;
-  font-size: 0.9rem;
-  text-align: center;
-  color: #6b7280;
-}
-
-.signup-link {
-  color: #2563eb;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.signup-link:hover {
-  text-decoration: underline;
-}
-
-/* Hero section */
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  align-items: center;
-  padding: 3rem 3.5rem 4rem;
-  gap: 2.5rem;
-}
-
-.hero-left {
-  max-width: 560px;
-}
-
-.badge {
-  display: inline-block;
-  background: rgba(255, 183, 165, 0.25);
-  color: var(--primary-dark);
-  padding: 0.4rem 1rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin-bottom: 1rem;
-}
-
-.hero-title {
-  font-size: 3.2rem;
-  line-height: 1.05;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 1.5rem;
-}
-
-.hero-subtitle {
-  font-size: 1rem;
-  line-height: 1.7;
-  color: #4b5563;
-  margin-bottom: 2rem;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 1rem;
-}
-
-.primary-btn {
-  background: var(--primary);
-  color: #ffffff;
-  border-radius: 999px;
-  border: none;
-  padding: 0.8rem 1.6rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.95rem;
-  box-shadow: 0 15px 30px rgba(240, 139, 111, 0.35);
-}
-
-.primary-btn:hover {
-  background: var(--primary-dark);
-}
-
-.secondary-btn {
-  background: var(--secondary);
-  color: #064e3b;
-  border-radius: 999px;
-  border: 1px solid var(--secondary-dark);
-  padding: 0.8rem 1.6rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.95rem;
-}
-
-.secondary-btn:hover {
-  background: var(--secondary-dark);
-}
-
-/* Right side image card */
-.hero-right {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.hero-image-card {
-  position: relative;
-  border-radius: 1.5rem;
-  overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
-  background: var(--primary-dark);
-}
-
-.hero-image {
-  display: block;
-  width: 520px;
-  height: 340px;
-  object-fit: cover;
-}
-
-.auth-card {
-  max-width: 900px;
-  width: 95%;
-  margin: 1rem auto;
-  background: white;
-  position: relative;
-  border-radius: 24px;
-  padding: 0;
-  box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.25);
-  z-index: 10;
-  overflow: hidden;
-  display: flex;
-  flex-direction: row;
-  min-height: 600px;
-  max-height: 90vh;
-}
-
-@media (max-width: 768px) {
-  .auth-card {
-    flex-direction: column;
-    max-height: none;
-    height: auto;
-    margin: 1rem auto;
-  }
-}
-
-.auth-title {
-  font-size: 1.8rem;
-  font-weight: 700;
-  text-align: center;
-}
-
-.auth-subtitle {
-  text-align: center;
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-bottom: 20px;
-}
-
-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: 4px;
-  display: block;
-}
-
-.auth-input {
-  display: flex;
-  align-items: center;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  padding: 10px 12px;
-  margin-bottom: 14px;
-}
-
-.auth-input span {
-  margin-right: 8px;
-  opacity: 0.6;
-}
-
-.auth-input input {
-  border: none;
-  outline: none;
-  width: 100%;
-  font-size: 0.95rem;
-}
-
-.auth-input select {
-  border: none;
-  outline: none;
-  width: 100%;
-  font-size: 0.95rem;
-  background: transparent;
-}
-
-.auth-input.invalid {
-  border-color: #e53935;
-  box-shadow: 0 0 0 1px rgba(229, 57, 53, 0.15);
-}
-
-.auth-input.invalid input,
-.auth-input.invalid select {
-  background-color: #fff5f5;
-}
-
-.auth-button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 8px;
-  border-radius: 12px;
-  border: none;
-  background: #2563eb;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.auth-button:hover {
-  background: #1d4ed8;
-}
-
-.auth-error {
-  color: #dc2626;
-  font-size: 0.85rem;
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-.auth-footer {
-  text-align: center;
-  margin-top: 16px;
-  font-size: 0.9rem;
-}
-
-.auth-footer span {
-  color: #2563eb;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* Certification card */
-.cert-card {
-  position: absolute;
-  bottom: 1.5rem;
-  left: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: #ffffff;
-  border-radius: 1rem;
-  padding: 0.75rem 1.2rem;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
-}
-
-.cert-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--secondary);
-  color: #166534;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-}
-
-.cert-label {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.cert-name {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #111827;
-}
-
-/* Services section */
-.services {
-  padding: 3rem 3.5rem 4rem;
-  background: #ffffff;
-}
-
-.services-header {
-  max-width: 640px;
-  margin-bottom: 2rem;
-}
-
-.services-header h2 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 0.75rem;
-}
-
-.services-header p {
-  font-size: 0.98rem;
-  color: #4b5563;
-  line-height: 1.6;
-}
-
-.services-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.5rem;
-}
-
-.service-card {
-  background: #ffffff;
-  border-radius: 1rem;
-  padding: 1.5rem;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
-  border: 1px solid rgba(0, 0, 0, 0.03);
-}
-
-.service-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  background: var(--secondary);
-  color: #065f46;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-}
-
-.service-card h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: #111827;
-}
-
-.service-card p {
-  font-size: 0.9rem;
-  color: #4b5563;
-  line-height: 1.5;
-}
-
-/* Modal overlay */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-/* Modal content */
-.modal-content {
-  width: 95%;
-  max-width: 1000px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  pointer-events: none; /* Let clicks pass through to overlay */
-}
-
-.modal-content > * {
-  pointer-events: auto; /* Re-enable clicks for actual content */
-}
-
-/* Close button - Positioned within container */
-.modal-close {
-  position: absolute;
-  top: 15px;
-  right: 20px;
-  width: 32px;
-  height: 32px;
-  font-size: 28px;
-  line-height: 1;
-  background: #f1f5f9;
-  color: #64748b;
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 1000;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-  transform: rotate(90deg);
-}
-
-/* Scrollable form inside */
-.form-scroll {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow-y: auto;
-}
-
-.auth-form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  width: 100%;
-}
-
-@media (max-width: 640px) {
-  .auth-form-row {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-}
-
-@media (max-width: 640px) {
-  .form-scroll {
-    padding: 30px 15px;
-  }
-}
-
-@media (max-width: 768px) {
-  .form-scroll {
-    padding: 20px 10px;
-  }
-}
-
-/* Scrollbar style */
-/* Removed scrollbar styles as they are no longer needed */
-
-/* Responsive */
-@media (max-width: 960px) {
-  .hero {
-    grid-template-columns: 1fr;
-    padding: 2rem 1.5rem 3rem;
-  }
-
-  .hero-right {
-    justify-content: center;
-  }
-
-  .nav {
-    padding: 0.75rem 1.25rem;
-    gap: 0.75rem;
-  }
-
-  .nav-links a {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    line-height: 1.1;
-  }
-
-  .sub-label {
-    font-size: 0.7rem;
-    color: #6b7280;
-    font-weight: 400;
-  }
-
-  .services {
-    padding: 2.5rem 1.5rem 3.5rem;
-  }
-
-  .services-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-image {
-    width: 100%;
-    height: 260px;
-  }
-}
-
-@media (max-width: 480px) {
-  .hero-title {
-    font-size: 2.2rem;
-  }
-
-  .badge {
-    font-size: 0.75rem;
-    padding: 0.3rem 0.8rem;
-  }
-
-  .primary-btn,
-  .secondary-btn {
-    padding: 0.7rem 1.2rem;
-    font-size: 0.9rem;
-    width: 100%;
-  }
-}
+### For Literature Review:
+> "Find and summarize 3 recent studies (2022-2025) on 'AI-driven urban infrastructure management' and 'Predictive maintenance in smart cities' to be used in the Review of Related Literature section for a project called PULSO."

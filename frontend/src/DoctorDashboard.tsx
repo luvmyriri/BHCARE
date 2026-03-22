@@ -166,7 +166,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
     const [patientsQueue, setPatientsQueue] = useState<any[]>([]);
     const [labResults, setLabResults] = useState<any[]>([]);
     const [inventory, setInventory] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    // const [loading, setLoading] = useState(true);
 
     React.useEffect(() => {
         const fetchData = async () => {
@@ -198,7 +198,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout }) => 
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {
-                setLoading(false);
+                // setLoading(false);
             }
         };
 

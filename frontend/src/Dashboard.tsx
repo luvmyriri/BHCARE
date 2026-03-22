@@ -300,7 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                             title="Schedule & Book Consultations"
                             description="Book new appointments or manage your existing ones with ease. Select your preferred date and time below."
                         />
-                        <Appointments user={user} onClose={() => setActiveTab('overview')} />
+                        <Appointments user={user} />
                     </VStack>
                 );
             case 'profile':

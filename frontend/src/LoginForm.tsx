@@ -117,8 +117,11 @@ const Select: FC<
   );
 };
 
+import { useNotification } from './contexts/NotificationContext';
+
 function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register' }) {
   const { t } = useLanguage();
+  const { showNotification } = useNotification();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
   const [email, setEmail] = useState('');
@@ -599,7 +602,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login' }: { onLoginSuccess?:
       const res = await fetch('/register', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Registration failed');
-      alert('Registration successful!');
+      showNotification('Success', 'Registration successful!', 'success');
       setMode('login');
       resetFormFields();
     } catch (err: any) {

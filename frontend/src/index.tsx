@@ -6,6 +6,8 @@ import './Animations.css';
 import App from './App';
 
 import { LanguageProvider } from './contexts/LanguageContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import NotificationModal from './components/NotificationModal';
 
 const rootElement = document.getElementById('root');
 if (rootElement) {
@@ -14,7 +16,10 @@ if (rootElement) {
     <React.StrictMode>
       <ChakraProvider>
         <LanguageProvider>
-          <App />
+          <NotificationProvider>
+            <App />
+            <NotificationModal />
+          </NotificationProvider>
         </LanguageProvider>
       </ChakraProvider>
     </React.StrictMode>
