@@ -156,7 +156,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
         }
     }, [appointmentUserId, patients]);
 
-    const filteredPatients = patients.filter(p => 
+    const filteredPatients = patients.filter(p =>
         `${p.last_name}, ${p.first_name} (${p.p_id})`.toLowerCase().includes(patientSearchQuery.toLowerCase())
     );
 
@@ -240,11 +240,33 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
 
     const handleWalkinRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         const finalProvince = selectedRegion === '1300000000' ? 'Metro Manila' : province;
         if (!firstName || !lastName || !dob || !gender || !contact || !barangay || !city || !finalProvince) {
             toast({ title: 'Validation Error', description: 'Please fill out all required fields marked with *', status: 'warning' });
             return;
+        }
+
+        const phPhoneRegex = /^(\+639\d{9}|09\d{9})$/;
+        if (!phPhoneRegex.test(contact)) {
+            toast({ title: 'Validation Error', description: 'Please enter a valid Philippine mobile number (e.g., +639123456789 or 09123456789).', status: 'warning' });
+            return;
+        }
+
+        const dobObj = new Date(dob);
+        const maxAgeDate = new Date();
+        maxAgeDate.setFullYear(maxAgeDate.getFullYear() - 120);
+        if (dobObj < maxAgeDate) {
+            toast({ title: 'Validation Error', description: 'Patient cannot be older than 120 years.', status: 'warning' });
+            return;
+        }
+
+        if (email) {
+            const emailRegex = /^[^\s@]+@gmail\.com$/i;
+            if (!emailRegex.test(email)) {
+                toast({ title: 'Validation Error', description: 'Please enter a valid @gmail.com email address.', status: 'warning' });
+                return;
+            }
         }
 
         setIsRegistering(true);
@@ -461,7 +483,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                 <Box pos="absolute" bottom="8" w="full" px={4}>
                     <Divider mb={4} />
                     <NavItem icon={FiLogOut} onClick={onLogout}>
-                        Exit Station
+                        Log out
                     </NavItem>
                 </Box>
             </Box>
@@ -495,7 +517,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                             <Box pos="absolute" bottom="8" w="full" px={4}>
                                 <Divider mb={4} />
                                 <NavItem icon={FiLogOut} onClick={onLogout}>
-                                    Exit Station
+                                    Log out
                                 </NavItem>
                             </Box>
                         </Box>
@@ -639,7 +661,18 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                     <Flex gap={4} direction={{ base: 'column', lg: 'row' }} align="flex-start">
                                         <Box flex={1} w="full">
                                             <Text fontSize="sm" fontWeight="600" mb={2}>Date of Birth *</Text>
-                                            <Input required type="date" max={new Date().toISOString().split('T')[0]} value={dob} onChange={e => setDob(e.target.value)} />
+                                            <Input
+                                                required
+                                                type="date"
+                                                min={(() => {
+                                                    const d = new Date();
+                                                    d.setFullYear(d.getFullYear() - 120);
+                                                    return d.toISOString().split('T')[0];
+                                                })()}
+                                                max={new Date().toISOString().split('T')[0]}
+                                                value={dob}
+                                                onChange={e => setDob(e.target.value)}
+                                            />
                                         </Box>
                                         <Box flex={1} w="full">
                                             <Text fontSize="sm" fontWeight="600" mb={2}>Gender *</Text>
@@ -656,7 +689,10 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                         </Box>
                                         <Box flex={1} w="full">
                                             <Text fontSize="sm" fontWeight="600" mb={2}>Contact No. *</Text>
-                                            <Input required placeholder="+639..." value={contact} onChange={e => setContact(e.target.value)} />
+                                            <Input required type="tel" maxLength={13} placeholder="+639XXXXXXXXX or 09XXXXXXXXX" value={contact} onChange={e => {
+                                                const val = e.target.value.replace(/[^\d+]/g, '');
+                                                setContact(val);
+                                            }} />
                                         </Box>
                                     </Flex>
 
@@ -753,7 +789,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                                     autoComplete="off"
                                                 />
                                                 {showPatientDropdown && (
-                                                    <Box 
+                                                    <Box
                                                         position="absolute" top="100%" left={0} right={0} zIndex={10}
                                                         bg="white" boxShadow="md" border="1px solid" borderColor="gray.200" borderRadius="md" maxHeight="200px" overflowY="auto" mt={1}
                                                     >
@@ -800,15 +836,15 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                                 <Text fontSize="sm" fontWeight="600" mb={2}>Date *</Text>
                                                 {(() => {
                                                     const scheduleMap: Record<string, { days: number[]; hint: string }> = {
-                                                        'consultation':    { days: [1,2,3,4,5], hint: 'Monday to Friday' },
-                                                        'prenatal':        { days: [2,4],       hint: 'Tuesday & Thursday' },
-                                                        'vaccination':     { days: [3,5],       hint: 'Wednesday & Friday' },
-                                                        'bakuna':          { days: [3,5],       hint: 'Wednesday & Friday' },
-                                                        'dental':          { days: [1,3,5],     hint: 'Monday, Wednesday & Friday' },
-                                                        'family planning': { days: [1,2,3,4,5], hint: 'Monday to Friday' },
-                                                        'dots':            { days: [1,2,3,4,5], hint: 'Monday to Friday' },
-                                                        'cervical':        { days: [1],         hint: 'Monday only' },
-                                                        'nutrition':       { days: [1,2,3,4,5], hint: 'Monday to Friday' },
+                                                        'consultation': { days: [1, 2, 3, 4, 5], hint: 'Monday to Friday' },
+                                                        'prenatal': { days: [2, 4], hint: 'Tuesday & Thursday' },
+                                                        'vaccination': { days: [3, 5], hint: 'Wednesday & Friday' },
+                                                        'bakuna': { days: [3, 5], hint: 'Wednesday & Friday' },
+                                                        'dental': { days: [1, 3, 5], hint: 'Monday, Wednesday & Friday' },
+                                                        'family planning': { days: [1, 2, 3, 4, 5], hint: 'Monday to Friday' },
+                                                        'dots': { days: [1, 2, 3, 4, 5], hint: 'Monday to Friday' },
+                                                        'cervical': { days: [1], hint: 'Monday only' },
+                                                        'nutrition': { days: [1, 2, 3, 4, 5], hint: 'Monday to Friday' },
                                                     };
                                                     const key = Object.keys(scheduleMap).find(k => appointmentService.toLowerCase().includes(k));
                                                     const rule = key ? scheduleMap[key] : null;
@@ -824,6 +860,11 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                                             allowedDays={rule?.days}
                                                             scheduleHint={rule?.hint}
                                                             minDate={new Date().toISOString().split('T')[0]}
+                                                            maxDate={(() => {
+                                                                const d = new Date();
+                                                                d.setDate(d.getDate() + 14);
+                                                                return d.toISOString().split('T')[0];
+                                                            })()}
                                                         />
                                                     );
                                                 })()}

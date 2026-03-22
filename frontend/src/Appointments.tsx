@@ -353,6 +353,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
 
         if (date < today) return true;
 
+        const maxDate = new Date(today);
+        maxDate.setDate(today.getDate() + 14);
+        if (date > maxDate) return true;
+
         const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
         if (dayOfWeek === 0 || dayOfWeek === 6) return true; // Weekends explicitly disabled for base check

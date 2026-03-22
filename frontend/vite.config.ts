@@ -64,7 +64,9 @@ export default defineConfig({
                         }
                     },
                     {
-                        urlPattern: /\/api\/.*/i,
+                        // Exclude OCR endpoints from service worker caching entirely
+                        // (OCR scans can take 10-180s, so no timeout should be applied)
+                        urlPattern: /\/api\/(?!ocr).*/i,
                         handler: 'NetworkFirst',
                         options: {
                             cacheName: 'api-cache',
@@ -72,7 +74,7 @@ export default defineConfig({
                                 maxEntries: 50,
                                 maxAgeSeconds: 60 * 5 // 5 minutes
                             },
-                            networkTimeoutSeconds: 10
+                            networkTimeoutSeconds: 30
                         }
                     }
                 ]

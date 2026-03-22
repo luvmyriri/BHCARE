@@ -1294,7 +1294,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     <HStack spacing={3}>
                         <img src="/images/Logo.png" alt="Logo" style={{ height: '32px' }} />
                         <Text fontSize="xl" fontWeight="800" color="teal.800" letterSpacing="tight">
-                            BHCare <Text as="span" color="orange.500" fontSize="xs">PRO</Text>
+                            BHCare <Text as="span" color="orange.500" fontSize="xs">Doctor</Text>
                         </Text>
                     </HStack>
                 </Flex>
@@ -1323,13 +1323,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 <Box pos="absolute" bottom="8" w="full" px={4}>
                     <Divider mb={4} />
                     <NavItem icon={FiLogOut} onClick={onLogout}>
-                        Exit Station
+                        Log out
                     </NavItem>
                 </Box>
             </Box>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p={{ base: 6, md: 10 }} position="relative">
+            <Box ml={{ base: 0, md: '280px' }} p={{ base: 6, md: 10 }} position="relative" maxW={{ base: "100%", md: "calc(100vw - 280px)" }} overflowX="hidden">
                 <Flex justify="space-between" align="center" mb={10}>
                     <HStack spacing={4}>
                         <IconButton
@@ -1594,7 +1594,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                 <HStack spacing={3}>
                                     <img src="/images/Logo.png" alt="Logo" style={{ height: '32px' }} />
                                     <Text fontSize="xl" fontWeight="800" color="teal.800" letterSpacing="tight">
-                                        BHCare <Text as="span" color="orange.500" fontSize="xs">PRO</Text>
+                                        BHCare <Text as="span" color="orange.500" fontSize="xs">Doctor</Text>
                                     </Text>
                                 </HStack>
                             </Flex>
@@ -1621,7 +1621,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             <Box pos="absolute" bottom="8" w="full" px={4}>
                                 <Divider mb={4} />
                                 <NavItem icon={FiLogOut} onClick={onLogout}>
-                                    Exit Station
+                                    Log out
                                 </NavItem>
                             </Box>
                         </Box>

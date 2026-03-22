@@ -66,7 +66,12 @@ import {
     FiUser,
     FiUserPlus,
     FiFileText,
-    FiMessageSquare
+    FiMessageSquare,
+    FiDownload,
+    FiChevronLeft,
+    FiChevronRight,
+    FiChevronUp,
+    FiChevronDown
 } from 'react-icons/fi';
 import {
     SimpleGrid,
@@ -342,9 +347,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const [staffSortOrder, setStaffSortOrder] = useState('name-asc');
     const [aptSearchQuery, setAptSearchQuery] = useState('');
     const [aptSortOrder, setAptSortOrder] = useState('time-asc');
+    const [roleFilter, setRoleFilter] = useState('All');
 
     // User Management State
     const [editUser, setEditUser] = useState<any>(null);
+    const [userPage, setUserPage] = useState(1);
+    const usersPerPage = 10;
     const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
     const [formData, setFormData] = useState({
         first_name: '',
@@ -778,23 +786,85 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             </HStack>
                         </ModalHeader>
                         <ModalBody py={6}>
-                            <VStack align="stretch" spacing={4}>
-                                <Text fontWeight="bold" fontSize="md" color="gray.700">Total Users Breakdown</Text>
-                                <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.200" boxShadow="sm">
-                                    <Table variant="simple" size="sm">
-                                        <Thead bg="gray.50">
-                                            <Tr>
-                                                <Th py={3}>Category</Th>
-                                                <Th py={3} isNumeric>Count</Th>
-                                            </Tr>
-                                        </Thead>
-                                        <Tbody>
-                                            <Tr><Td py={3}>Residents (Barangay 174)</Td><Td py={3} isNumeric>{residentsCount}</Td></Tr>
-                                            <Tr><Td py={3}>Non-Residents</Td><Td py={3} isNumeric>{nonResidentsCount}</Td></Tr>
-                                            <Tr bg="teal.50"><Td py={3} fontWeight="bold" color="teal.800">Total</Td><Td py={3} isNumeric fontWeight="bold" color="teal.800">{users.length}</Td></Tr>
-                                        </Tbody>
-                                    </Table>
+                            <VStack align="stretch" spacing={6}>
+
+
+                                <Box h="320px" w="full" position="relative" display="flex" alignItems="center" justifyContent="center">
+                                    {users.length > 0 ? (
+                                        <>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie
+                                                        data={[
+                                                            { name: 'Residents', value: residentsCount },
+                                                            { name: 'Non-Residents', value: nonResidentsCount },
+                                                        ]}
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={75}
+                                                        outerRadius={115}
+                                                        paddingAngle={8}
+                                                        dataKey="value"
+                                                        stroke="none"
+                                                    >
+                                                        <Cell
+                                                            fill="#38b2ac"
+                                                            // @ts-ignore
+                                                            style={{ filter: 'drop-shadow(0px 4px 10px rgba(56, 178, 172, 0.4))' }}
+                                                        />
+                                                        <Cell
+                                                            fill="#ed8936"
+                                                            // @ts-ignore
+                                                            style={{ filter: 'drop-shadow(0px 4px 10px rgba(237, 137, 54, 0.4))' }}
+                                                        />
+                                                    </Pie>
+                                                    <Tooltip
+                                                        contentStyle={{ borderRadius: '15px', border: 'none', boxShadow: '0 10px 20px rgba(0,0,0,0.15)' }}
+                                                    />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+
+                                            {/* Central Total Indicator */}
+                                            <VStack
+                                                position="absolute"
+                                                top="50%"
+                                                left="50%"
+                                                transform="translate(-50%, -50%)"
+                                                spacing={0}
+                                            >
+                                                <Text fontSize="sm" color="gray.400" fontWeight="700" textTransform="uppercase" letterSpacing="1px">Total</Text>
+                                                <Text fontSize="4xl" color="teal.800" fontWeight="900" lineHeight="1">{users.length}</Text>
+                                            </VStack>
+                                        </>
+                                    ) : (
+                                        <VStack spacing={4} opacity={0.5}>
+                                            <Box
+                                                w="200px" h="200px" borderRadius="full" border="15px solid" borderColor="gray.100"
+                                                display="flex" alignItems="center" justifyContent="center"
+                                            >
+                                                <Icon as={FiUsers} boxSize={10} color="gray.300" />
+                                            </Box>
+                                            <Text fontWeight="600" color="gray.400">No patient data available</Text>
+                                        </VStack>
+                                    )}
                                 </Box>
+
+                                <VStack spacing={4} align="stretch" px={4} mt={-2}>
+                                    <Flex justify="space-between" align="center" p={4} bg="teal.50" borderRadius="2xl" border="1px solid" borderColor="teal.100" transition="0.2s" _hover={{ transform: 'translateX(5px)', bg: 'teal.100' }}>
+                                        <HStack spacing={4}>
+                                            <Box w={4} h={4} borderRadius="full" bg="teal.500" shadow="0 0 10px rgba(56, 178, 172, 0.5)" />
+                                            <Text fontWeight="700" color="teal.800">Residents (Brgy 174)</Text>
+                                        </HStack>
+                                        <Text fontWeight="900" color="teal.900" fontSize="xl">{residentsCount}</Text>
+                                    </Flex>
+                                    <Flex justify="space-between" align="center" p={4} bg="orange.50" borderRadius="2xl" border="1px solid" borderColor="orange.100" transition="0.2s" _hover={{ transform: 'translateX(5px)', bg: 'orange.100' }}>
+                                        <HStack spacing={4}>
+                                            <Box w={4} h={4} borderRadius="full" bg="orange.500" shadow="0 0 10px rgba(237, 137, 54, 0.5)" />
+                                            <Text fontWeight="700" color="orange.800">Non-Residents</Text>
+                                        </HStack>
+                                        <Text fontWeight="900" color="orange.900" fontSize="xl">{nonResidentsCount}</Text>
+                                    </Flex>
+                                </VStack>
                             </VStack>
                         </ModalBody>
                     </>
@@ -1191,11 +1261,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </VStack>
                 );
             case 'users': {
-                const filteredUsers = users.filter(u =>
-                    u.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    u.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    u.email.toLowerCase().includes(searchQuery.toLowerCase())
-                ).sort((a, b) => {
+                const filteredUsers = users.filter(u => {
+                    const matchesSearch = u.first_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                          u.last_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                          u.email.toLowerCase().includes(searchQuery.toLowerCase());
+                    
+                    const roleLower = (u.role || 'Patient').toLowerCase();
+                    const matchesRole = roleFilter === 'All' || 
+                        (roleFilter === 'Medical Staff' && (roleLower.includes('medic') || roleLower.includes('staff'))) ||
+                        (roleFilter === 'Doctor' && roleLower.includes('doctor')) ||
+                        (roleFilter === 'Patient' && roleLower === 'patient');
+                        
+                    return matchesSearch && matchesRole;
+                }).sort((a, b) => {
                     if (sortOrder === 'name-asc') return a.first_name.localeCompare(b.first_name);
                     if (sortOrder === 'name-desc') return b.first_name.localeCompare(a.first_name);
                     if (sortOrder === 'role') return a.role.localeCompare(b.role);
@@ -1231,20 +1309,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 <HStack>
                                     <InputGroup w={{ base: "full", md: "250px" }}>
                                         <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
-                                        <Input placeholder="Search users..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                                        <Input
+                                            placeholder="Search users..."
+                                            value={searchQuery}
+                                            onChange={(e) => {
+                                                setSearchQuery(e.target.value);
+                                                setUserPage(1);
+                                            }}
+                                        />
                                     </InputGroup>
-                                    <Select w="150px" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                                        <option value="name-asc">Name (A-Z)</option>
-                                        <option value="name-desc">Name (Z-A)</option>
-                                        <option value="role">Role</option>
-                                        <option value="date">Date Joined</option>
+                                    <Select w="180px" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setUserPage(1); }}>
+                                        <option value="All">All Roles</option>
+                                        <option value="Patient">Patients</option>
+                                        <option value="Medical Staff">Medical Staff</option>
+                                        <option value="Doctor">Doctors</option>
                                     </Select>
                                     <Button
                                         size="sm" colorScheme="red" variant="outline"
                                         leftIcon={<Icon as={FiFileText} />}
                                         onClick={async () => {
-                                            const headers = ['First Name', 'Last Name', 'Email', 'Date Joined'];
-                                            const rows = filteredUsers.map((u: any) => [
+                                            const headers = ['No.', 'First Name', 'Last Name', 'Email', 'Date Joined'];
+                                            const rows = filteredUsers.map((u: any, index: number) => [
+                                                index + 1,
                                                 u.first_name, u.last_name, u.email,
                                                 u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
                                             ]);
@@ -1257,8 +1343,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         size="sm" colorScheme="green" variant="outline"
                                         leftIcon={<Icon as={FiFileText} />}
                                         onClick={async () => {
-                                            const headers = ['First Name', 'Last Name', 'Email', 'Date Joined'];
-                                            const rows = filteredUsers.map((u: any) => [
+                                            const headers = ['No.', 'First Name', 'Last Name', 'Email', 'Date Joined'];
+                                            const rows = filteredUsers.map((u: any, index: number) => [
+                                                index + 1,
                                                 u.first_name, u.last_name, u.email,
                                                 u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
                                             ]);
@@ -1274,7 +1361,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     <Thead bg="gray.50">
                                         <Tr>
                                             <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>User ID</Th>
-                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Name</Th>
+                                            <Th 
+                                                fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}
+                                                cursor="pointer"
+                                                onClick={() => {
+                                                    setSortOrder(sortOrder === 'name-asc' ? 'name-desc' : 'name-asc');
+                                                    setUserPage(1);
+                                                }}
+                                                _hover={{ color: 'teal.500' }}
+                                            >
+                                                <HStack spacing={1}>
+                                                    <Text>Name</Text>
+                                                    {sortOrder.startsWith('name') && (
+                                                        <Icon as={sortOrder === 'name-asc' ? FiChevronUp : FiChevronDown} />
+                                                    )}
+                                                </HStack>
+                                            </Th>
                                             <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Email</Th>
                                             <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Role</Th>
                                             <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Joined</Th>
@@ -1283,28 +1385,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                     </Thead>
                                     <Tbody>
                                         {filteredUsers.length > 0 ? (
-                                            filteredUsers.map((user, idx) => (
-                                                <Tr key={user.id} bg={idx % 2 === 0 ? 'white' : 'gray.50'} _hover={{ bg: 'teal.50' }}>
-                                                    <Td py={4}><Text fontFamily="mono" fontSize="sm" fontWeight="600" color="teal.700">{formatUserId(user.id, user.role, user.created_at)}</Text></Td>
-                                                    <Td py={4} fontWeight="600">{user.first_name} {user.last_name}</Td>
-                                                    <Td py={4}>{user.email}</Td>
-                                                    <Td py={4}>
-                                                        <Badge colorScheme={(user.role || '').toLowerCase().includes('admin') ? 'red' : (user.role || '').toLowerCase().includes('medic') || (user.role || '').toLowerCase().includes('staff') ? 'blue' : (user.role || '').toLowerCase().includes('doctor') ? 'purple' : 'green'} fontWeight="600" fontSize="xs" px={2} py={1}>
-                                                            {(user.role || 'Patient').toLowerCase().includes('admin') ? 'Administrator' : user.role}
-                                                        </Badge>
-                                                    </Td>
-                                                    <Td py={4}>{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</Td>
-                                                    <Td py={4}>
-                                                        <HStack spacing={2}>
-                                                            {(user?.role || '').toLowerCase().includes('super') ? (
-                                                                <Button size="sm" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
-                                                            ) : (
-                                                                <Button size="sm" colorScheme="teal" variant="outline" onClick={() => handleEditClick(user)}>View</Button>
-                                                            )}
-                                                        </HStack>
-                                                    </Td>
-                                                </Tr>
-                                            ))
+                                            filteredUsers
+                                                .slice((userPage - 1) * usersPerPage, userPage * usersPerPage)
+                                                .map((user, idx) => (
+                                                    <Tr key={user.id} bg={idx % 2 === 0 ? 'white' : 'gray.50'} _hover={{ bg: 'teal.50' }}>
+                                                        <Td py={4}><Text fontFamily="mono" fontSize="sm" fontWeight="600" color="teal.700">{formatUserId(user.id, user.role, user.created_at)}</Text></Td>
+                                                        <Td py={4} fontWeight="600">{user.first_name} {user.last_name}</Td>
+                                                        <Td py={4}>{user.email}</Td>
+                                                        <Td py={4}>
+                                                            <Badge colorScheme={(user.role || '').toLowerCase().includes('admin') ? 'red' : (user.role || '').toLowerCase().includes('medic') || (user.role || '').toLowerCase().includes('staff') ? 'blue' : (user.role || '').toLowerCase().includes('doctor') ? 'purple' : 'green'} fontWeight="600" fontSize="xs" px={2} py={1}>
+                                                                {(user.role || 'Patient').toLowerCase().includes('admin') ? 'Administrator' : user.role}
+                                                            </Badge>
+                                                        </Td>
+                                                        <Td py={4}>{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</Td>
+                                                        <Td py={4}>
+                                                            <HStack spacing={2}>
+                                                                {(user?.role || '').toLowerCase().includes('super') ? (
+                                                                    <Button size="sm" colorScheme="blue" variant="ghost" onClick={() => handleEditClick(user)}>Edit</Button>
+                                                                ) : (
+                                                                    <Button size="sm" colorScheme="teal" variant="outline" onClick={() => handleEditClick(user)}>View</Button>
+                                                                )}
+                                                            </HStack>
+                                                        </Td>
+                                                    </Tr>
+                                                ))
                                         ) : (
                                             <Tr>
                                                 <Td colSpan={6} textAlign="center" py={10} color="gray.500" fontSize="sm">No users found.</Td>
@@ -1312,6 +1416,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         )}
                                     </Tbody>
                                 </Table>
+                            </Box>
+                            <Box p={4} borderTop="1px solid" borderColor="gray.100" bg="gray.50" borderBottomRadius="xl">
+                                <Flex justify="space-between" align="center" direction={{ base: "column", sm: "row" }} gap={4}>
+                                    <Text fontSize="sm" color="gray.600" fontWeight="600">
+                                        Showing {Math.min((userPage - 1) * usersPerPage + 1, filteredUsers.length)} to {Math.min(userPage * usersPerPage, filteredUsers.length)} of {filteredUsers.length} users
+                                    </Text>
+                                    <HStack spacing={2}>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            isDisabled={userPage === 1}
+                                            onClick={() => setUserPage(prev => prev - 1)}
+                                            leftIcon={<FiChevronLeft />}
+                                            bg="white"
+                                        >
+                                            Prev
+                                        </Button>
+
+                                        {/* Page Numbers */}
+                                        {Array.from({ length: Math.ceil(filteredUsers.length / usersPerPage) }, (_, i) => i + 1)
+                                            .filter(p => p === 1 || p === Math.ceil(filteredUsers.length / usersPerPage) || Math.abs(p - userPage) <= 1)
+                                            .map((p, i, arr) => (
+                                                <React.Fragment key={p}>
+                                                    {i > 0 && arr[i - 1] !== p - 1 && <Text color="gray.400">...</Text>}
+                                                    <Button
+                                                        size="sm"
+                                                        colorScheme={userPage === p ? "teal" : "gray"}
+                                                        variant={userPage === p ? "solid" : "ghost"}
+                                                        onClick={() => setUserPage(p)}
+                                                        minW="32px"
+                                                    >
+                                                        {p}
+                                                    </Button>
+                                                </React.Fragment>
+                                            ))
+                                        }
+
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            isDisabled={userPage >= Math.ceil(filteredUsers.length / usersPerPage)}
+                                            onClick={() => setUserPage(prev => prev + 1)}
+                                            rightIcon={<FiChevronRight />}
+                                            bg="white"
+                                        >
+                                            Next
+                                        </Button>
+                                    </HStack>
+                                </Flex>
                             </Box>
                         </Box>
                     </VStack>
@@ -1466,7 +1619,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         { name: 'Not completed', value: tbRemaining },
                     ]
                     : [];
-
+                const handleExportGraph = async (e: React.MouseEvent, graphName: string, patients: any[]) => {
+                    e.stopPropagation();
+                    if (!patients || patients.length === 0) {
+                        toast({ title: 'No Data', description: `No patient data found for ${graphName}.`, status: 'warning', duration: 3000 });
+                        return;
+                    }
+                    const headers = ['No.', 'Patient Name', 'Date', 'Status', 'Service'];
+                    const rows = patients.map((p: any, index: number) => [
+                        index + 1,
+                        p.patient_name || 'N/A',
+                        p.appointment_date || 'N/A',
+                        (p.status || 'N/A').toUpperCase(),
+                        p.service_type || p.service || graphName
+                    ]);
+                    await downloadPDF(`${graphName.replace(/\s+/g, '_').toLowerCase()}_patients.pdf`, `${graphName} Patients`, headers, rows);
+                };
 
                 return (
                     <VStack align="stretch" spacing={10}>
@@ -1483,8 +1651,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 size="sm" colorScheme="red" variant="outline"
                                 leftIcon={<Icon as={FiFileText} />}
                                 onClick={async () => {
-                                    const headers = ['Service', 'Total Appointments', 'Upcoming', 'Completed'];
-                                    const rows = (predictiveData?.top_services || []).map((s: any) => [
+                                    const headers = ['No.', 'Service', 'Total Appointments', 'Upcoming', 'Completed'];
+                                    const rows = (predictiveData?.top_services || []).map((s: any, index: number) => [
+                                        index + 1,
                                         s.service, s.total, s.upcoming, s.completed
                                     ]);
                                     await downloadPDF(
@@ -1501,8 +1670,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 size="sm" colorScheme="green" variant="outline"
                                 leftIcon={<Icon as={FiFileText} />}
                                 onClick={async () => {
-                                    const headers = ['Service', 'Total Appointments', 'Upcoming', 'Completed'];
-                                    const rows = (predictiveData?.top_services || []).map((s: any) => [
+                                    const headers = ['No.', 'Service', 'Total Appointments', 'Upcoming', 'Completed'];
+                                    const rows = (predictiveData?.top_services || []).map((s: any, index: number) => [
+                                        index + 1,
                                         s.service, s.total, s.upcoming, s.completed
                                     ]);
                                     await downloadExcel('service_demand_report.xlsx', 'Service Demand Report', headers, rows);
@@ -1545,9 +1715,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                     How many prenatal checkups were recorded
                                                 </Text>
                                             </Box>
-                                            <Badge colorScheme="teal" variant="subtle" borderRadius="full" px={3}>
-                                                {prenatalCount.toLocaleString()}
-                                            </Badge>
+                                            <HStack>
+                                                <IconButton
+                                                    icon={<FiDownload />}
+                                                    aria-label="Download Patient Data"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    colorScheme="teal"
+                                                    onClick={(e) => handleExportGraph(e, 'Prenatal Visits', analyticsData?.prenatal?.patients || [])}
+                                                />
+                                                <Badge colorScheme="teal" variant="subtle" borderRadius="full" px={3}>
+                                                    {prenatalCount.toLocaleString()}
+                                                </Badge>
+                                            </HStack>
                                         </HStack>
                                         <Text fontSize="xs" color="gray.500">
                                             {prenatalPrev > 0 ? `${Math.abs(prenatalChange)}% ${prenatalChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
@@ -1594,9 +1774,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                     Total immunization appointments (this month)
                                                 </Text>
                                             </Box>
-                                            <Badge colorScheme="orange" variant="subtle" borderRadius="full" px={3}>
-                                                {immunCount.toLocaleString()}
-                                            </Badge>
+                                            <HStack>
+                                                <IconButton
+                                                    icon={<FiDownload />}
+                                                    aria-label="Download Patient Data"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    colorScheme="orange"
+                                                    onClick={(e) => handleExportGraph(e, 'Immunization', analyticsData?.immunization?.patients || [])}
+                                                />
+                                                <Badge colorScheme="orange" variant="subtle" borderRadius="full" px={3}>
+                                                    {immunCount.toLocaleString()}
+                                                </Badge>
+                                            </HStack>
                                         </HStack>
                                         <Text fontSize="xs" color="gray.500">
                                             {immunPrev > 0 ? `${Math.abs(immunChange)}% ${immunChange >= 0 ? 'more' : 'less'} than last month` : 'No prior month data'}
@@ -1659,9 +1849,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                     How many patients completed treatment
                                                 </Text>
                                             </Box>
-                                            <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={3}>
-                                                {tbTotal > 0 ? `${tbPct}%` : 'N/A'}
-                                            </Badge>
+                                            <HStack>
+                                                <IconButton
+                                                    icon={<FiDownload />}
+                                                    aria-label="Download Patient Data"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    colorScheme="blue"
+                                                    onClick={(e) => handleExportGraph(e, 'TB Treatment', analyticsData?.tb_treatment?.patients || [])}
+                                                />
+                                                <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={3}>
+                                                    {tbTotal > 0 ? `${tbPct}%` : 'N/A'}
+                                                </Badge>
+                                            </HStack>
                                         </HStack>
 
                                         <Box h="190px" mt={4}>
@@ -1723,9 +1923,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                             Appointments (last 90 days)
                                                         </Text>
                                                     </Box>
-                                                    <Badge colorScheme="purple" variant="subtle" borderRadius="full" px={3}>
-                                                        {svc.total}
-                                                    </Badge>
+                                                    <HStack>
+                                                        <IconButton
+                                                            icon={<FiDownload />}
+                                                            aria-label="Download Patient Data"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            colorScheme="purple"
+                                                            onClick={(e) => handleExportGraph(e, svc.service, svc.patients || [])}
+                                                        />
+                                                        <Badge colorScheme="purple" variant="subtle" borderRadius="full" px={3}>
+                                                            {svc.total}
+                                                        </Badge>
+                                                    </HStack>
                                                 </HStack>
                                                 <Box h="190px" mt={4}>
                                                     {svcChartData.length > 0 ? (
@@ -2173,7 +2383,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             </Box>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p={{ base: 6, md: 10 }} position="relative">
+            <Box
+                ml={{ base: 0, md: '280px' }}
+                p={{ base: 6, md: 10 }}
+                position="relative"
+                maxW={{ base: "100%", md: "calc(100vw - 280px)" }}
+                overflowX="hidden"
+            >
                 <Flex justify="space-between" align="center" mb={10}>
                     <HStack spacing={4}>
                         <IconButton

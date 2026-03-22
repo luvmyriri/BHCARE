@@ -8,6 +8,7 @@ import psycopg2.extras  # type: ignore
 from psycopg2.extras import RealDictCursor  # type: ignore
 from database import get_db_connection  # type: ignore
 import random
+import time
 import string
 from flask_bcrypt import Bcrypt  # type: ignore
 import os
@@ -32,7 +33,7 @@ from email_config import (  # type: ignore
     send_walkin_patient_credentials_email,
     check_forgot_cooldown,
 )
-
+from reminder_service import start_reminder_service # type: ignore
 load_dotenv()
 
 START_TIME = datetime.now()
@@ -104,9 +105,25 @@ try:
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );''')
     conn.commit()
-    cur.close()
+    # Ensure reminder_sent column exists in appointments
+    cur.execute("""
+        SELECT count(*) FROM information_schema.columns 
+        WHERE table_name = 'appointments' AND column_name = 'reminder_sent'
+    """)
+    if cur.fetchone()[0] == 0:
+        print("🔗 Adding 'reminder_sent' column to appointments table...")
+        cur.execute("ALTER TABLE appointments ADD COLUMN reminder_sent BOOLEAN DEFAULT FALSE")
+        conn.commit()
+
     conn.close()
-    print("✅ Database connection verified and contact_tickets table checked.")
+    print("✅ Database connection verified and schema updated.")
+
+    # Start the Appointment Reminder Service
+    try:
+        start_reminder_service(app, mail)
+        print("🔔 Appointment Reminder Service activated.")
+    except Exception as e:
+        print(f"⚠️ Failed to start Reminder Service: {e}")
 except Exception as e:
     print(f"❌ CRITICAL: Database connection failed at startup: {e}")
 
@@ -125,7 +142,7 @@ def preprocess_image(image_bytes):
         img = img.convert('RGB')
     
     # 1. Scale image to optimal OCR size (large enough to read, but strict < 1MB limit for OCR.space)
-    target_width = 1400
+    target_width = 1200
     if img.width != target_width:
         ratio = target_width / img.width
         img = img.resize((target_width, int(img.height * ratio)), Image.Resampling.LANCZOS)
@@ -1201,22 +1218,36 @@ def ocr_dual():
             'language': 'eng',
             'isOverlayRequired': 'false',
             'scale': 'true',
-            'OCREngine': '2'
+            'OCREngine': '1'
         }
         
-        response = requests.post(
-            'https://api.ocr.space/parse/image',
-            files={'file': ('front.jpg', processed_front, 'image/jpeg')},
-            data=payload,
-            timeout=60
-        )
-        
-        if response.status_code != 200:
-            return jsonify({"error": f"OCR API error: {response.status_code}"}), 500
-        
-        result = response.json()
-        if not result.get('ParsedResults'):
-            return jsonify({"error": "No text detected"}), 400
+        start_time = time.time()
+        try:
+            response = requests.post(
+                'https://api.ocr.space/parse/image',
+                files={'file': ('front.jpg', processed_front, 'image/jpeg')},
+                data=payload,
+                timeout=180
+            )
+            elapsed = time.time() - start_time
+            print(f"[OCR] API call took {elapsed:.2f} seconds")
+            
+            if response.status_code != 200:
+                print(f"[OCR] HTTP Error {response.status_code}: {response.text}")
+                return jsonify({"error": f"OCR API error: {response.status_code}"}), 500
+            
+            result = response.json()
+        except requests.exceptions.Timeout:
+            return jsonify({"error": "OCR API Request Timed Out. The service is unusually slow right now. Please try again or fill manually."}), 504
+        except Exception as e:
+            print(f"[OCR] Request Exception: {str(e)}")
+            return jsonify({"error": f"OCR Request Error: {str(e)}"}), 500
+            
+        print(f"[OCR] API Response: {result}")
+        if not result.get('ParsedResults') or len(result.get('ParsedResults')) == 0:
+            err_msg = result.get('ErrorMessage', 'No text detected')
+            print(f"[OCR] OCR Space Error/Empty: {err_msg}")
+            return jsonify({"error": f"No text detected. OCR Details: {err_msg}"}), 400
         
         front_text = result['ParsedResults'][0].get('ParsedText', '')
         print(f"FRONT OCR:\n{front_text}\n")
@@ -1228,18 +1259,21 @@ def ocr_dual():
             back_bytes = back.read()
             processed_back = preprocess_image(back_bytes)
             
-            response = requests.post(
-                'https://api.ocr.space/parse/image',
-                files={'file': ('back.jpg', processed_back, 'image/jpeg')},
-                data=payload,
-                timeout=60
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('ParsedResults'):
-                    back_text = result['ParsedResults'][0].get('ParsedText', '')
-                    print(f"BACK OCR:\n{back_text}\n")
+            try:
+                response = requests.post(
+                    'https://api.ocr.space/parse/image',
+                    files={'file': ('back.jpg', processed_back, 'image/jpeg')},
+                    data=payload,
+                    timeout=180
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('ParsedResults'):
+                        back_text = result['ParsedResults'][0].get('ParsedText', '')
+                        print(f"BACK OCR:\n{back_text}\n")
+            except Exception as e:
+                print(f"Back ID OCR Error (Non-Fatal): {e}")
         
         # Parse combined text
         combined_text = front_text + "\n" + back_text # Combine and Parse
@@ -1289,20 +1323,23 @@ def ocr():
             'language': 'eng',
             'isOverlayRequired': 'false',
             'scale': 'true',
-            'OCREngine': '2'
+            'OCREngine': '1'
         }
         
-        response = requests.post(
-            'https://api.ocr.space/parse/image',
-            files={'file': ('id.jpg', processed, 'image/jpeg')},
-            data=payload,
-            timeout=60
-        )
-        
-        if response.status_code != 200:
-            return jsonify({"error": "OCR failed"}), 500
-        
-        result = response.json()
+        try:
+            response = requests.post(
+                'https://api.ocr.space/parse/image',
+                files={'file': ('id.jpg', processed, 'image/jpeg')},
+                data=payload,
+                timeout=180
+            )
+            
+            if response.status_code != 200:
+                return jsonify({"error": "OCR failed"}), 500
+            
+            result = response.json()
+        except requests.exceptions.Timeout:
+            return jsonify({"error": "OCR API Timeout"}), 504
         if not result.get('ParsedResults'):
             return jsonify({"error": "No text"}), 400
         
@@ -1697,11 +1734,13 @@ def get_all_users():
         # Select relevant fields, excluding sensitive auth data
         query = """
             SELECT 
-                id, patient_number, first_name, last_name, email, 
-                contact_number, gender, date_of_birth, full_address,
-                barangay, city, role, created_at, status, suffix
-            FROM users 
-            ORDER BY created_at DESC
+                u.id, u.patient_number, u.first_name, u.last_name, u.email, 
+                u.contact_number, u.gender, u.date_of_birth, u.full_address,
+                u.barangay, u.city, u.role, u.created_at, u.status, u.suffix,
+                d.prc_license_number, d.specialization, d.schedule, d.clinic_room
+            FROM users u
+            LEFT JOIN medical_staff_details d ON u.id = d.user_id
+            ORDER BY u.created_at DESC
         """
         
         cur.execute(query)
@@ -2093,7 +2132,8 @@ def get_medical_staff():
         query = """
             SELECT 
                 u.id, u.first_name, u.last_name, u.email, 
-                u.contact_number, u.role, u.gender,
+                u.contact_number, u.role, u.gender, u.date_of_birth,
+                u.full_address, u.barangay, u.city, u.province, u.patient_number,
                 d.prc_license_number, d.specialization, d.schedule, d.clinic_room
             FROM users u
             LEFT JOIN medical_staff_details d ON u.id = d.user_id
@@ -2102,7 +2142,15 @@ def get_medical_staff():
         """
         
         cur.execute(query)
-        staff = cur.fetchall()
+        staff_rows = cur.fetchall()
+        
+        # Format dates
+        staff = []
+        for row in staff_rows:
+            s_dict = dict(row)
+            if s_dict.get('date_of_birth'):
+                s_dict['date_of_birth'] = s_dict['date_of_birth'].strftime('%Y-%m-%d')
+            staff.append(s_dict)
         
         cur.close()
         conn.close()
@@ -2761,7 +2809,6 @@ def get_admin_analytics():
             WHERE {prenatal_filter}
               AND a.status NOT IN ('cancelled')
             ORDER BY a.appointment_date DESC
-            LIMIT 20
         """)
         prenatal_patients_raw = cur.fetchall()
         prenatal_patients = []
@@ -2817,6 +2864,27 @@ def get_admin_analytics():
         """)
         breakdown['Other'] = cur.fetchone()['n']
 
+        # Immunization patients
+        cur.execute(f"""
+            SELECT
+                u.first_name || ' ' || u.last_name AS patient_name,
+                a.appointment_date,
+                a.service_type,
+                a.status
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE {immunization_filter}
+              AND a.status NOT IN ('cancelled')
+            ORDER BY a.appointment_date DESC
+        """)
+        immunization_patients_raw = cur.fetchall()
+        immunization_patients = []
+        for p in immunization_patients_raw:
+            row = dict(p)
+            if row.get('appointment_date'):
+                row['appointment_date'] = row['appointment_date'].strftime('%b %d, %Y')
+            immunization_patients.append(row)
+
         # ── 3. TB / DOTS Treatment Success ────────────────────────────
         tb_filter = """(
             service_type ILIKE '%dots%'
@@ -2838,6 +2906,26 @@ def get_admin_analytics():
         tb_total     = sum(r['n'] for r in tb_rows)
         tb_completed = sum(r['n'] for r in tb_rows if r['status'] == 'completed')
         tb_pct = float(round((tb_completed / tb_total * 100), 1)) if tb_total > 0 else 0.0  # type: ignore
+
+        # TB patients
+        cur.execute(f"""
+            SELECT
+                u.first_name || ' ' || u.last_name AS patient_name,
+                a.appointment_date,
+                a.service_type,
+                a.status
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE {tb_filter}
+            ORDER BY a.appointment_date DESC
+        """)
+        tb_patients_raw = cur.fetchall()
+        tb_patients = []
+        for p in tb_patients_raw:
+            row = dict(p)
+            if row.get('appointment_date'):
+                row['appointment_date'] = row['appointment_date'].strftime('%b %d, %Y')
+            tb_patients.append(row)
 
         # ── 4. Top Morbidity (by diagnosis) ───────────────────────────
         cur.execute("""
@@ -2957,12 +3045,14 @@ def get_admin_analytics():
                 "count":      immunization_count,
                 "prev_month": immunization_prev,
                 "target_pct": 95,
-                "breakdown":  breakdown
+                "breakdown":  breakdown,
+                "patients":   immunization_patients
             },
             "tb_treatment": {
                 "completed":   tb_completed,
                 "total":       tb_total,
-                "success_pct": tb_pct
+                "success_pct": tb_pct,
+                "patients":    tb_patients
             },
             "morbidity": morbidity,
             "dengue_hotspots": dengue_hotspots,
@@ -3371,6 +3461,33 @@ def predictive_insights():
             LIMIT 10
         """)
         service_rows = cur.fetchall()
+        
+        # Map patients to top services
+        cur.execute("""
+            SELECT
+                a.service_type AS service,
+                u.first_name || ' ' || u.last_name AS patient_name,
+                a.appointment_date,
+                a.status
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.status != 'cancelled'
+              AND a.appointment_date >= CURRENT_DATE - INTERVAL '90 days'
+        """)
+        recent_patients = cur.fetchall()
+        
+        service_map = {row['service']: [] for row in service_rows}
+        for p in recent_patients:
+            srv = p['service'].lower() if p['service'] else ''
+            if srv in service_map:
+                service_map[srv].append({
+                    "patient_name": p['patient_name'],
+                    "appointment_date": p['appointment_date'].strftime('%b %d, %Y') if p.get('appointment_date') else '',
+                    "status": p['status']
+                })
+        
+        for row in service_rows:
+            row['patients'] = service_map[row['service']]
 
         # ── 2. Busiest day of week ───────────────────────────────────────────
         cur.execute("""
@@ -3421,7 +3538,8 @@ def predictive_insights():
                 "service": svc.title(),
                 "total": total,
                 "upcoming": upcoming,
-                "completed": int(row['completed'] or 0)
+                "completed": int(row['completed'] or 0),
+                "patients": row.get('patients', [])
             })
             # Extract individual words from service name for keyword matching
             for word in str(svc).split():

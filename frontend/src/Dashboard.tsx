@@ -684,10 +684,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                         />
 
                         <Flex gap={4} direction={{ base: 'column', lg: 'row' }}>
-                            <Box flex="2" bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Box flex="2" minW="0" bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                                 <Heading size="md" color="teal.800" mb={6}>My Medical History</Heading>
-                                <Box overflowX="auto">
-                                    <Table variant="simple">
+                                <Box overflowX="hidden">
+                                    <Table variant="simple" size="sm">
                                         <Thead>
                                             <Tr>
                                                 <Th>Date</Th>
@@ -701,7 +701,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                             {medicalHistory.length > 0 ? (
                                                 medicalHistory.map((r, i) => (
                                                     <Tr key={i}>
-                                                        <Td whiteSpace="nowrap">{r.created_at}</Td>
+                                                        <Td>{r.created_at}</Td>
                                                         <Td fontWeight="600">{r.assessment || 'Medical Log'}</Td>
                                                         <Td>{r.doctor_name || 'Unknown'}</Td>
                                                         <Td><Badge colorScheme="green">Completed</Badge></Td>
@@ -723,40 +723,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                             </Box>
 
                             {/* Document Request History */}
-                            <Box flex="1" bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Box flex="1" minW="0" bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
                                 <Heading size="md" color="teal.800" mb={6}>My Document Requests</Heading>
-                                <Box overflowX="auto">
-                                    <Table variant="simple">
+                                <Box overflowX="hidden">
+                                    <Table variant="simple" size="sm" css={{ tableLayout: 'fixed', width: '100%' }}>
                                         <Thead>
                                             <Tr>
-                                                <Th>Date</Th>
-                                                <Th>Document Type</Th>
-                                                <Th>Purpose</Th>
-                                                <Th>Status</Th>
+                                                <Th w="30%">Date</Th>
+                                                <Th w="35%">Document Type</Th>
+                                                <Th w="35%">Purpose</Th>
                                             </Tr>
                                         </Thead>
                                         <Tbody>
                                             {documentHistory.length > 0 ? (
                                                 documentHistory.map((doc, i) => (
                                                     <Tr key={i}>
-                                                        <Td whiteSpace="nowrap">{doc.created_at}</Td>
-                                                        <Td fontWeight="600">{doc.document_type}</Td>
-                                                        <Td>
-                                                            <VStack align="start" spacing={0}>
-                                                                <Text fontSize="sm">{doc.reason}</Text>
-                                                                <Text fontSize="xs" color="gray.500">{doc.sickness}</Text>
+                                                        <Td wordBreak="break-word" whiteSpace="normal">{doc.created_at}</Td>
+                                                        <Td fontWeight="600" wordBreak="break-word" whiteSpace="normal">{doc.document_type}</Td>
+                                                        <Td wordBreak="break-word" whiteSpace="normal">
+                                                            <VStack align="start" spacing={1}>
+                                                                <Text fontSize="xs">{doc.reason}</Text>
+                                                                <Badge colorScheme={doc.status === 'completed' ? 'green' : 'orange'} fontSize="10px">
+                                                                    {doc.status.toUpperCase()}
+                                                                </Badge>
                                                             </VStack>
-                                                        </Td>
-                                                        <Td>
-                                                            <Badge colorScheme={doc.status === 'completed' ? 'green' : 'orange'}>
-                                                                {doc.status.toUpperCase()}
-                                                            </Badge>
                                                         </Td>
                                                     </Tr>
                                                 ))
                                             ) : (
                                                 <Tr>
-                                                    <Td colSpan={4} textAlign="center">
+                                                    <Td colSpan={3} textAlign="center">
                                                         <Text color="gray.500" py={4}>No document requests found.</Text>
                                                     </Td>
                                                 </Tr>
@@ -851,7 +847,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
             </Box>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p={{ base: 6, sm: 8, md: 10 }} position="relative">
+            <Box 
+                ml={{ base: 0, md: '280px' }} 
+                p={{ base: 6, sm: 8, md: 10 }} 
+                position="relative" 
+                maxW={{ base: "100%", md: "calc(100vw - 280px)" }}
+                overflowX="hidden"
+            >
                 <Flex
                     justify="space-between"
                     align={{ base: "start", sm: "center" }}

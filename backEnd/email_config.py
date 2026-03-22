@@ -1,7 +1,8 @@
+# pyre-ignore-all-errors
 """
 Email configuration and utility functions for sending emails via Gmail SMTP
 """
-from flask_mail import Mail, Message
+from flask_mail import Mail, Message  # type: ignore
 import secrets
 from datetime import datetime, timedelta
 
@@ -65,7 +66,7 @@ def validate_reset_token(token, email=None):
         return None
         
     if datetime.now() > data['expires']:
-        del reset_codes[email]
+        del reset_codes[email] # type: ignore
         return None
     
     return email
@@ -73,7 +74,7 @@ def validate_reset_token(token, email=None):
 def invalidate_reset_token(token, email=None):
     """Remove token after use"""
     if email and email in reset_codes:
-        del reset_codes[email]
+        del reset_codes[email] # type: ignore
 
 
 def check_forgot_cooldown(email: str, cooldown_seconds: int = 60, max_per_hour: int = 5):
@@ -86,12 +87,12 @@ def check_forgot_cooldown(email: str, cooldown_seconds: int = 60, max_per_hour: 
     now = datetime.now()
     info = forgot_rate_limits.get(email, {})
 
-    last = info.get("last_requested_at")
-    count = info.get("count", 0)
+    last = info.get("last_requested_at") # type: ignore
+    count = info.get("count", 0) # type: ignore
 
     # Per-minute style cooldown between requests
     if last is not None:
-        delta = (now - last).total_seconds()
+        delta = (now - last).total_seconds() # type: ignore
         if delta < cooldown_seconds:
             retry_after = int(cooldown_seconds - delta)
             msg = f"Too many attempts. Please wait {retry_after} seconds before requesting another code."
@@ -102,14 +103,14 @@ def check_forgot_cooldown(email: str, cooldown_seconds: int = 60, max_per_hour: 
             count = 0
 
     # Basic hourly cap
-    if count >= max_per_hour:
+    if count >= max_per_hour: # type: ignore
         msg = "You have requested too many codes. Please try again later."
         return False, cooldown_seconds, msg
 
     # Update tracking and allow request
-    forgot_rate_limits[email] = {
+    forgot_rate_limits[email] = { # type: ignore
         "last_requested_at": now,
-        "count": count + 1,
+        "count": count + 1, # type: ignore
     }
     return True, None, None
 
@@ -413,4 +414,100 @@ def send_ticket_resolved_email(mail, recipient_email, name, subject, ticket_id):
         """
     )
 
+    mail.send(msg)
+
+
+def send_appointment_confirmation_email(mail, recipient_email, first_name, date, time, service):
+    """Send an appointment confirmation email"""
+    
+    msg = Message(
+        subject="Appointment Confirmed - BHCare Health Center",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+                    
+                    <h2 style="color: #2c5282; text-align: center;">Appointment Confirmed! ✅</h2>
+                    
+                    <p>Hello <strong>{first_name}</strong>,</p>
+                    
+                    <p>Your appointment has been successfully scheduled. We look forward to seeing you!</p>
+                    
+                    <div style="margin: 20px 0; padding: 20px; background: #f0f4f8; border-radius: 8px; border-left: 5px solid #38b2ac;">
+                        <p style="margin: 5px 0;"><strong>📅 Date:</strong> {date}</p>
+                        <p style="margin: 5px 0;"><strong>⏰ Time:</strong> {time}</p>
+                        <p style="margin: 5px 0;"><strong>🏥 Service:</strong> {service}</p>
+                    </div>
+                    
+                    <p><strong>Reminders:</strong></p>
+                    <ul>
+                        <li>Please arrive 15 minutes before your scheduled time.</li>
+                        <li>Bring your Barangay ID or any valid identification.</li>
+                        <li>If you need to reschedule, please do so through the portal at least 24 hours in advance.</li>
+                    </ul>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="http://localhost:5173/appointments" style="display: inline-block; padding: 12px 24px; background: #38b2ac; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">View My Appointments</a>
+                    </div>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+    
+    mail.send(msg)
+
+def send_appointment_reminder_email(mail, recipient_email, first_name, date, time, service):
+    """Send an appointment reminder email"""
+    
+    msg = Message(
+        subject="Reminder: Upcoming Appointment - BHCare Health Center",
+        recipients=[recipient_email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="{LOGO_URL}" alt="BHCare Logo" style="height: 64px; margin-bottom: 8px;" />
+                        <h1 style="color: #38b2ac; margin: 0;">BHCare Health Center</h1>
+                        <p style="color: #666; margin: 5px 0;">Barangay 174 Health Portal</p>
+                    </div>
+                    
+                    <h2 style="color: #2c5282; text-align: center;">Appointment Reminder 🔔</h2>
+                    
+                    <p>Hello <strong>{first_name}</strong>,</p>
+                    
+                    <p>This is a friendly reminder that you have an upcoming appointment scheduled at our health center.</p>
+                    
+                    <div style="margin: 20px 0; padding: 20px; background: #fffaf0; border-radius: 8px; border-left: 5px solid #ed8936;">
+                        <p style="margin: 5px 0;"><strong>📅 Date:</strong> {date}</p>
+                        <p style="margin: 5px 0;"><strong>⏰ Time:</strong> {time}</p>
+                        <p style="margin: 5px 0;"><strong>🏥 Service:</strong> {service}</p>
+                    </div>
+                    
+                    <p>If you cannot make it, please cancel or reschedule as soon as possible so we can offer the slot to other patients.</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="http://localhost:5173/appointments" style="display: inline-block; padding: 12px 24px; background: #38b2ac; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">View Portal</a>
+                    </div>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© 2026 BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+    
     mail.send(msg)

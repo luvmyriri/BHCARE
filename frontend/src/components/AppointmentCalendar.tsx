@@ -11,6 +11,7 @@ interface AppointmentCalendarProps {
     allowedDays?: number[]; // 0=Sun … 6=Sat, undefined = all days
     scheduleHint?: string;
     minDate?: string; // 'YYYY-MM-DD'
+    maxDate?: string; // 'YYYY-MM-DD'
     isInvalid?: boolean;
 }
 
@@ -28,7 +29,7 @@ function toYMD(d: Date): string {
 }
 
 const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
-    value, onChange, allowedDays, scheduleHint, minDate, isInvalid
+    value, onChange, allowedDays, scheduleHint, minDate, maxDate, isInvalid
 }) => {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -74,7 +75,7 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
 
     const handleDayClick = (day: number) => {
         const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        if (dateStr < minYMD) return;
+        if (dateStr < minYMD || (maxDate && dateStr > maxDate)) return;
         const dayOfWeek = new Date(viewYear, viewMonth, day).getDay();
         if (allowedDays && !allowedDays.includes(dayOfWeek)) return;
         onChange(dateStr);
@@ -184,8 +185,9 @@ const AppointmentCalendar: React.FC<AppointmentCalendarProps> = ({
                             const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
                             const dayOfWeek = new Date(viewYear, viewMonth, day).getDay();
                             const isPast = dateStr < minYMD;
+                            const isFutureTooFar = maxDate ? dateStr > maxDate : false;
                             const isUnavailable = allowedDays ? !allowedDays.includes(dayOfWeek) : false;
-                            const isDisabled = isPast || isUnavailable;
+                            const isDisabled = isPast || isFutureTooFar || isUnavailable;
                             const isSelected = dateStr === value;
                             const isToday = dateStr === todayYMD;
 

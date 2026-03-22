@@ -1046,6 +1046,16 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
       setTimeout(scrollToError, 100);
       return;
     }
+    // DOB Validation (Max 120 years old)
+    const dobObj = new Date(dob);
+    const maxAgeDate = new Date();
+    maxAgeDate.setFullYear(maxAgeDate.getFullYear() - 120);
+    if (dobObj < maxAgeDate) {
+      setError('Patient cannot be older than 120 years.');
+      setErrors({ ...newErrors, dob: true });
+      setTimeout(scrollToError, 100);
+      return;
+    }
 
     // Strict Email Validation
     // Allowed: gmail.com, yahoo.com, hotmail.com, *.gov.ph, *.gov
@@ -1773,6 +1783,12 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                       label={t.dob}
                       icon={<FiCalendar />}
                       type="date"
+                      min={(() => {
+                        const d = new Date();
+                        d.setFullYear(d.getFullYear() - 120);
+                        return d.toISOString().split('T')[0];
+                      })()}
+                      max={new Date().toISOString().split('T')[0]}
                       confidence={confidence.dob}
                       value={dob}
                       onChange={(e) => handleInputChange('dob', e.target.value, setDob)}

@@ -333,7 +333,7 @@ const SecurityDashboard: React.FC<SecurityDashboardProps> = ({ user, onLogout })
             </Drawer>
 
             {/* Main Content Area */}
-            <Box ml={{ base: 0, md: '280px' }} p="8" position="relative">
+            <Box ml={{ base: 0, md: '280px' }} p="8" position="relative" maxW={{ base: "100%", md: "calc(100vw - 280px)" }} overflowX="hidden">
                 <Flex justify="space-between" align="center" mb={10}>
                     <HStack spacing={4}>
                         <IconButton
