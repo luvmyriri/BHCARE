@@ -1,0 +1,14 @@
+TABLES REFERENCING 'users':
+Table: appointments, Column: user_id
+Table: health_records, Column: user_id
+Table: audit_log, Column: user_id
+Table: medical_records, Column: user_id
+Table: medical_records, Column: doctor_id
+Table: lab_results, Column: patient_id
+Table: visit_logs, Column: user_id
+Table: soap_notes, Column: patient_id
+Table: notifications, Column: user_id
+Table: medical_staff_details, Column: user_id
+Table: bmi_logs, Column: user_id
+Table: bp_logs, Column: user_id
+Table: document_requests, Column: user_id

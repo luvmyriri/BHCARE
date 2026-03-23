@@ -622,6 +622,17 @@ class PHIDParser:
                                  self.confidence['first_name'] = conf_f
                      print(f"[NAMES] Extracted via PhilHealth rules: {self.fields['first_name']} {self.fields['middle_name']} {self.fields['last_name']}")
                      return
+
+        # POST-PROCESSING FOR DRIVER'S LICENSE:
+        if self.fields.get('id_type') == "Driver's License" and not self.fields.get('middle_name'):
+             first_name_str = self.fields.get('first_name')
+             if isinstance(first_name_str, str):
+                 f_name_parts = first_name_str.split()
+                 if len(f_name_parts) > 1:
+                     self.fields['middle_name'] = str(f_name_parts.pop())
+                     self.fields['first_name'] = str(' '.join(f_name_parts))
+                     self.confidence['middle_name'] = 0.85
+                     print(f"[NAMES] Post-processed DL names: {self.fields.get('first_name')} {self.fields.get('middle_name')} {self.fields.get('last_name')}")
     def _extract_suffix_from_names(self):
         """Extract suffix from names if present (e.g., Jr, Sr, III)"""
         valid_suffixes_map = {
@@ -3736,6 +3747,46 @@ def update_contact_ticket(ticket_id):
         conn.rollback()
         print("Error updating contact ticket:", e)
         return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+def superadmin_delete_user(user_id):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 500
+
+    try:
+        cur = conn.cursor()
+        
+        # Delete dependent records first to avoid foreign key violations
+        cur.execute("DELETE FROM appointments WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM health_records WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM audit_log WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM medical_records WHERE user_id = %s OR doctor_id = %s", (user_id, user_id))
+        cur.execute("DELETE FROM lab_results WHERE patient_id = %s", (user_id,))
+        cur.execute("DELETE FROM visit_logs WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM soap_notes WHERE patient_id = %s", (user_id,))
+        cur.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM medical_staff_details WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM bmi_logs WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM bp_logs WHERE user_id = %s", (user_id,))
+        cur.execute("DELETE FROM document_requests WHERE user_id = %s", (user_id,))
+        
+        # Finally delete the user
+        cur.execute("DELETE FROM users WHERE id = %s RETURNING id", (user_id,))
+        deleted_user = cur.fetchone()
+        
+        if not deleted_user:
+            return jsonify({"error": "User not found"}), 404
+            
+        conn.commit()
+        return jsonify({"message": "User deleted successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        print("Error deleting user:", e)
+        return jsonify({"error": "Failed to delete user due to database constraints."}), 500
     finally:
         cur.close()
         conn.close()

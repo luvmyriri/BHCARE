@@ -38,6 +38,12 @@ import {
     InputLeftElement,
     FormControl,
     FormLabel,
+    AlertDialog,
+    AlertDialogBody,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogContent,
+    AlertDialogOverlay,
 } from '@chakra-ui/react';
 import {
     ResponsiveContainer,
@@ -354,6 +360,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const [userPage, setUserPage] = useState(1);
     const usersPerPage = 10;
     const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
+    const { isOpen: isDeleteAlertOpen, onOpen: onDeleteAlertOpen, onClose: onDeleteAlertClose } = useDisclosure();
+    const cancelRef = React.useRef(null);
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -765,6 +773,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         }
     };
 
+    const handleDeleteUser = async () => {
+        try {
+            const response = await fetch(`/api/admin/users/${editUser.id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                onDeleteAlertClose();
+                onEditClose();
+                fetchUsers();
+                if (activeTab === 'doctors') fetchMedicalStaff();
+                toast({ title: 'User deleted', status: 'success', duration: 3000 });
+            } else {
+                const data = await response.json();
+                toast({ title: 'Delete failed', description: data.error || 'Failed to delete user', status: 'error', duration: 3000 });
+            }
+        } catch (error) {
+            toast({ title: 'Network error', status: 'error', duration: 3000 });
+        }
+    };
 
     const handleCardClick = (card: string) => {
         setSelectedCard(card);
@@ -2631,6 +2658,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </VStack>
                     </ModalBody>
                     <ModalFooter bg="gray.50" borderTopWidth="1px">
+                        {(user?.role || '').toLowerCase().includes('super') && editUser?.id && (
+                            <Button colorScheme="red" variant="outline" mr="auto" onClick={onDeleteAlertOpen}>
+                                Delete User
+                            </Button>
+                        )}
                         <Button variant="ghost" mr={3} onClick={onEditClose}>
                             {(user?.role || '').toLowerCase().includes('super') ? 'Cancel' : 'Close'}
                         </Button>
@@ -2745,6 +2777,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </ModalFooter>
                 </ModalContent>
             </Modal>
+
+            {/* Delete Confirmation Alert */}
+            <AlertDialog
+                isOpen={isDeleteAlertOpen}
+                leastDestructiveRef={cancelRef}
+                onClose={onDeleteAlertClose}
+                isCentered
+            >
+                <AlertDialogOverlay backdropFilter="blur(5px)" bg="blackAlpha.600">
+                    <AlertDialogContent borderRadius="2xl" overflow="hidden">
+                        <AlertDialogHeader fontSize="lg" fontWeight="bold" bg="red.50" color="red.800" borderBottomWidth="1px">
+                            <HStack align="center" spacing={3}>
+                                <Icon as={FiUser} boxSize={5} />
+                                <Text>Delete User</Text>
+                            </HStack>
+                        </AlertDialogHeader>
+
+                        <AlertDialogBody py={6}>
+                            Are you sure you want to completely delete this user? This action cannot be undone and will remove all their appointments and records.
+                        </AlertDialogBody>
+
+                        <AlertDialogFooter bg="gray.50" borderTopWidth="1px">
+                            <Button ref={cancelRef} onClick={onDeleteAlertClose} variant="ghost">
+                                Cancel
+                            </Button>
+                            <Button colorScheme="red" onClick={handleDeleteUser} ml={3} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>
+                                Delete
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialogOverlay>
+            </AlertDialog>
 
         </Box>
     );

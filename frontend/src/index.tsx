@@ -9,6 +9,14 @@ import { LanguageProvider } from './contexts/LanguageContext';
 
 import { BrowserRouter } from 'react-router-dom';
 
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (let registration of registrations) {
+      registration.unregister();
+    }
+  });
+}
+
 const rootElement = document.getElementById('root');
 if (rootElement) {
   const root = ReactDOM.createRoot(rootElement);

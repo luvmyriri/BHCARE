@@ -786,7 +786,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                         <label htmlFor="walkin-pwd-checkbox" style={{ cursor: 'pointer', lineHeight: '1.5', fontSize: '14px', color: '#4a5568' }}>
                                             Patient is a{' '}
                                             <strong style={{ color: '#805ad5' }}>Person with Disability (PWD)</strong>
-                                            {' '}— flags the account for PWD-priority services.
+
                                         </label>
                                     </div>
 
