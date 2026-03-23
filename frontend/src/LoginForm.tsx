@@ -297,6 +297,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isPwd, setIsPwd] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
 
@@ -573,6 +574,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
     // to allow users to keep their credentials if they swap modes,
     // but they can be added if the user specifically wants a total wipe.
     setConfirmPassword('');
+    setIsPwd(false);
   };
 
   const identifyIDType = (text: string) => {
@@ -1099,6 +1101,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
     formData.append('subdivision', subdivision);
     formData.append('zip_code', zipCode);
     formData.append('full_address', fullAddress);
+    formData.append('is_pwd', isPwd ? 'true' : 'false');
 
 
     setLoading(true);
@@ -1796,6 +1799,24 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                       invalid={errors.dob}
                       required
                     />
+                    {/* Senior Citizen Auto-Indicator */}
+                    {dob && (() => {
+                      const dobObj = new Date(dob);
+                      const today = new Date();
+                      const age = today.getFullYear() - dobObj.getFullYear() -
+                        ((today.getMonth() < dobObj.getMonth() || (today.getMonth() === dobObj.getMonth() && today.getDate() < dobObj.getDate())) ? 1 : 0);
+                      return age >= 60 ? (
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '6px',
+                          background: '#fffbeb', border: '1.5px solid #f6ad55',
+                          borderRadius: '20px', padding: '4px 12px',
+                          fontSize: '12px', fontWeight: 700, color: '#c05621', marginTop: '6px'
+                        }}>
+                          Senior Citizen (60+) — Priority Flag Applied
+                        </div>
+                      ) : null;
+                    })()}
+
                     <Select
                       label={t.gender}
                       icon={<FiUser />}
@@ -2081,6 +2102,38 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                               Terms &amp; Conditions and Privacy Policy
                             </button>
                             {' '}of BHCare Health Center.
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* PWD Checkbox */}
+                      <div style={{ marginTop: '12px', marginBottom: '4px' }}>
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          color: '#4a5568',
+                          lineHeight: '1.5'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={isPwd}
+                            onChange={(e) => setIsPwd(e.target.checked)}
+                            style={{
+                              marginTop: '2px',
+                              width: '16px',
+                              height: '16px',
+                              accentColor: '#805ad5',
+                              flexShrink: 0,
+                              cursor: 'pointer'
+                            }}
+                          />
+                          <span>
+                            I am a{' '}
+                            <strong style={{ color: '#805ad5' }}>Person with Disability (PWD)</strong>
+                            {' '}— checking this will flag my account for PWD-priority services.
                           </span>
                         </label>
                       </div>

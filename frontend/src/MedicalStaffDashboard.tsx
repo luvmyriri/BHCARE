@@ -128,6 +128,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
     const [streetName, setStreetName] = useState('');
 
     const [isRegistering, setIsRegistering] = useState(false);
+    const [isPwd, setIsPwd] = useState(false);
 
     // Form states for Appointment
     const [appointmentUserId, setAppointmentUserId] = useState<number | ''>('');
@@ -242,7 +243,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
         e.preventDefault();
 
         const finalProvince = selectedRegion === '1300000000' ? 'Metro Manila' : province;
-        if (!firstName || !lastName || !dob || !gender || !contact || !barangay || !city || !finalProvince) {
+        if (!firstName || !lastName || !email || !dob || !gender || !contact || !barangay || !city || !finalProvince) {
             toast({ title: 'Validation Error', description: 'Please fill out all required fields marked with *', status: 'warning' });
             return;
         }
@@ -261,12 +262,10 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
             return;
         }
 
-        if (email) {
-            const emailRegex = /^[^\s@]+@gmail\.com$/i;
-            if (!emailRegex.test(email)) {
-                toast({ title: 'Validation Error', description: 'Please enter a valid @gmail.com email address.', status: 'warning' });
-                return;
-            }
+        const emailRegex = /^[^\s@]+@gmail\.com$/i;
+        if (!emailRegex.test(email)) {
+            toast({ title: 'Validation Error', description: 'Please enter a valid @gmail.com email address.', status: 'warning' });
+            return;
         }
 
         setIsRegistering(true);
@@ -283,7 +282,8 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                 city,
                 province: finalProvince,
                 house_number: houseNumber,
-                street_name: streetName
+                street_name: streetName,
+                is_pwd: isPwd
             };
 
             const res = await fetch('/api/register-walkin', {
@@ -299,6 +299,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                 // Clear form
                 setFirstName(''); setMiddleName(''); setLastName(''); setEmail(''); setDob(''); setGender(''); setContact('+63');
                 setBarangay(''); setCity(''); setProvince(''); setHouseNumber(''); setStreetName('');
+                setIsPwd(false);
 
                 // Refresh patients list so they appear in dropdown
                 await fetchPatients();
@@ -673,6 +674,23 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                                 value={dob}
                                                 onChange={e => setDob(e.target.value)}
                                             />
+                                            {/* Senior Citizen Auto-Indicator */}
+                                            {dob && (() => {
+                                                const dobObj = new Date(dob);
+                                                const today = new Date();
+                                                const age = today.getFullYear() - dobObj.getFullYear() -
+                                                    ((today.getMonth() < dobObj.getMonth() || (today.getMonth() === dobObj.getMonth() && today.getDate() < dobObj.getDate())) ? 1 : 0);
+                                                return age >= 60 ? (
+                                                    <div style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                                        background: '#fffbeb', border: '1.5px solid #f6ad55',
+                                                        borderRadius: '20px', padding: '4px 12px',
+                                                        fontSize: '12px', fontWeight: 700, color: '#c05621', marginTop: '6px'
+                                                    }}>
+                                                        Senior Citizen (60+) — Priority Flag Applied
+                                                    </div>
+                                                ) : null;
+                                            })()}
                                         </Box>
                                         <Box flex={1} w="full">
                                             <Text fontSize="sm" fontWeight="600" mb={2}>Gender *</Text>
@@ -683,8 +701,8 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                             </Box>
                                         </Box>
                                         <Box flex={1.5} w="full">
-                                            <Text fontSize="sm" fontWeight="600" mb={2}>Email Address (Optional)</Text>
-                                            <Input type="email" placeholder="patient@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+                                            <Text fontSize="sm" fontWeight="600" mb={2}>Email Address *</Text>
+                                            <Input required type="email" placeholder="patient@example.com" value={email} onChange={e => setEmail(e.target.value)} />
                                             <Text fontSize="xs" color="gray.500" mt={1}>Patient receives temporary password here to access the portal.</Text>
                                         </Box>
                                         <Box flex={1} w="full">
@@ -739,6 +757,38 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                             <Input placeholder="Street Name" value={streetName} onChange={e => setStreetName(e.target.value)} />
                                         </Box>
                                     </Flex>
+
+                                    {/* PWD Checkbox */}
+                                    <div style={{
+                                        marginTop: '8px',
+                                        padding: '14px 18px',
+                                        background: '#faf5ff',
+                                        border: '1.5px solid #d6bcfa',
+                                        borderRadius: '12px',
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: '12px'
+                                    }}>
+                                        <input
+                                            id="walkin-pwd-checkbox"
+                                            type="checkbox"
+                                            checked={isPwd}
+                                            onChange={(e) => setIsPwd(e.target.checked)}
+                                            style={{
+                                                marginTop: '2px',
+                                                width: '18px',
+                                                height: '18px',
+                                                accentColor: '#805ad5',
+                                                flexShrink: 0,
+                                                cursor: 'pointer'
+                                            }}
+                                        />
+                                        <label htmlFor="walkin-pwd-checkbox" style={{ cursor: 'pointer', lineHeight: '1.5', fontSize: '14px', color: '#4a5568' }}>
+                                            Patient is a{' '}
+                                            <strong style={{ color: '#805ad5' }}>Person with Disability (PWD)</strong>
+                                            {' '}— flags the account for PWD-priority services.
+                                        </label>
+                                    </div>
 
                                     <Button
                                         type="submit"

@@ -2036,7 +2036,7 @@ def register_walkin():
         subdivision = data.get('subdivision', '')
         zip_code = data.get('zip_code', '')
         
-        if not all([first_name, last_name, dob_str, gender, contact, barangay, city, province]):
+        if not all([first_name, last_name, email, dob_str, gender, contact, barangay, city, province]):
             return jsonify({"error": "Missing required fields"}), 400
 
         # Construct full address for easy reference
@@ -2047,15 +2047,8 @@ def register_walkin():
         import string
         from datetime import datetime
         
-        if email:
-            # Use the provided email
-            registration_email = email
-            send_email = True
-        else:
-            # Generate a unique pseudo-email for the walkin patient
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            registration_email = f"{first_name.lower()}.{last_name.lower()}.{timestamp}@walkin.bhcare.local".replace(" ", "")
-            send_email = False
+        registration_email = email
+        send_email = True
         
         # Auto-generate a secure random password
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*"

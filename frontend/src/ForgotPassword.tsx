@@ -179,13 +179,13 @@ export default function ForgotPassword() {
 
                     {error && (
                         <div style={{ background: '#fff5f5', color: '#c53030', padding: '12px', borderRadius: '10px', fontSize: '13px', marginBottom: '24px', fontWeight: 600, border: '1px solid #fed7d7' }}>
-                            ⚠️ {error}
+                            {error}
                         </div>
                     )}
 
                     {message && (
                         <div style={{ background: '#f0fdf4', color: '#166534', padding: '12px', borderRadius: '10px', fontSize: '13px', marginBottom: '24px', fontWeight: 600, border: '1px solid #bbf7d0' }}>
-                            ✅ {message}
+                            {message}
                         </div>
                     )}
 
