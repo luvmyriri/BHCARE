@@ -18,7 +18,7 @@ def view_all_users():
     users = cursor.fetchall()
     
     print("=" * 80)
-    print(f"📊 Total Users: {len(users)}")
+    print(f"Total Users: {len(users)}")
     print("=" * 80)
     
     if users:
@@ -38,8 +38,8 @@ def view_all_users():
                 city[:9] if city else ""
             ))
     else:
-        print("\n⚠️  No users in database yet!")
-        print("💡 Register a user from your frontend to see data here.")
+        print("\nNo users in database yet!")
+        print("Register a user from your frontend to see data here.")
     
     print("=" * 80)
     
@@ -50,5 +50,5 @@ if __name__ == "__main__":
     try:
         view_all_users()
     except Exception as e:
-        print(f"❌ Error: {e}")
-        print("💡 Make sure PostgreSQL is running and database exists.")
+        print(f"Error: {e}")
+        print("Make sure PostgreSQL is running and database exists.")

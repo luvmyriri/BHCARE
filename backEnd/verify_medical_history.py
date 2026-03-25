@@ -54,29 +54,29 @@ def test_medical_history_endpoints():
                     # based on soap_notes.py analysis, it expects json
                     create_res = session.post(f"{BASE_URL}/api/soap-notes", json=note_payload)
                     if create_res.status_code == 201:
-                        print("✅ SOAP note created.")
+                        print("SOAP note created.")
                     else:
-                        print(f"⚠️ Failed to create note: {create_res.text}")
+                        print(f"Failed to create note: {create_res.text}")
 
                     # 3. Test Get Patient History
                     print(f"Fetching history for Patient {patient_id}...")
                     history_res = session.get(f"{BASE_URL}/api/patients/{patient_id}/history")
                     if history_res.status_code == 200:
                         history = history_res.json()
-                        print(f"✅ Patient history fetched. Found {len(history)} records.")
+                        print(f"Patient history fetched. Found {len(history)} records.")
                         if len(history) > 0:
                             print(f"   - Latest Diagnosis: {history[0].get('assessment')}")
                     else:
-                         print(f"❌ Failed to fetch patient history: {history_res.text}")
+                         print(f"Failed to fetch patient history: {history_res.text}")
 
                     # 4. Test Get All Medical Records
                     print("Fetching all medical records...")
                     all_res = session.get(f"{BASE_URL}/api/doctor/medical-records")
                     if all_res.status_code == 200:
                          records = all_res.json()
-                         print(f"✅ All records fetched. Found {len(records)} records.")
+                         print(f"All records fetched. Found {len(records)} records.")
                     else:
-                        print(f"❌ Failed to fetch all records: {all_res.text}")
+                        print(f"Failed to fetch all records: {all_res.text}")
                         
                 else:
                     print("No patients found to test with.")

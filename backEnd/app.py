@@ -91,7 +91,7 @@ app.register_blueprint(notifications_bp)
 
 # Startup Database Verification
 try:
-    print("⏳ Testing database connection at startup...")
+    print("Testing database connection at startup...")
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS contact_tickets (
@@ -111,7 +111,7 @@ try:
         WHERE table_name = 'appointments' AND column_name = 'reminder_sent'
     """)
     if cur.fetchone()[0] == 0:
-        print("🔗 Adding 'reminder_sent' column to appointments table...")
+        print(" Adding 'reminder_sent' column to appointments table...")
         cur.execute("ALTER TABLE appointments ADD COLUMN reminder_sent BOOLEAN DEFAULT FALSE")
         conn.commit()
 
@@ -121,7 +121,7 @@ try:
         WHERE table_name = 'appointments' AND column_name = 'is_pregnant'
     """)
     if cur.fetchone()[0] == 0:
-        print("🔗 Adding 'is_pregnant' column to appointments table...")
+        print("Adding 'is_pregnant' column to appointments table...")
         cur.execute("ALTER TABLE appointments ADD COLUMN is_pregnant BOOLEAN DEFAULT FALSE")
         conn.commit()
 
@@ -131,21 +131,21 @@ try:
         WHERE table_name = 'appointments' AND column_name = 'pregnancy_weeks'
     """)
     if cur.fetchone()[0] == 0:
-        print("🔗 Adding 'pregnancy_weeks' column to appointments table...")
+        print("Adding 'pregnancy_weeks' column to appointments table...")
         cur.execute("ALTER TABLE appointments ADD COLUMN pregnancy_weeks INT DEFAULT 0")
         conn.commit()
 
     conn.close()
-    print("✅ Database connection verified and schema updated.")
+    print("Database connection verified and schema updated.")
 
     # Start the Appointment Reminder Service
     try:
         start_reminder_service(app, mail)
-        print("🔔 Appointment Reminder Service activated.")
+        print("Appointment Reminder Service activated.")
     except Exception as e:
-        print(f"⚠️ Failed to start Reminder Service: {e}")
+        print(f"Failed to start Reminder Service: {e}")
 except Exception as e:
-    print(f"❌ CRITICAL: Database connection failed at startup: {e}")
+    print(f"CRITICAL: Database connection failed at startup: {e}")
 
 def get_db():
     return get_db_connection()

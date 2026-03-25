@@ -14,7 +14,7 @@ def add_role_column():
         """)
         
         if cur.fetchone():
-            print("✅ 'role' column already exists.")
+            print(" 'role' column already exists.")
         else:
             print("Creating 'role' column...")
             cur.execute("ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'Patient';")
@@ -29,13 +29,13 @@ def add_role_column():
             cur.execute("UPDATE users SET role = 'Medical Staff' WHERE LOWER(first_name) LIKE '%dr.%' OR LOWER(last_name) LIKE '%dr.%'")
             
             conn.commit()
-            print("✅ 'role' column added and backfilled.")
+            print(" 'role' column added and backfilled.")
             
         cur.close()
         conn.close()
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
 
 if __name__ == "__main__":
     add_role_column()

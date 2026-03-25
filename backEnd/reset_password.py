@@ -16,10 +16,10 @@ def reset_security_password():
         user = cur.fetchone()
         
         if user:
-            print(f"🔄 Updating password for existing user: {email}")
+            print(f" Updating password for existing user: {email}")
             cur.execute("UPDATE users SET password_hash = %s WHERE email = %s", (hashed, email))
         else:
-            print(f"➕ Creating new user: {email}")
+            print(f"Creating new user: {email}")
             first_name = "Security"
             last_name = "Department"
             dob = "1990-01-01"
@@ -35,12 +35,12 @@ def reset_security_password():
             """, (email, hashed, first_name, last_name, dob, gender, contact, barangay, city, province))
             
         conn.commit()
-        print(f"✅ Password for {email} reset successfully to '{password}'")
+        print(f"Password for {email} reset successfully to '{password}'")
         cur.close()
         conn.close()
         
     except Exception as e:
-        print(f"❌ Error resetting password: {e}")
+        print(f"Error resetting password: {e}")
 
 if __name__ == "__main__":
     reset_security_password()

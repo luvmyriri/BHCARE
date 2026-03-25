@@ -30,9 +30,9 @@ def test_doctor_profile():
                 print(f" - Schedule: {profile.get('schedule')}")
                 
                 if profile.get('clinic_room') and profile.get('schedule'):
-                    print("✅ Specialized details present!")
+                    print("Specialized details present!")
                 else:
-                    print("❌ Specialized details MISSING!")
+                    print("Specialized details MISSING!")
             else:
                 print(f"Failed to fetch profile: {profile_res.text}")
         else:

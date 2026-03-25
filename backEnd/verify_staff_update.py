@@ -51,9 +51,9 @@ def test_update_staff():
     res = session.put(f"{BASE_URL}/user/{target_staff['id']}", json=update_payload)
     
     if res.status_code == 200:
-        print("✅ Update successful.")
+        print("Update successful.")
     else:
-        print(f"❌ Update failed: {res.text}")
+        print(f"Update failed: {res.text}")
         return
 
     # 4. Verify the update
@@ -67,11 +67,11 @@ def test_update_staff():
         print(f"Updated Room: {updated_staff['clinic_room']}")
         
         if updated_staff['schedule'] == "Mon-Wed-Fri 9am-4pm" and updated_staff['clinic_room'] == "Room 505":
-            print("✅ Verification Passed!")
+            print("Verification Passed!")
         else:
-            print("❌ Verification Failed: Data mismatch.")
+            print("Verification Failed: Data mismatch.")
     else:
-        print("❌ Could not find staff after update.")
+        print("Could not find staff after update.")
 
 if __name__ == "__main__":
     test_update_staff()

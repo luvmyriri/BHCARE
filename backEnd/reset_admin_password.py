@@ -20,15 +20,15 @@ def reset_password(email, new_password):
             conn.commit()
             
             if cur.rowcount > 0:
-                print("✅ Password updated successfully.")
+                print("Password updated successfully.")
             else:
-                print("❌ User not found.")
+                print("User not found.")
                 
             cur.close()
             conn.close()
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
 
 if __name__ == "__main__":
     reset_password("genetabios13@gmail.com", "password123")

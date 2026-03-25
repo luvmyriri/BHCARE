@@ -21,7 +21,7 @@ def setup_appointment_tables():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        print("✅ Services table created")
+        print("Services table created")
         
         # Create schedule_slots table
         cursor.execute("""
@@ -36,7 +36,7 @@ def setup_appointment_tables():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        print("✅ Schedule slots table created")
+        print("Schedule slots table created")
         
         # Insert default services
         services = [
@@ -54,7 +54,7 @@ def setup_appointment_tables():
                 VALUES (%s, %s, %s)
                 ON CONFLICT (name) DO NOTHING
             """, (name, description, duration))
-        print(f"✅ Inserted {len(services)} default services")
+        print(f"Inserted {len(services)} default services")
         
         # Insert default schedule slots (Monday to Friday, 8 AM to 5 PM)
         schedule_slots = [
@@ -80,14 +80,14 @@ def setup_appointment_tables():
                 INSERT INTO schedule_slots (day_of_week, start_time, end_time, max_appointments)
                 VALUES (%s, %s, %s, %s)
             """, (day, start, end, max_appts))
-        print(f"✅ Inserted {len(schedule_slots)} schedule slots")
+        print(f"Inserted {len(schedule_slots)} schedule slots")
         
         conn.commit()
-        print("\n✅ All appointment tables created successfully!")
+        print("\nAll appointment tables created successfully!")
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         raise
     finally:
         cursor.close()
