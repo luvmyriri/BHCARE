@@ -21,6 +21,7 @@ import {
     ModalHeader,
     ModalBody,
     ModalCloseButton,
+    Select,
 } from '@chakra-ui/react';
 import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw, FiList, FiActivity, FiXCircle } from 'react-icons/fi';
 
@@ -68,11 +69,15 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
     const [statusFilter, setStatusFilter] = useState<'pending' | 'completed' | 'cancelled'>('pending');
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+    const [isPregnant, setIsPregnant] = useState<boolean | null>(null);
+    const [pregnancyWeeks, setPregnancyWeeks] = useState(0);
 
     useEffect(() => {
         if (isOpen) {
             setView(initialView);
             setStep(1); // Reset step to 1 when opening
+            setIsPregnant(null);
+            setPregnancyWeeks(0);
         }
     }, [isOpen, initialView]);
     const toast = useToast();
@@ -194,7 +199,9 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                     service_type: selectedService.name,
                     appointment_date: selectedDate,
                     appointment_time: selectedTime,
-                    reason: reason
+                    reason: reason,
+                    is_pregnant: isPregnant === true,
+                    pregnancy_weeks: pregnancyWeeks
                 })
             });
 
@@ -213,6 +220,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                 setSelectedDate('');
                 setSelectedTime('');
                 setReason('');
+                setIsPregnant(null);
+                setPregnancyWeeks(0);
                 setReschedulingAppointmentId(null);
                 fetchMyAppointments();
                 setView('my-appointments');
@@ -628,8 +637,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                         bgGradient="linear(to-r, green.500, teal.500)"
                         color="white"
                         borderTopRadius="3xl"
-                        py={8}
-                        px={8}
+                        py={4}
+                        px={6}
                         position="relative"
                         _before={{
                             content: '""',
@@ -646,8 +655,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                         <HStack spacing={4}>
                             <Icon as={FiCalendar} boxSize={8} />
                             <VStack align="start" spacing={0}>
-                                <Heading size="xl" fontWeight="800">Appointments</Heading>
-                                <Text fontSize="sm" color="whiteAlpha.900" fontWeight="500">
+                                <Heading size="lg" fontWeight="800">Appointments</Heading>
+                                <Text fontSize="xs" color="whiteAlpha.900" fontWeight="500">
                                     Book and manage your healthcare appointments
                                 </Text>
                             </VStack>
@@ -661,10 +670,10 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                         _hover={{ bg: 'whiteAlpha.300', transform: 'scale(1.1)' }}
                         borderRadius="lg"
                     />
-                    <ModalBody p={8} bg="gray.50">
-                        <Box bg="white" borderRadius="2xl" p={6} boxShadow="sm">
+                    <ModalBody p={5} bg="gray.50">
+                        <Box bg="white" borderRadius="2xl" p={4} boxShadow="sm">
                             {/* View Toggle */}
-                            <HStack spacing={3} mb={8} bg="gray.100" p={2} borderRadius="xl">
+                            <HStack spacing={3} mb={5} bg="gray.100" p={2} borderRadius="xl">
                                 <Button
                                     flex={1}
                                     variant={view === 'book' ? 'solid' : 'ghost'}
@@ -704,17 +713,17 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                             {view === 'book' ? (
                                 <VStack align="stretch" spacing={8}>
                                     {/* Step Indicator */}
-                                    <Flex justify="center" align="center" mb={4}>
+                                    <Flex justify="center" align="center" mb={2}>
                                         <HStack spacing={4}>
-                                            <VStack spacing={2}>
+                                            <VStack spacing={1}>
                                                 <Flex
-                                                    w="50px"
-                                                    h="50px"
+                                                    w="40px"
+                                                    h="40px"
                                                     borderRadius="full"
                                                     align="center"
                                                     justify="center"
                                                     fontWeight="bold"
-                                                    fontSize="lg"
+                                                    fontSize="md"
                                                     bgGradient={step >= 1 ? 'linear(to-r, green.500, teal.500)' : 'none'}
                                                     bg={step >= 1 ? 'teal.500' : 'gray.200'}
                                                     color={step >= 1 ? 'white' : 'gray.500'}
@@ -726,12 +735,12 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                 <Text fontSize="xs" fontWeight="600" color="gray.600">Service</Text>
                                             </VStack>
 
-                                            <Box w="80px" h="3px" bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 2 ? 'teal.500' : 'gray.200'} borderRadius="full" />
+                                            <Box w="60px" h="2px" bgGradient={step >= 2 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 2 ? 'teal.500' : 'gray.200'} borderRadius="full" />
 
-                                            <VStack spacing={2}>
+                                            <VStack spacing={1}>
                                                 <Flex
-                                                    w="50px"
-                                                    h="50px"
+                                                    w="40px"
+                                                    h="40px"
                                                     borderRadius="full"
                                                     align="center"
                                                     justify="center"
@@ -748,17 +757,17 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                 <Text fontSize="xs" fontWeight="600" color="gray.600">Date & Time</Text>
                                             </VStack>
 
-                                            <Box w="80px" h="3px" bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 3 ? 'teal.500' : 'gray.200'} borderRadius="full" />
+                                            <Box w="60px" h="2px" bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'} bg={step >= 3 ? 'teal.500' : 'gray.200'} borderRadius="full" />
 
-                                            <VStack spacing={2}>
+                                            <VStack spacing={1}>
                                                 <Flex
-                                                    w="50px"
-                                                    h="50px"
+                                                    w="40px"
+                                                    h="40px"
                                                     borderRadius="full"
                                                     align="center"
                                                     justify="center"
                                                     fontWeight="bold"
-                                                    fontSize="lg"
+                                                    fontSize="md"
                                                     bgGradient={step >= 3 ? 'linear(to-r, green.500, teal.500)' : 'none'}
                                                     bg={step >= 3 ? 'teal.500' : 'gray.200'}
                                                     color={step >= 3 ? 'white' : 'gray.500'}
@@ -774,18 +783,65 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
 
                                     {/* Step 1: Select Service */}
                                     {step === 1 && (
-                                        <VStack align="stretch" spacing={6}>
-                                            <Heading size="lg" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text">
+                                        <VStack align="stretch" spacing={4}>
+                                            {user?.gender === 'Female' && (
+                                                <Box bg="white" p={4} borderRadius="xl" boxShadow="sm" border="1px solid" borderColor="pink.100">
+                                                    <Text fontWeight="700" color="gray.700" fontSize="md" mb={2}>Are you currently pregnant?</Text>
+                                                    <HStack spacing={3}>
+                                                        <Button 
+                                                            colorScheme={isPregnant === true ? "pink" : "gray"} 
+                                                            variant={isPregnant === true ? "solid" : "outline"}
+                                                            onClick={() => setIsPregnant(true)}
+                                                            size="sm"
+                                                            px={6}
+                                                        >
+                                                            Yes
+                                                        </Button>
+                                                        <Button 
+                                                            colorScheme={isPregnant === false ? "teal" : "gray"} 
+                                                            variant={isPregnant === false ? "solid" : "outline"}
+                                                            onClick={() => { setIsPregnant(false); setPregnancyWeeks(0); }}
+                                                            size="sm"
+                                                            px={6}
+                                                        >
+                                                            No
+                                                        </Button>
+                                                    </HStack>
+                                                    
+                                                    {isPregnant === true && (
+                                                        <Flex mt={3} p={3} bg="pink.50" borderRadius="lg" border="1px solid" borderColor="pink.200" align="center" gap={4}>
+                                                            <Text fontSize="sm" fontWeight="700" color="pink.800">How many weeks pregnant are you?</Text>
+                                                            <Select 
+                                                                placeholder="Select weeks" 
+                                                                value={pregnancyWeeks || ''} 
+                                                                onChange={(e) => setPregnancyWeeks(parseInt(e.target.value))}
+                                                                borderColor="pink.300"
+                                                                _hover={{ borderColor: 'pink.400' }}
+                                                                focusBorderColor="pink.500"
+                                                                bg="white"
+                                                                w="140px"
+                                                                size="sm"
+                                                            >
+                                                                {[...Array(42)].map((_, i) => (
+                                                                    <option key={i+1} value={i+1}>{i+1} weeks</option>
+                                                                ))}
+                                                            </Select>
+                                                        </Flex>
+                                                    )}
+                                                </Box>
+                                            )}
+
+                                            <Heading size="md" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text" mt={0}>
                                                 Select a Service
                                             </Heading>
-                                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                                            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
                                                 {services.map(service => (
                                                     <Box
                                                         key={service.id}
                                                         onClick={() => setSelectedService(service)}
-                                                        p={6}
-                                                        borderRadius="2xl"
-                                                        border="3px solid"
+                                                        p={4}
+                                                        borderRadius="xl"
+                                                        border="2px solid"
                                                         borderColor={selectedService?.id === service.id ? 'teal.400' : 'gray.200'}
                                                         bg={selectedService?.id === service.id ? 'teal.50' : 'white'}
                                                         cursor="pointer"
@@ -797,26 +853,25 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                         }}
                                                         boxShadow={selectedService?.id === service.id ? 'lg' : 'sm'}
                                                     >
-                                                        <HStack align="start" spacing={4}>
-                                                            <Icon as={FiActivity} boxSize={10} color="teal.500" />
-                                                            <VStack align="start" flex={1} spacing={2}>
-                                                                <Heading size="md" color="gray.900" fontWeight="700">{service.name}</Heading>
-                                                                <Text fontSize="sm" color="gray.600" lineHeight="tall">{service.description}</Text>
+                                                        <HStack align="center" spacing={3}>
+                                                            <Icon as={FiActivity} boxSize={6} color="teal.500" />
+                                                            <VStack align="start" flex={1} spacing={0}>
+                                                                <Heading size="sm" color="gray.900" fontWeight="700">{service.name}</Heading>
+                                                                <Text fontSize="xs" color="gray.600" lineHeight="1.2" noOfLines={2}>{service.description}</Text>
                                                             </VStack>
                                                         </HStack>
                                                     </Box>
                                                 ))}
                                             </SimpleGrid>
                                             <Button
-                                                isDisabled={!selectedService}
+                                                isDisabled={!selectedService || (user?.gender === 'Female' && (isPregnant === null || (isPregnant === true && !pregnancyWeeks)))}
                                                 onClick={() => setStep(2)}
                                                 bgGradient="linear(to-r, green.500, teal.500)"
                                                 color="white"
-                                                size="lg"
-                                                h="56px"
-                                                fontSize="lg"
+                                                size="md"
+                                                fontSize="md"
                                                 fontWeight="700"
-                                                borderRadius="xl"
+                                                borderRadius="lg"
                                                 _hover={{
                                                     transform: 'translateY(-2px)',
                                                     boxShadow: 'xl'
@@ -1063,6 +1118,8 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
 
                                                 </VStack>
                                             </Box>
+
+
 
                                             <Box>
                                                 <Text fontSize="sm" fontWeight="700" color="gray.700" mb={3}>Reason for Visit (Optional)</Text>

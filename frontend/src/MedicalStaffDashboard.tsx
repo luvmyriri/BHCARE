@@ -579,7 +579,14 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                                     <Td>
                                                         <VStack align="start" spacing={0}>
                                                             <Text fontWeight="600">{item.first_name} {item.last_name}</Text>
-                                                            <Text fontSize="xs" color="gray.500">{item.gender}</Text>
+                                                            <HStack spacing={2}>
+                                                                <Text fontSize="xs" color="gray.500">{item.gender}</Text>
+                                                                {item.is_pregnant && (
+                                                                    <Badge colorScheme="pink" variant="subtle" fontSize="0.65em" borderRadius="full">
+                                                                        Priority {item.pregnancy_weeks ? `(${item.pregnancy_weeks} Weeks)` : ''}
+                                                                    </Badge>
+                                                                )}
+                                                            </HStack>
                                                         </VStack>
                                                     </Td>
                                                     <Td>

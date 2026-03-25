@@ -115,6 +115,26 @@ try:
         cur.execute("ALTER TABLE appointments ADD COLUMN reminder_sent BOOLEAN DEFAULT FALSE")
         conn.commit()
 
+    # Ensure is_pregnant column exists in appointments
+    cur.execute("""
+        SELECT count(*) FROM information_schema.columns 
+        WHERE table_name = 'appointments' AND column_name = 'is_pregnant'
+    """)
+    if cur.fetchone()[0] == 0:
+        print("🔗 Adding 'is_pregnant' column to appointments table...")
+        cur.execute("ALTER TABLE appointments ADD COLUMN is_pregnant BOOLEAN DEFAULT FALSE")
+        conn.commit()
+
+    # Ensure pregnancy_weeks column exists in appointments
+    cur.execute("""
+        SELECT count(*) FROM information_schema.columns 
+        WHERE table_name = 'appointments' AND column_name = 'pregnancy_weeks'
+    """)
+    if cur.fetchone()[0] == 0:
+        print("🔗 Adding 'pregnancy_weeks' column to appointments table...")
+        cur.execute("ALTER TABLE appointments ADD COLUMN pregnancy_weeks INT DEFAULT 0")
+        conn.commit()
+
     conn.close()
     print("✅ Database connection verified and schema updated.")
 

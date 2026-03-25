@@ -484,7 +484,16 @@ const SecurityDashboard: React.FC<SecurityDashboardProps> = ({ user, onLogout })
                                                 #{String(p.queue_number || idx + 1).padStart(3, '0')}
                                             </Badge>
                                         </Td>
-                                        <Td fontWeight="700" color="gray.700">{p.first_name} {p.last_name}</Td>
+                                        <Td>
+                                            <VStack align="start" spacing={0}>
+                                                <Text fontWeight="700" color="gray.700">{p.first_name} {p.last_name}</Text>
+                                                {p.is_pregnant && (
+                                                    <Badge colorScheme="pink" variant="subtle" fontSize="0.65em" borderRadius="full">
+                                                        🤰 Priority {p.pregnancy_weeks ? `(${p.pregnancy_weeks} Weeks)` : ''}
+                                                    </Badge>
+                                                )}
+                                            </VStack>
+                                        </Td>
                                         <Td color="teal.600" fontWeight="600">{p.service_type || 'Consultation'}</Td>
                                         <Td>
                                             <Badge colorScheme={p.status === 'consulting' ? 'green' : 'orange'} borderRadius="full" px={3}>

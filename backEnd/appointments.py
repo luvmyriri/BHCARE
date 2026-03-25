@@ -223,6 +223,8 @@ def create_appointment():
         service_type = data['service_type']
         doctor_preference = data.get('doctor_preference')
         reason = data.get('reason')
+        is_pregnant = data.get('is_pregnant', False)
+        pregnancy_weeks = data.get('pregnancy_weeks', 0)
         
         # Reject booking if the slot is in the past (today + past time)
         try:
@@ -255,11 +257,11 @@ def create_appointment():
         cursor.execute("""
             INSERT INTO appointments 
             (user_id, appointment_date, appointment_time, service_type, 
-             doctor_preference, reason, status)
-            VALUES (%s, %s, %s, %s, %s, %s, 'pending')
-            RETURNING id, appointment_date, appointment_time, service_type, status, created_at
+             doctor_preference, reason, status, is_pregnant, pregnancy_weeks)
+            VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s)
+            RETURNING id, appointment_date, appointment_time, service_type, status, created_at, is_pregnant, pregnancy_weeks
         """, (user_id, appointment_date, appointment_time, service_type, 
-              doctor_preference, reason))
+              doctor_preference, reason, is_pregnant, pregnancy_weeks))
         
         appointment = cursor.fetchone()
         conn.commit()
@@ -522,6 +524,8 @@ def get_queue():
                 a.appointment_time, 
                 a.service_type, 
                 a.status,
+                a.is_pregnant,
+                a.pregnancy_weeks,
                 u.first_name, 
                 u.last_name,
                 u.gender
@@ -529,7 +533,7 @@ def get_queue():
             JOIN users u ON a.user_id = u.id
             WHERE a.appointment_date = %s
               AND a.status IN ('pending', 'confirmed', 'serving')
-            ORDER BY a.appointment_time ASC
+            ORDER BY a.is_pregnant DESC NULLS LAST, a.appointment_time ASC
         """
         
         cursor.execute(query, (today,))
