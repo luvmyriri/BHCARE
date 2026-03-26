@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
     Box,
     Flex,
@@ -52,6 +54,7 @@ import {
     FiUser,
     FiSearch,
     FiFileText,
+    FiDownload,
 } from 'react-icons/fi';
 
 interface DoctorDashboardProps {
@@ -326,6 +329,11 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
     const handleUpdateInventoryItem = async () => {
         if (!editInventoryItem?.id) return;
+        const decreaseAmt = editInventoryItem.decrease_stock || 0;
+        if (decreaseAmt > 0 && decreaseAmt > editInventoryItem.stock_quantity) {
+            toast({ title: "Invalid Amount", description: `Cannot decrease by ${decreaseAmt}. Current stock is only ${editInventoryItem.stock_quantity}.`, status: "error", duration: 3000, isClosable: true });
+            return;
+        }
         try {
             const res = await fetch(`/api/inventory/${editInventoryItem.id}`, {
                 method: 'PUT',
@@ -334,6 +342,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                     item_name: editInventoryItem.item_name,
                     category: editInventoryItem.category,
                     unit: editInventoryItem.unit,
+                    decrease_stock: decreaseAmt,
                 })
             });
             if (res.ok) {
@@ -494,6 +503,110 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         const year = createdAt ? new Date(createdAt).getFullYear() : new Date().getFullYear();
         const paddedId = String(id).padStart(3, '0');
         return `${prefix}${year}${paddedId}`;
+    };
+
+    const downloadPatientHistoryPDF = async () => {
+        if (!selectedHistory) return;
+        const patient = selectedHistory.patient;
+        const records: any[] = selectedHistory.records || [];
+
+        const doc = new jsPDF({ orientation: 'portrait' });
+        let startY = 16;
+
+        // Try loading logo
+        try {
+            const res = await fetch('/images/Logo.png');
+            const blob = await res.blob();
+            const logoBase64: string = await new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(r.result as string);
+                r.onerror = reject;
+                r.readAsDataURL(blob);
+            });
+            doc.addImage(logoBase64, 'PNG', 14, 8, 16, 16);
+            doc.setFontSize(15);
+            doc.setTextColor(0);
+            doc.text('Patient Medical History', 34, 16);
+            doc.setFontSize(8);
+            doc.setTextColor(100);
+            doc.text(`BHCare - Barangay 174 Health Center  ·  Generated: ${new Date().toLocaleString()}`, 34, 22);
+            startY = 30;
+        } catch {
+            doc.setFontSize(15);
+            doc.text('Patient Medical History', 14, 16);
+            doc.setFontSize(8);
+            doc.setTextColor(100);
+            doc.text(`BHCare - Barangay 174 Health Center  ·  Generated: ${new Date().toLocaleString()}`, 14, 22);
+            startY = 28;
+        }
+
+        // Patient profile table
+        autoTable(doc, {
+            startY,
+            head: [['Patient Information', '']],
+            body: [
+                ['Name', `${patient?.first_name || ''} ${patient?.last_name || ''}`],
+                ['Patient ID', patient?.p_id || '—'],
+                ['Age / Gender', `${patient?.age || '—'} / ${patient?.gender || '—'}`],
+                ['Contact', patient?.contact_number || '—'],
+            ],
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [43, 108, 176], textColor: 255, fontStyle: 'bold' },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
+            theme: 'grid',
+        });
+
+        let curY = (doc as any).lastAutoTable.finalY + 8;
+
+        // Clinical Notes
+        doc.setFontSize(11);
+        doc.setTextColor(35, 78, 82);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Clinical Notes  (${records.length} record${records.length !== 1 ? 's' : ''})`, 14, curY);
+        doc.setFont('helvetica', 'normal');
+        curY += 4;
+
+        if (records.length === 0) {
+            doc.setFontSize(9);
+            doc.setTextColor(160);
+            doc.text('No clinical notes on record.', 14, curY + 6);
+        } else {
+            records.forEach((record: any) => {
+                let meds: any[] = [];
+                try {
+                    meds = typeof record.prescription === 'string' ? JSON.parse(record.prescription) : (record.prescription || []);
+                } catch { meds = []; }
+
+                const medsText = meds.length > 0
+                    ? meds.map((m: any) => `  • ${m.item_name} x${m.quantity}${m.instructions ? ` — ${m.instructions}` : ''}`).join('\n')
+                    : '';
+
+                const bodyRows: [string, string][] = [
+                    ['S (Subjective)', record.subjective || '—'],
+                    ['O (Objective)', record.objective || '—'],
+                    ['A (Assessment)', record.assessment || '—'],
+                    ['P (Plan)', record.plan || '—'],
+                ];
+                if (medsText) bodyRows.push(['Dispensed Medicine(s)', medsText]);
+
+                autoTable(doc, {
+                    startY: curY,
+                    head: [[`${record.created_at}`, record.doctor_name || 'Medical Officer']],
+                    body: bodyRows,
+                    styles: { fontSize: 8, cellPadding: 3 },
+                    headStyles: { fillColor: [56, 178, 172], textColor: 255, fontStyle: 'bold' },
+                    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } },
+                    alternateRowStyles: { fillColor: [245, 255, 253] },
+                    theme: 'grid',
+                    margin: { left: 14, right: 14 },
+                });
+                curY = (doc as any).lastAutoTable.finalY + 6;
+            });
+        }
+
+        const filename = `MedicalHistory_${patient?.last_name || 'Patient'}_${patient?.first_name || ''}.pdf`
+            .replace(/\s+/g, '_');
+        doc.save(filename);
     };
 
     const renderModalContent = () => {
@@ -764,9 +877,18 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                             </VStack>
                         </ModalBody>
                         <ModalFooter bg="gray.50" borderTopWidth="1px">
-                            <Button colorScheme="teal" onClick={onClose}>
-                                Close
-                            </Button>
+                            <HStack w="full" justify="space-between">
+                                <Button
+                                    leftIcon={<Icon as={FiDownload} />}
+                                    colorScheme="teal"
+                                    variant="solid"
+                                    onClick={downloadPatientHistoryPDF}
+                                    isDisabled={!selectedHistory?.records?.length}
+                                >
+                                    Download PDF
+                                </Button>
+                                <Button variant="ghost" onClick={onClose}>Close</Button>
+                            </HStack>
                         </ModalFooter>
                     </>
                 );
@@ -1219,7 +1341,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                                     variant="outline"
                                                                     colorScheme="gray"
                                                                     onClick={() => {
-                                                                        setEditInventoryItem({ ...item });
+                                                                        setEditInventoryItem({ ...item, decrease_stock: 0 });
                                                                         onEditInventoryOpen();
                                                                     }}
                                                                 >
@@ -1422,7 +1544,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         borderColor={newInventoryItem.stock_quantity > MAX_STOCK ? 'red.400' : undefined}
                                     />
                                     {newInventoryItem.stock_quantity > MAX_STOCK && (
-                                        <Text color="red.500" fontSize="xs" mt={1}>⚠ Exceeds maximum stock of {MAX_STOCK}</Text>
+                                        <Text color="red.500" fontSize="xs" mt={1}>Exceeds maximum stock of {MAX_STOCK}</Text>
                                     )}
                                 </Box>
                                 <Box w="full">
@@ -1494,7 +1616,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                             />
                                             {wouldExceed && (
                                                 <Text color="red.500" fontSize="xs" mt={1}>
-                                                    ⚠ Adding {restockQuantity} would bring total to {newTotal}, exceeding the limit of {MAX_STOCK}.
+                                                    Adding {restockQuantity} would bring total to {newTotal}, exceeding the limit of {MAX_STOCK}.
                                                 </Text>
                                             )}
                                         </>
@@ -1570,10 +1692,35 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                     <option value="tubes">tubes</option>
                                 </select>
                             </Box>
-                            <Box w="full">
-                                <Text fontSize="xs" color="gray.500">
-                                    Stock is adjusted using <strong>Restock</strong>.
+                            <Box w="full" p={3} bg="red.50" borderRadius="lg" border="1px solid" borderColor="red.100">
+                                <Text mb={1} fontSize="sm" fontWeight="bold" color="red.700">Decrease Stock</Text>
+                                <Text fontSize="xs" color="gray.500" mb={2}>
+                                    Current stock: <Text as="span" fontWeight="bold" color="teal.600">{editInventoryItem?.stock_quantity ?? 0} {editInventoryItem?.unit}</Text>
+                                    {' · '}Leave at 0 to keep unchanged.
                                 </Text>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    max={editInventoryItem?.stock_quantity ?? 0}
+                                    value={editInventoryItem?.decrease_stock === undefined || editInventoryItem?.decrease_stock === 0 ? '' : editInventoryItem.decrease_stock}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setEditInventoryItem((prev: any) => ({ ...(prev || {}), decrease_stock: val === '' ? 0 : parseInt(val) }));
+                                    }}
+                                    placeholder="Amount to remove (optional)"
+                                    bg="white"
+                                    borderColor={(editInventoryItem?.decrease_stock || 0) > (editInventoryItem?.stock_quantity || 0) ? 'red.400' : undefined}
+                                />
+                                {(editInventoryItem?.decrease_stock || 0) > (editInventoryItem?.stock_quantity || 0) && (
+                                    <Text color="red.500" fontSize="xs" mt={1}>
+                                        ⚠ Cannot exceed current stock of {editInventoryItem?.stock_quantity}.
+                                    </Text>
+                                )}
+                                {(editInventoryItem?.decrease_stock || 0) > 0 && (editInventoryItem?.decrease_stock || 0) <= (editInventoryItem?.stock_quantity || 0) && (
+                                    <Text color="orange.600" fontSize="xs" mt={1} fontWeight="600">
+                                        Stock will be reduced from {editInventoryItem?.stock_quantity} → {editInventoryItem.stock_quantity - editInventoryItem.decrease_stock}
+                                    </Text>
+                                )}
                             </Box>
                         </VStack>
                     </ModalBody>

@@ -3197,32 +3197,61 @@ def restock_inventory_item():
         print(f"Error restocking inventory item: {e}")
         return jsonify({"error": str(e)}), 500
 
-# Edit inventory item (name/category/unit). Stock should be adjusted via restock.
+# Edit inventory item (name/category/unit/decrease_stock).
 @app.route("/api/inventory/<int:item_id>", methods=["PUT"])
 def update_inventory_item(item_id: int):
-    """Update inventory item details"""
+    """Update inventory item details and optionally decrease stock"""
     try:
         data = request.json or {}
         item_name = (data.get('item_name') or '').strip()
         category = (data.get('category') or '').strip()
         unit = (data.get('unit') or '').strip()
+        decrease_stock = data.get('decrease_stock', 0)
 
         if not item_name or not category or not unit:
             return jsonify({"error": "Missing required fields"}), 400
 
+        try:
+            decrease_stock = int(decrease_stock)
+        except (ValueError, TypeError):
+            decrease_stock = 0
+
         conn = get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT id FROM inventory WHERE id = %s", (item_id,))
-        exists = cur.fetchone()
-        if not exists:
+        cur.execute("SELECT id, stock_quantity FROM inventory WHERE id = %s", (item_id,))
+        existing = cur.fetchone()
+        if not existing:
             cur.close()
             conn.close()
             return jsonify({"error": "Item not found"}), 404
 
-        cur.execute(
-            "UPDATE inventory SET item_name = %s, category = %s, unit = %s WHERE id = %s RETURNING id",
-            (item_name, category, unit, item_id)
-        )
+        current_stock = existing['stock_quantity']
+
+        if decrease_stock > 0:
+            new_stock = current_stock - decrease_stock
+            if new_stock < 0:
+                cur.close()
+                conn.close()
+                return jsonify({"error": f"Cannot decrease by {decrease_stock}. Current stock is only {current_stock}."}), 400
+
+            # Determine new status
+            if new_stock < 50:
+                new_status = 'Low Stock'
+            elif new_stock < 100:
+                new_status = 'Moderate'
+            else:
+                new_status = 'Good'
+
+            cur.execute(
+                "UPDATE inventory SET item_name = %s, category = %s, unit = %s, stock_quantity = %s, status = %s WHERE id = %s RETURNING id",
+                (item_name, category, unit, new_stock, new_status, item_id)
+            )
+        else:
+            cur.execute(
+                "UPDATE inventory SET item_name = %s, category = %s, unit = %s WHERE id = %s RETURNING id",
+                (item_name, category, unit, item_id)
+            )
+
         conn.commit()
         cur.close()
         conn.close()
