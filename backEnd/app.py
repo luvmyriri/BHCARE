@@ -27,6 +27,7 @@ from email_config import (  # type: ignore
     send_password_reset_email,
     send_registration_success_email,
     send_staff_creation_email,
+    send_admin_creation_email,
     send_document_ready_email,
     send_ticket_confirmation_email,
     send_ticket_resolved_email,
@@ -2262,6 +2263,77 @@ def create_medical_staff():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/admin/create-admin", methods=["POST"])
+def create_admin():
+    """Create a new administrator account (accessible only by Super Admin)"""
+    try:
+        data = request.json
+        email = data.get('email')
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+        contact = data.get('contact_number', '')
+        
+        # Verify it's an admin/super admin making the request
+        # (Assuming the frontend passes the currently logged-in user's role or we trust the dashboard)
+        
+        # Auto-generate a 10-character secure temporary password
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits
+        temporary_password = ''.join(secrets.choice(alphabet) for i in range(10))
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        # Check if email exists
+        cur.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Email already registered"}), 409
+            
+        hashed_password = bcrypt.generate_password_hash(temporary_password).decode('utf-8')
+            
+        # Insert user 
+        insert_user_query = """
+            INSERT INTO users (
+                email, password_hash, first_name, last_name, 
+                contact_number, role, status, requires_password_change,
+                date_of_birth, gender, barangay, city, province, full_address
+            ) VALUES (
+                %s, %s, %s, %s, 
+                %s, 'Admin', 'Active', TRUE,
+                '1980-01-01', 'Not Specified', 'System', 'System City', 'System Prov', 'System Address'
+            ) RETURNING id
+        """
+        cur.execute(insert_user_query, (
+            email, hashed_password, first_name, last_name, contact
+        ))
+        
+        user_id = cur.fetchone()[0]
+        conn.commit()
+        
+        # Send welcome email using the new function
+        email_status = "sent"
+        try:
+            send_admin_creation_email(mail, email, first_name, temporary_password)
+        except Exception as e:
+            print(f"Failed to send admin welcome email to {email}: {e}")
+            email_status = "failed"
+            
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "message": "Administrator account created successfully.",
+            "email_status": email_status
+        }), 201
+
+    except Exception as e:
+        print(f"Error creating admin: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/doctor/patients", methods=["GET"])
 def get_doctor_patients():
     """Get all patients for doctor dashboard with computed fields"""
@@ -2590,10 +2662,18 @@ def delete_user(user_id):
         user_email = target[2] or ''   # email column (index 2)
 
         role_lower = user_role.lower()
-        if 'super' in role_lower or role_lower in ('admin', 'administrator'):
+        requester_role = request.args.get('requester_role', '').lower()
+        is_super_admin = 'super' in requester_role
+
+        if 'super' in role_lower:
             cur.close()
             conn.close()
-            return jsonify({"error": "Administrator accounts cannot be deleted for security reasons."}), 403
+            return jsonify({"error": "Super Administrator accounts cannot be deleted."}), 403
+        
+        if role_lower in ('admin', 'administrator') and not is_super_admin:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Administrator accounts cannot be deleted by standard Admins."}), 403
 
         # Delete related records first to avoid FK constraint errors
         cur.execute("DELETE FROM appointments WHERE user_id = %s", (user_id,))

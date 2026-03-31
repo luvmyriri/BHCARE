@@ -144,7 +144,7 @@ const Select: FC<
   );
 };
 
-function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'patient' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register'; expectedType?: 'patient'|'admin'|'employee' }) {
+function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'patient' }: { onLoginSuccess?: (user: any) => void; initialMode?: 'login' | 'register'; expectedType?: 'patient' | 'admin' | 'employee' }) {
   const { t } = useLanguage();
   const toast = useToast();
   const [mode, setMode] = useState<'login' | 'register' | 'guide'>(initialMode);
@@ -400,7 +400,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
       setCanResend(false);
       setResetMessage(
         data?.message ||
-          "If this email is registered, we've sent a 6-digit verification code."
+        "If this email is registered, we've sent a 6-digit verification code."
       );
     } catch (err: any) {
       setResetError(err.message);
@@ -1256,27 +1256,29 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <a
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setMode('register');
-                    resetFormFields();
-                    setSelectedIdType('');
-                  }}
-                  style={{
-                    fontSize: '13px',
-                    color: '#718096',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    cursor: 'pointer',
-                    transition: 'color 0.2s'
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.color = '#4a5568')}
-                  onMouseOut={(e) => (e.currentTarget.style.color = '#718096')}
-                >
-                  Don't have an account? <span style={{ color: '#ed8936' }}>Sign Up</span>
-                </a>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: expectedType === 'patient' ? 'space-between' : 'flex-end', alignItems: 'center', marginBottom: '20px' }}>
+                {expectedType === 'patient' && (
+                  <a
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setMode('register');
+                      resetFormFields();
+                      setSelectedIdType('');
+                    }}
+                    style={{
+                      fontSize: '13px',
+                      color: '#718096',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.color = '#4a5568')}
+                    onMouseOut={(e) => (e.currentTarget.style.color = '#718096')}
+                  >
+                    Don't have an account? <span style={{ color: '#ed8936' }}>Sign Up</span>
+                  </a>
+                )}
                 <a
                   onClick={(e) => {
                     e.preventDefault();
@@ -1316,25 +1318,27 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
 
-              <p style={{
-                fontSize: '13px',
-                marginTop: '24px',
-                textAlign: 'center',
-                color: '#4a5568'
-              }}>
-                New Patient?{' '}
-                <span
-                  onClick={() => { setMode('guide'); resetFormFields(); setSelectedIdType(''); }}
-                  style={{
-                    color: '#ed8936',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    textDecoration: 'none'
-                  }}
-                >
-                  Guide Registration
-                </span>
-              </p>
+              {expectedType === 'patient' && (
+                <p style={{
+                  fontSize: '13px',
+                  marginTop: '24px',
+                  textAlign: 'center',
+                  color: '#4a5568'
+                }}>
+                  New Patient?{' '}
+                  <span
+                    onClick={() => { setMode('guide'); resetFormFields(); setSelectedIdType(''); }}
+                    style={{
+                      color: '#ed8936',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    Guide Registration
+                  </span>
+                </p>
+              )}
             </form >
           ) : mode === 'guide' ? (
             // STEP-BY-STEP REGISTRATION GUIDE

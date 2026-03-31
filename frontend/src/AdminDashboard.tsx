@@ -431,6 +431,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         password: ''
     });
 
+    // Add Admin State (Super Admin Only)
+    const { isOpen: isAddAdminOpen, onOpen: onAddAdminOpen, onClose: onAddAdminClose } = useDisclosure();
+    const [newAdmin, setNewAdmin] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        contact_number: ''
+    });
+    const [admins, setAdmins] = useState<any[]>([]);
+
     const toast = useToast();
     const [resendCooldowns, setResendCooldowns] = React.useState<Record<number, number>>({});
 
@@ -486,6 +496,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             }
         } catch (error) {
             console.error('Error fetching medical staff:', error);
+        }
+    };
+
+    // Fetch Admins (Super Admin only)
+    const fetchAdmins = async () => {
+        try {
+            const response = await fetch('/api/admin/users'); // We can filter this array locally
+            if (response.ok) {
+                const data = await response.json();
+                const adminList = data.filter((u: any) => u.role === 'Admin');
+                setAdmins(adminList);
+            }
+        } catch (error) {
+            console.error('Error fetching admins:', error);
         }
     };
 
@@ -663,6 +687,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const refreshAll = async () => {
         await Promise.all([
             fetchUsers(),
+            fetchAdmins(),
             fetchMedicalStaff(),
             fetchAppointments(),
             fetchSystemStats(),
@@ -680,6 +705,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     }, []);
 
     const handleAddStaff = async () => {
+        if (!newStaff.first_name.trim() || !newStaff.last_name.trim() || !newStaff.email.trim()) {
+            toast({ title: "Validation Error", description: "First Name, Last Name, and Email are required.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+
+        const nameRegex = /^[A-Za-z\s\-ñÑ]+$/;
+        if (!nameRegex.test(newStaff.first_name) || !nameRegex.test(newStaff.last_name)) {
+            toast({ title: "Validation Error", description: "Name cannot contain numbers or special characters.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(newStaff.email)) {
+            toast({ title: "Validation Error", description: "Please enter a valid email address.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+
         try {
             const response = await fetch('/api/admin/medical-staff', {
                 method: 'POST',
@@ -704,6 +746,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         } catch (error) {
             console.error(error);
             toast({ title: "Error", description: "Failed to create account.", status: "error" });
+        }
+    };
+
+    const handleAddAdmin = async () => {
+        // Validation check
+        if (!newAdmin.first_name.trim() || !newAdmin.last_name.trim() || !newAdmin.email.trim()) {
+            toast({
+                title: "Validation Error",
+                description: "First Name, Last Name, and Email Address are required.",
+                status: "warning",
+                duration: 4000,
+                isClosable: true,
+            });
+            return;
+        }
+        
+        const nameRegex = /^[A-Za-z\s\-ñÑ]+$/;
+        if (!nameRegex.test(newAdmin.first_name) || !nameRegex.test(newAdmin.last_name)) {
+            toast({ title: "Validation Error", description: "Name cannot contain numbers or special characters.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+        
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(newAdmin.email)) {
+            toast({ title: "Validation Error", description: "Please enter a valid email address.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/admin/create-admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newAdmin)
+            });
+            if (response.ok) {
+                toast({ title: "Success", description: "Administrator account created successfully.", status: "success" });
+                onAddAdminClose();
+                setNewAdmin({
+                    first_name: '',
+                    last_name: '',
+                    email: '',
+                    contact_number: ''
+                });
+                fetchAdmins();
+                fetchUsers();
+            } else {
+                const data = await response.json();
+                toast({ title: "Error", description: data.error, status: "error" });
+            }
+        } catch (error) {
+            console.error(error);
+            toast({ title: "Error", description: "Failed to create administrator account.", status: "error" });
         }
     };
 
@@ -732,6 +826,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const handleUpdateUser = async () => {
         if (!editUser) return;
 
+        if (!formData.first_name.trim() || !formData.last_name.trim() || !formData.email.trim()) {
+            toast({ title: "Validation Error", description: "First Name, Last Name, and Email are required.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+        
+        const nameRegex = /^[A-Za-z\s\-ñÑ]+$/;
+        if (!nameRegex.test(formData.first_name) || !nameRegex.test(formData.last_name)) {
+            toast({ title: "Validation Error", description: "Name cannot contain numbers or special characters.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+        
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            toast({ title: "Validation Error", description: "Please enter a valid email address.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+
         try {
             const response = await fetch(`/user/${editUser.id}`, {
                 method: 'PUT',
@@ -745,6 +856,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 if (activeTab === 'doctors') {
                     fetchMedicalStaff(); // Refresh medical staff list if on that tab
                 }
+                fetchAdmins(); // Always refresh admins to be safe
                 toast({
                     title: "Success",
                     description: "User details updated successfully.",
@@ -775,7 +887,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
     const handleDeleteUser = async () => {
         try {
-            const response = await fetch(`/api/admin/users/${editUser.id}`, {
+            const reqRole = user?.role || '';
+            const response = await fetch(`/api/admin/users/${editUser.id}?requester_role=${encodeURIComponent(reqRole)}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
@@ -783,6 +896,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 onEditClose();
                 fetchUsers();
                 if (activeTab === 'doctors') fetchMedicalStaff();
+                fetchAdmins();
                 toast({ title: 'User deleted', status: 'success', duration: 3000 });
             } else {
                 const data = await response.json();
@@ -2355,6 +2469,90 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     </VStack>
                 );
             }
+            case 'administrators': {
+                const isSA = ['super admin', 'superadmin'].includes((user?.role || '').toLowerCase());
+                if (!isSA) return null;
+
+                const filteredAdmins = admins.filter(a => {
+                    const search = staffSearchQuery.toLowerCase();
+                    return a.first_name?.toLowerCase().includes(search) ||
+                           a.last_name?.toLowerCase().includes(search) ||
+                           a.email?.toLowerCase().includes(search);
+                });
+
+                return (
+                    <VStack align="stretch" spacing={10}>
+                        <PageHero
+                            badge="SUPER ADMIN ONLY"
+                            title="System Administrators"
+                            description="Manage other administrator accounts that have high-level access to the health center platform."
+                        />
+                        <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                            <Flex justify="space-between" align="center" mb={6} wrap="wrap" gap={4}>
+                                <Heading size="md" color="teal.800">Administrator Accounts</Heading>
+                                <HStack>
+                                    <InputGroup w={{ base: "full", md: "250px" }}>
+                                        <InputLeftElement pointerEvents="none"><FiSearch color="gray.300" /></InputLeftElement>
+                                        <Input
+                                            placeholder="Search admins..."
+                                            value={staffSearchQuery}
+                                            onChange={(e) => setStaffSearchQuery(e.target.value)}
+                                        />
+                                    </InputGroup>
+                                    <Button colorScheme="teal" onClick={onAddAdminOpen} leftIcon={<Icon as={FiUserPlus} />}>
+                                        Add Administrator
+                                    </Button>
+                                </HStack>
+                            </Flex>
+                            <Box overflowX="auto" borderRadius="xl" border="1px solid" borderColor="gray.100">
+                                <Table variant="simple" size="md">
+                                    <Thead bg="gray.50">
+                                        <Tr>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Name</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Email</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Contact</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Role</Th>
+                                            <Th fontSize="xs" fontWeight="700" color="gray.600" textTransform="uppercase" letterSpacing="wider" py={4}>Actions</Th>
+                                        </Tr>
+                                    </Thead>
+                                    <Tbody>
+                                        {filteredAdmins.length > 0 ? (
+                                            filteredAdmins.map((admin: any) => (
+                                                <Tr key={admin.id} _hover={{ bg: 'teal.50' }} transition="all 0.2s">
+                                                    <Td py={4}>
+                                                        <HStack>
+                                                            <Avatar size="sm" name={`${admin.first_name} ${admin.last_name}`} bg="teal.100" color="teal.700" />
+                                                            <Text fontWeight="600" color="gray.800">{admin.first_name} {admin.last_name}</Text>
+                                                        </HStack>
+                                                    </Td>
+                                                    <Td py={4} color="gray.600">{admin.email}</Td>
+                                                    <Td py={4} color="gray.600">{admin.contact_number || 'N/A'}</Td>
+                                                    <Td py={4}>
+                                                        <Badge colorScheme={admin.role.toLowerCase().includes('super') ? 'purple' : 'orange'} px={3} py={1} borderRadius="full">
+                                                            {admin.role}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td py={4}>
+                                                        <Button size="sm" colorScheme="orange" variant="ghost" onClick={() => handleEditClick(admin)}>
+                                                            Edit
+                                                        </Button>
+                                                    </Td>
+                                                </Tr>
+                                            ))
+                                        ) : (
+                                            <Tr>
+                                                <Td colSpan={5} textAlign="center" py={10} color="gray.500">
+                                                    No administrators found.
+                                                </Td>
+                                            </Tr>
+                                        )}
+                                    </Tbody>
+                                </Table>
+                            </Box>
+                        </Box>
+                    </VStack>
+                );
+            }
 
             default:
                 return null;
@@ -2393,6 +2591,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     <NavItem icon={FiActivity} active={activeTab === 'doctors'} onClick={() => setActiveTab('doctors')}>
                         Medical Staff
                     </NavItem>
+                    {['super admin', 'superadmin'].includes((user?.role || '').toLowerCase()) && (
+                        <NavItem icon={FiShield} active={activeTab === 'administrators'} onClick={() => setActiveTab('administrators')}>
+                            Administrators
+                        </NavItem>
+                    )}
                     <NavItem icon={FiMessageSquare} active={activeTab === 'tickets'} onClick={() => setActiveTab('tickets')}>
                         Support Tickets
                     </NavItem>
@@ -2669,6 +2872,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         {(user?.role || '').toLowerCase().includes('super') && (
                             <Button colorScheme="blue" onClick={handleUpdateUser} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>Save Changes</Button>
                         )}
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* Add Admin Modal (Super Admin Only) */}
+            <Modal isOpen={isAddAdminOpen} onClose={onAddAdminClose} isCentered size="md">
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.600" />
+                <ModalContent borderRadius="2xl" overflow="hidden">
+                    <ModalHeader bg="teal.50" color="teal.800" borderBottomWidth="1px" pb={4}>
+                        <HStack align="center" spacing={3}>
+                            <Icon as={FiUserPlus} boxSize={6} />
+                            <Text>Add New Administrator</Text>
+                        </HStack>
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
+                        <VStack spacing={5}>
+                            <Text fontSize="sm" color="gray.600" textAlign="center" mb={2}>
+                                A temporary password will be automatically generated and sent to the provided email address upon account creation.
+                            </Text>
+                            <HStack w="full">
+                                <FormControl isRequired>
+                                    <FormLabel>First Name</FormLabel>
+                                    <Input
+                                        value={newAdmin.first_name}
+                                        onChange={(e) => setNewAdmin({ ...newAdmin, first_name: e.target.value })}
+                                    />
+                                </FormControl>
+                                <FormControl isRequired>
+                                    <FormLabel>Last Name</FormLabel>
+                                    <Input
+                                        value={newAdmin.last_name}
+                                        onChange={(e) => setNewAdmin({ ...newAdmin, last_name: e.target.value })}
+                                    />
+                                </FormControl>
+                            </HStack>
+                            <FormControl isRequired>
+                                <FormLabel>Email Address</FormLabel>
+                                <Input
+                                    type="email"
+                                    value={newAdmin.email}
+                                    onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                                />
+                            </FormControl>
+                            <FormControl>
+                                <FormLabel>Contact Number</FormLabel>
+                                <Input
+                                    value={newAdmin.contact_number}
+                                    onChange={(e) => setNewAdmin({ ...newAdmin, contact_number: e.target.value })}
+                                />
+                            </FormControl>
+                        </VStack>
+                    </ModalBody>
+                    <ModalFooter bg="gray.50" borderTopWidth="1px">
+                        <Button variant="ghost" mr={3} onClick={onAddAdminClose}>Cancel</Button>
+                        <Button colorScheme="teal" onClick={handleAddAdmin} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>Create Admin</Button>
                     </ModalFooter>
                 </ModalContent>
             </Modal>

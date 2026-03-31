@@ -511,3 +511,44 @@ def send_appointment_reminder_email(mail, recipient_email, first_name, date, tim
     )
     
     mail.send(msg)
+
+def send_admin_creation_email(mail, email, first_name, temp_password):
+    """Send welcome email with temporary credentials to a new Admin."""
+    msg = Message(
+        subject="Welcome to BHCare - Administrative Access",
+        recipients=[email],
+        html=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 40px;">
+                <div style="max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-top: 5px solid #38b2ac;">
+                    <br><h2 style="color: #2c7a7b; margin-bottom: 24px; font-size: 24px;">Welcome to BHCare Admin Portal</h2>
+                    
+                    <p style="color: #4a5568; font-size: 16px; line-height: 1.6;">Hello <strong>{first_name}</strong>,</p>
+                    <p style="color: #4a5568; font-size: 16px; line-height: 1.6;">Your <strong>Administrator</strong> account has been successfully created. You can now access the system with complete oversight privileges.</p>
+                    
+                    <div style="background: #edf2f7; padding: 25px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #319795;">
+                        <p style="margin: 0 0 10px 0; color: #4a5568; font-size: 14px; text-transform: uppercase; font-weight: bold;">Your Login Credentials</p>
+                        <ul style="list-style: none; padding: 0; margin: 0;">
+                            <li style="margin-bottom: 8px;"><strong style="color: #2d3748;">Email:</strong> {email}</li>
+                            <li><strong style="color: #2d3748;">Temporary Password:</strong> <code style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px; color: #e53e3e; font-size: 16px; font-weight: bold;">{temp_password}</code></li>
+                        </ul>
+                    </div>
+
+                    <p style="color: #e53e3e; font-size: 15px; font-weight: bold; margin-bottom: 30px;">
+                        ⚠️ Security Notice: You will be required to change your password immediately upon your first login.
+                    </p>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="http://localhost:5173/admin" style="display: inline-block; padding: 12px 24px; background: #38b2ac; color: white; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">Access Admin Dashboard</a>
+                    </div>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <p>© {datetime.now().year} BHCare Health Center - Barangay 174, Caloocan City</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    )
+    
+    mail.send(msg)
