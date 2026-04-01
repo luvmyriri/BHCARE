@@ -9,6 +9,7 @@ import {
     FiShield,
     FiMenu,
 } from 'react-icons/fi';
+import { formatSystemTime } from './utils/dateFormatter';
 import {
     Box,
     Flex,
@@ -441,7 +442,7 @@ const SecurityDashboard: React.FC<SecurityDashboardProps> = ({ user, onLogout })
                             <Tbody>
                                 {pendingArrivals.length > 0 ? pendingArrivals.map((p, idx) => (
                                     <Tr key={idx} _hover={{ bg: 'gray.50' }}>
-                                        <Td fontWeight="600" color="teal.700">{p.appointment_time}</Td>
+                                        <Td fontWeight="600" color="teal.700">{formatSystemTime(p.appointment_time)}</Td>
                                         <Td fontWeight="700" color="gray.700">{p.first_name} {p.last_name}</Td>
                                         <Td>
                                             <Badge borderRadius="full" px={3} py={1} colorScheme="teal" variant="subtle">

@@ -55,8 +55,8 @@ import Profile from './Profile';
 import Appointments from './Appointments';
 import AIChatbot from './AIChatbot';
 import HealthCalculators from './components/HealthCalculators';
-
 import NotificationBell from './components/NotificationBell';
+import { formatSystemDateTime, formatTimestamp } from './utils/dateFormatter';
 
 interface DashboardProps {
     user: any;
@@ -324,10 +324,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                         <ModalBody>
                             {nextAppointment ? (
                                 <Box p={4} bg="teal.50" borderRadius="lg" mb={4}>
-                                    <Text fontWeight="bold" color="teal.800">Next Visit: {new Date(nextAppointment.date).toLocaleDateString()}</Text>
+                                    <Text fontWeight="bold" color="teal.800">Next Visit: {formatSystemDateTime(nextAppointment.date, nextAppointment.time)}</Text>
                                     <Text fontSize="sm">Reason: {nextAppointment.service_type || 'Medical Check-up'}</Text>
                                     <Text fontSize="sm">Doctor: {nextAppointment.doctor_name || 'Dr. Maria Santos'}</Text>
-                                    <Text fontSize="sm" color="teal.600" mt={1}>{nextAppointment.time}</Text>
                                 </Box>
                             ) : (
                                 <Box p={4} bg="gray.50" borderRadius="lg" mb={4} textAlign="center">
@@ -347,7 +346,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                 {medicalHistory.length > 0 ? medicalHistory.slice(0, 3).map((record, index) => (
                                     <HStack key={index} justify="space-between" p={2} borderBottom="1px solid" borderColor="gray.100">
                                         <Text fontSize="sm" fontWeight="600">{record.assessment || 'Medical Log'}</Text>
-                                        <Text fontSize="xs" color="gray.500">{record.created_at}</Text>
+                                        <Text fontSize="xs" color="gray.500">{formatTimestamp(record.created_at)}</Text>
                                     </HStack>
                                 )) : (
                                     <Text fontSize="sm" color="gray.500">No medical records found.</Text>
@@ -373,7 +372,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                         <SimpleGrid columns={2} spacing={4}>
                                             <Box>
                                                 <Text fontWeight="800" fontSize="xs" color="blue.800" textTransform="uppercase">Date Recorded</Text>
-                                                <Text fontSize="md" color="blue.900" fontWeight="600">{selectedRecord.created_at}</Text>
+                                                <Text fontSize="md" color="blue.900" fontWeight="600">{formatTimestamp(selectedRecord.created_at)}</Text>
                                             </Box>
                                             <Box>
                                                 <Text fontWeight="800" fontSize="xs" color="blue.800" textTransform="uppercase">Attending Doctor</Text>
@@ -489,7 +488,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                             </Box>
                                             <VStack align="start" spacing={0}>
                                                 <Text fontWeight="700">Appointment Scheduled</Text>
-                                                <Text fontSize="sm" color="gray.500">{nextAppointment.service_type || 'Medical Check-up'} on {new Date(nextAppointment.date).toLocaleDateString()} at {nextAppointment.time}</Text>
+                                                <Text fontSize="sm" color="gray.500">{nextAppointment.service_type || 'Medical Check-up'} on {formatSystemDateTime(nextAppointment.date, nextAppointment.time)}</Text>
                                             </VStack>
                                         </HStack>
                                         <Text fontSize="sm" color="gray.400">Upcoming</Text>
@@ -701,7 +700,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                             {medicalHistory.length > 0 ? (
                                                 medicalHistory.map((r, i) => (
                                                     <Tr key={i}>
-                                                        <Td>{r.created_at}</Td>
+                                                        <Td>{formatTimestamp(r.created_at)}</Td>
                                                         <Td fontWeight="600">{r.assessment || 'Medical Log'}</Td>
                                                         <Td>{r.doctor_name || 'Unknown'}</Td>
                                                         <Td><Badge colorScheme="green">Completed</Badge></Td>
@@ -738,7 +737,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUserUpdated }) 
                                             {documentHistory.length > 0 ? (
                                                 documentHistory.map((doc, i) => (
                                                     <Tr key={i}>
-                                                        <Td wordBreak="break-word" whiteSpace="normal">{doc.created_at}</Td>
+                                                        <Td wordBreak="break-word" whiteSpace="normal">{formatTimestamp(doc.created_at)}</Td>
                                                         <Td fontWeight="600" wordBreak="break-word" whiteSpace="normal">{doc.document_type}</Td>
                                                         <Td wordBreak="break-word" whiteSpace="normal">
                                                             <VStack align="start" spacing={1}>

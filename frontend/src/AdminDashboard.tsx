@@ -88,6 +88,8 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
+import { formatSystemDate, formatSystemTime } from './utils/dateFormatter';
+import GenericPDFPreviewPage from './components/GenericPDFPreviewPage';
 
 interface AdminDashboardProps {
     user: any;
@@ -117,7 +119,7 @@ const loadLogoBase64 = async (): Promise<string | null> => {
 };
 
 /** Generic PDF download with BHCare branding and logo */
-const downloadPDF = async (filename: string, title: string, headers: string[], rows: (string | number)[][]) => {
+const generatePDFBlob = async (filename: string, title: string, headers: string[], rows: (string | number)[][]) => {
     const doc = new jsPDF({ orientation: 'landscape' });
     let startY = 16;
 
@@ -148,7 +150,8 @@ const downloadPDF = async (filename: string, title: string, headers: string[], r
         headStyles: { fillColor: [0, 128, 128], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 250, 250] },
     });
-    doc.save(filename);
+    const blobUrl = doc.output('bloburl') as unknown as string;
+    return { url: blobUrl, filename };
 };
 
 /** Generic Excel download with BHCare branding and logo */
@@ -338,7 +341,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState('overview');
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+    const [pdfPreviewFilename, setPdfPreviewFilename] = useState('');
     const [selectedCard, setSelectedCard] = useState('');
+
+    const handlePdfPreview = async (filename: string, title: string, headers: string[], rows: (string | number)[][]) => {
+        const res = await generatePDFBlob(filename, title, headers, rows);
+        setPdfPreviewUrl(res.url);
+        setPdfPreviewFilename(res.filename);
+    };
     const [users, setUsers] = useState<any[]>([]);
     const [medicalStaff, setMedicalStaff] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<any[]>([]);
@@ -1209,7 +1220,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                 <Tr key={i}>
                                                     <Td fontWeight="600">{p.patient_name}</Td>
                                                     <Td>{p.service_type}</Td>
-                                                    <Td>{p.appointment_date}</Td>
+                                                    <Td>{formatSystemDate(p.appointment_date)}</Td>
                                                 </Tr>
                                             ))
                                         ) : (
@@ -1330,7 +1341,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
     const renderContent = () => {
         switch (activeTab) {
-            case 'overview':
+            case 'overview': {
+                // Compute new charts data
+                const roleDistribution = users.reduce((acc: any, user: any) => {
+                    const role = user.role || 'Patient';
+                    acc[role] = (acc[role] || 0) + 1;
+                    return acc;
+                }, {});
+                const roleData = Object.keys(roleDistribution).map(key => ({
+                    name: key,
+                    value: roleDistribution[key]
+                }));
+
+                const serviceDistribution = appointments.reduce((acc: any, apt: any) => {
+                    const service = apt.service_type || 'General';
+                    acc[service] = (acc[service] || 0) + 1;
+                    return acc;
+                }, {});
+                const serviceData = Object.keys(serviceDistribution).map(key => ({
+                    name: key,
+                    count: serviceDistribution[key]
+                }));
+
                 return (
                     <VStack align="stretch" spacing={10}>
                         <PageHero
@@ -1339,7 +1371,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             description="Complete system oversight and management. Monitor all health center operations, user activities."
                         />
 
-                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={8}>
+                        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={8}>
                             <AdminStatCard
                                 label="Total Users"
                                 value={stats.total_users}
@@ -1349,6 +1381,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                             />
                             <AdminStatCard label="Active Doctors" value={stats.active_doctors} icon={FiActivity} color="orange" onClick={() => handleCardClick('doctors')} />
                             <AdminStatCard label="Today's Appointments" value={stats.todays_appointments} icon={FiCalendar} color="blue" onClick={() => handleCardClick('appointments')} />
+                            <AdminStatCard label="Pending Tickets" value={contactTickets.filter((t: any) => t.status !== 'Resolved').length} icon={FiMessageSquare} color="purple" onClick={() => setActiveTab('tickets')} />
+                        </SimpleGrid>
+
+                        <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
+                            {/* Chart 1: User Roles */}
+                            <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                                <Heading size="md" color="teal.800" mb={6}>User Role Distribution</Heading>
+                                <Box h="300px">
+                                    {roleData.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={roleData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={60}
+                                                    outerRadius={100}
+                                                    paddingAngle={5}
+                                                    dataKey="value"
+                                                >
+                                                    {roleData.map((_: any, index: number) => (
+                                                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip />
+                                                <Legend />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <Flex h="100%" align="center" justify="center"><Text color="gray.500">No user data available</Text></Flex>
+                                    )}
+                                </Box>
+                            </Box>
+
+                            {/* Chart 2: Today's Appointments */}
+                            <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
+                                <Heading size="md" color="teal.800" mb={6}>Today's Appointments by Service</Heading>
+                                <Box h="300px">
+                                    {serviceData.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={serviceData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                                <YAxis allowDecimals={false} />
+                                                <Tooltip />
+                                                <Legend />
+                                                <Bar name="Appointments" dataKey="count" fill="#3182ce" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <Flex h="100%" align="center" justify="center"><Text color="gray.500">No appointments for today</Text></Flex>
+                                    )}
+                                </Box>
+                            </Box>
                         </SimpleGrid>
 
                         <Box bg="white" p={8} borderRadius="3xl" boxShadow="sm" border="1px solid" borderColor="gray.100">
@@ -1357,7 +1443,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 <HStack spacing={3}>
                                     {lastUpdated && (
                                         <Text fontSize="xs" color="gray.400">
-                                            Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            Updated {formatSystemTime(lastUpdated.toISOString())}
                                         </Text>
                                     )}
                                     <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FiBarChart2 />} onClick={() => handleCardClick('all-logs')}>View All Logs</Button>
@@ -1401,6 +1487,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         </Box>
                     </VStack>
                 );
+            }
             case 'users': {
                 const filteredUsers = users.filter(u => {
                     const matchesSearch = u.first_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -1473,9 +1560,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                             const rows = filteredUsers.map((u: any, index: number) => [
                                                 index + 1,
                                                 u.first_name, u.last_name, u.email,
-                                                u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
+                                                u.created_at ? formatSystemDate(u.created_at) : ''
                                             ]);
-                                            await downloadPDF('users_report.pdf', 'Registered Users Report', headers, rows);
+                                            await handlePdfPreview('users_report.pdf', 'Registered Users Report', headers, rows);
                                         }}
                                     >
                                         PDF
@@ -1488,7 +1575,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                             const rows = filteredUsers.map((u: any, index: number) => [
                                                 index + 1,
                                                 u.first_name, u.last_name, u.email,
-                                                u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
+                                                u.created_at ? formatSystemDate(u.created_at) : ''
                                             ]);
                                             await downloadExcel('users_report.xlsx', 'Registered Users Report', headers, rows);
                                         }}
@@ -1538,7 +1625,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                                 {(user.role || 'Patient').toLowerCase().includes('admin') ? 'Administrator' : user.role}
                                                             </Badge>
                                                         </Td>
-                                                        <Td py={4}>{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</Td>
+                                                        <Td py={4}>{formatSystemDate(user.created_at)}</Td>
                                                         <Td py={4}>
                                                             <HStack spacing={2}>
                                                                 {(user?.role || '').toLowerCase().includes('super') ? (
@@ -1774,7 +1861,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                         (p.status || 'N/A').toUpperCase(),
                         p.service_type || p.service || graphName
                     ]);
-                    await downloadPDF(`${graphName.replace(/\s+/g, '_').toLowerCase()}_patients.pdf`, `${graphName} Patients`, headers, rows);
+                    await handlePdfPreview(`${graphName.replace(/\s+/g, '_').toLowerCase()}_patients.pdf`, `${graphName} Patients`, headers, rows);
                 };
 
                 return (
@@ -1797,7 +1884,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                         index + 1,
                                         s.service, s.total, s.upcoming, s.completed
                                     ]);
-                                    await downloadPDF(
+                                    await handlePdfPreview(
                                         'service_demand_report.pdf',
                                         'Service Demand Report',
                                         headers, rows
@@ -2418,7 +2505,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                         </Text>
                                                     </Td>
                                                     <Td py={4}>
-                                                        <Text fontSize="sm" color="gray.700">{new Date(ticket.created_at).toLocaleDateString()}</Text>
+                                                        <Text fontSize="sm" color="gray.700">{formatSystemDate(ticket.created_at)}</Text>
                                                     </Td>
                                                     <Td py={4}>
                                                         <VStack align="start" spacing={0}>
@@ -2558,6 +2645,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 return null;
         }
     };
+
+    if (pdfPreviewUrl) {
+        return (
+            <GenericPDFPreviewPage
+                pdfUrl={pdfPreviewUrl}
+                filename={pdfPreviewFilename}
+                onBack={() => {
+                    URL.revokeObjectURL(pdfPreviewUrl);
+                    setPdfPreviewUrl(null);
+                }}
+            />
+        );
+    }
 
     return (
         <Box minH="100vh" bg="#f8f9fc">

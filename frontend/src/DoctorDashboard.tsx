@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+
 import {
     Box,
     Flex,
@@ -42,6 +41,9 @@ import {
     useToast,
 } from '@chakra-ui/react';
 import Profile from './Profile';
+
+import PDFPreviewPage from './components/PDFPreviewPage';
+import { formatSystemDate, formatSystemTime } from './utils/dateFormatter';
 import {
     FiGrid,
     FiUsers,
@@ -179,6 +181,8 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
     const [activeTab, setActiveTab] = useState('overview');
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isOpen: isSidebarOpen, onOpen: onSidebarOpen, onClose: onSidebarClose } = useDisclosure();
+
+    const [pdfPreviewPageData, setPdfPreviewPageData] = useState<{ patient: any; records: any[] } | null>(null);
     const [selectedCard, setSelectedCard] = useState('');
     const [soapPatientId, setSoapPatientId] = useState<any>(null);
 
@@ -505,109 +509,17 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         return `${prefix}${year}${paddedId}`;
     };
 
-    const downloadPatientHistoryPDF = async () => {
+    // Open the full-page PDF preview/editor
+    const openPdfPreviewPage = () => {
         if (!selectedHistory) return;
-        const patient = selectedHistory.patient;
-        const records: any[] = selectedHistory.records || [];
-
-        const doc = new jsPDF({ orientation: 'portrait' });
-        let startY = 16;
-
-        // Try loading logo
-        try {
-            const res = await fetch('/images/Logo.png');
-            const blob = await res.blob();
-            const logoBase64: string = await new Promise((resolve, reject) => {
-                const r = new FileReader();
-                r.onload = () => resolve(r.result as string);
-                r.onerror = reject;
-                r.readAsDataURL(blob);
-            });
-            doc.addImage(logoBase64, 'PNG', 14, 8, 16, 16);
-            doc.setFontSize(15);
-            doc.setTextColor(0);
-            doc.text('Patient Medical History', 34, 16);
-            doc.setFontSize(8);
-            doc.setTextColor(100);
-            doc.text(`BHCare - Barangay 174 Health Center  ·  Generated: ${new Date().toLocaleString()}`, 34, 22);
-            startY = 30;
-        } catch {
-            doc.setFontSize(15);
-            doc.text('Patient Medical History', 14, 16);
-            doc.setFontSize(8);
-            doc.setTextColor(100);
-            doc.text(`BHCare - Barangay 174 Health Center  ·  Generated: ${new Date().toLocaleString()}`, 14, 22);
-            startY = 28;
-        }
-
-        // Patient profile table
-        autoTable(doc, {
-            startY,
-            head: [['Patient Information', '']],
-            body: [
-                ['Name', `${patient?.first_name || ''} ${patient?.last_name || ''}`],
-                ['Patient ID', patient?.p_id || '—'],
-                ['Age / Gender', `${patient?.age || '—'} / ${patient?.gender || '—'}`],
-                ['Contact', patient?.contact_number || '—'],
-            ],
-            styles: { fontSize: 9, cellPadding: 3 },
-            headStyles: { fillColor: [43, 108, 176], textColor: 255, fontStyle: 'bold' },
-            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
-            theme: 'grid',
+        setPdfPreviewPageData({
+            patient: selectedHistory.patient,
+            records: selectedHistory.records || [],
         });
-
-        let curY = (doc as any).lastAutoTable.finalY + 8;
-
-        // Clinical Notes
-        doc.setFontSize(11);
-        doc.setTextColor(35, 78, 82);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Clinical Notes  (${records.length} record${records.length !== 1 ? 's' : ''})`, 14, curY);
-        doc.setFont('helvetica', 'normal');
-        curY += 4;
-
-        if (records.length === 0) {
-            doc.setFontSize(9);
-            doc.setTextColor(160);
-            doc.text('No clinical notes on record.', 14, curY + 6);
-        } else {
-            records.forEach((record: any) => {
-                let meds: any[] = [];
-                try {
-                    meds = typeof record.prescription === 'string' ? JSON.parse(record.prescription) : (record.prescription || []);
-                } catch { meds = []; }
-
-                const medsText = meds.length > 0
-                    ? meds.map((m: any) => `  • ${m.item_name} x${m.quantity}${m.instructions ? ` — ${m.instructions}` : ''}`).join('\n')
-                    : '';
-
-                const bodyRows: [string, string][] = [
-                    ['S (Subjective)', record.subjective || '—'],
-                    ['O (Objective)', record.objective || '—'],
-                    ['A (Assessment)', record.assessment || '—'],
-                    ['P (Plan)', record.plan || '—'],
-                ];
-                if (medsText) bodyRows.push(['Dispensed Medicine(s)', medsText]);
-
-                autoTable(doc, {
-                    startY: curY,
-                    head: [[`${record.created_at}`, record.doctor_name || 'Medical Officer']],
-                    body: bodyRows,
-                    styles: { fontSize: 8, cellPadding: 3 },
-                    headStyles: { fillColor: [56, 178, 172], textColor: 255, fontStyle: 'bold' },
-                    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } },
-                    alternateRowStyles: { fillColor: [245, 255, 253] },
-                    theme: 'grid',
-                    margin: { left: 14, right: 14 },
-                });
-                curY = (doc as any).lastAutoTable.finalY + 6;
-            });
-        }
-
-        const filename = `MedicalHistory_${patient?.last_name || 'Patient'}_${patient?.first_name || ''}.pdf`
-            .replace(/\s+/g, '_');
-        doc.save(filename);
+        onClose(); // close the modal
     };
+
+
 
     const renderModalContent = () => {
         switch (selectedCard) {
@@ -649,7 +561,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         {patientsQueue.length > 0 ? (
                                             patientsQueue.map((p) => (
                                                 <Tr key={p.id} _hover={{ bg: "gray.50", transition: "0.2s" }}>
-                                                    <Td>{p.appointment_time}</Td>
+                                                    <Td>{formatSystemTime(p.appointment_time)}</Td>
                                                     <Td fontWeight="700" color="teal.700">{p.first_name} {p.last_name}</Td>
                                                     <Td>
                                                         <Badge colorScheme={p.status === 'consulting' ? 'green' : p.status === 'waiting' ? 'orange' : 'gray'} px={3} py={1} borderRadius="full">
@@ -705,7 +617,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         {patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').length > 0 ? (
                                             patientsQueue.filter(p => p.status === 'completed' || p.status === 'done').map(p => (
                                                 <Tr key={p.id} _hover={{ bg: "gray.50", transition: "0.2s" }}>
-                                                    <Td>{p.appointment_time}</Td>
+                                                    <Td>{formatSystemTime(p.appointment_time)}</Td>
                                                     <Td fontWeight="700" color="teal.700">{p.first_name} {p.last_name}</Td>
                                                     <Td>
                                                         <Text fontSize="sm" color="gray.700">{p.diagnosis || 'N/A'}</Text>
@@ -757,7 +669,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         {documentRequests.length > 0 ? (
                                             documentRequests.map((doc: any) => (
                                                 <Tr key={doc.id} _hover={{ bg: "gray.50", transition: "0.2s" }}>
-                                                    <Td>{doc.created_at}</Td>
+                                                    <Td>{formatSystemDate(doc.created_at)}</Td>
                                                     <Td fontWeight="700" color="teal.700">{doc.first_name} {doc.last_name}</Td>
                                                     <Td>
                                                         <Badge colorScheme={doc.document_type.includes('Clearance') ? 'orange' : 'purple'} px={3} py={1} borderRadius="full">
@@ -832,7 +744,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         {selectedHistory.records.map((record: any, index: number) => (
                                             <Box key={index} p={5} bg="white" borderWidth="1px" borderRadius="xl" borderColor="gray.200" boxShadow="sm" _hover={{ boxShadow: 'md', borderColor: 'teal.200', transition: '0.2s' }}>
                                                 <Flex justify="space-between" align="center" mb={4}>
-                                                    <Text fontWeight="bold" fontSize="sm" color="teal.600">{record.created_at}</Text>
+                                                    <Text fontWeight="bold" fontSize="sm" color="teal.600">{formatSystemDate(record.created_at)}</Text>
                                                     <Badge colorScheme="purple" borderRadius="full" px={3} py={1}>{record.doctor_name || 'Medical Officer'}</Badge>
                                                 </Flex>
                                                 <VStack align="start" spacing={2} pl={4} borderLeft="3px solid" borderColor="teal.200">
@@ -882,7 +794,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                     leftIcon={<Icon as={FiDownload} />}
                                     colorScheme="teal"
                                     variant="solid"
-                                    onClick={downloadPatientHistoryPDF}
+                                    onClick={openPdfPreviewPage}
                                     isDisabled={!selectedHistory?.records?.length}
                                 >
                                     Download PDF
@@ -955,7 +867,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                             patientsQueue.map(p => (
                                                 <Tr key={p.id}>
                                                     <Td fontWeight="600">{p.first_name} {p.last_name}</Td>
-                                                    <Td>{p.appointment_time}</Td>
+                                                    <Td>{formatSystemTime(p.appointment_time)}</Td>
                                                     <Td>{p.reason || 'N/A'}</Td>
                                                     <Td>
                                                         <Badge
@@ -1058,7 +970,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                     <Td fontWeight="600">{p.first_name} {p.last_name}</Td>
                                                     <Td>{p.age} / {p.gender}</Td>
                                                     <Td>{p.contact_number}</Td>
-                                                    <Td>{p.last_visit}</Td>
+                                                    <Td>{formatSystemDate(p.last_visit)}</Td>
                                                     <Td>
                                                         <Button size="xs" colorScheme="teal" variant="ghost" onClick={() => handleViewHistory(p.id)}>View History</Button>
                                                         <Button size="xs" colorScheme="blue" ml={2} onClick={() => handleOpenSoap(p.id)}>SOAP</Button>
@@ -1255,7 +1167,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         {filteredHistory.length > 0 ? (
                                             filteredHistory.map((r: any, i: number) => (
                                                 <Tr key={i}>
-                                                    <Td>{r.appointment_date}</Td>
+                                                    <Td>{formatSystemDate(r.appointment_date)}</Td>
                                                     <Td fontWeight="600">{r.patient_name}</Td>
                                                     <Td>{r.diagnosis || 'N/A'}</Td>
                                                     <Td>{r.doctor_name}</Td>
@@ -1398,6 +1310,17 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 return null;
         }
     };
+
+    // Full-page PDF Editor/Preview — replaces the dashboard temporarily
+    if (pdfPreviewPageData) {
+        return (
+            <PDFPreviewPage
+                patient={pdfPreviewPageData.patient}
+                records={pdfPreviewPageData.records}
+                onBack={() => setPdfPreviewPageData(null)}
+            />
+        );
+    }
 
     return (
         <Box minH="100vh" bg="#f8f9fc">
@@ -1778,6 +1701,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
 
         </Box>
+
     );
 };
 

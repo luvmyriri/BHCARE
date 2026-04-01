@@ -36,6 +36,7 @@ import {
     Button,
 } from '@chakra-ui/react';
 import { FiInfo, FiActivity, FiHeart, FiSettings, FiSave } from 'react-icons/fi';
+import { formatTimestamp } from '../utils/dateFormatter';
 import { Table, Thead, Tbody, Tr, Th, Td, useToast } from '@chakra-ui/react';
 
 interface Props {
@@ -327,7 +328,7 @@ const HealthCalculators: React.FC<Props> = ({ user }) => {
                                                         else if (bmiVal >= 30) { color = 'red'; lbl = 'Obese'; }
                                                         return (
                                                             <Tr key={log.id}>
-                                                                <Td>{log.created_at}</Td>
+                                                                <Td>{formatTimestamp(log.created_at)}</Td>
                                                                 <Td>{parseFloat(log.weight).toFixed(1)} {log.unit_system === 'metric' ? 'kg' : 'lbs'}</Td>
                                                                 <Td>{parseFloat(log.height).toFixed(1)} {log.unit_system === 'metric' ? 'cm' : 'inches'}</Td>
                                                                 <Td fontWeight="bold">{bmiVal.toFixed(1)}</Td>
@@ -461,7 +462,7 @@ const HealthCalculators: React.FC<Props> = ({ user }) => {
                                                         else if (sys >= 120 && sys < 130 && dia < 80) { color = 'yellow'; lbl = 'Elevated'; }
                                                         return (
                                                             <Tr key={log.id}>
-                                                                <Td>{log.created_at}</Td>
+                                                                <Td>{formatTimestamp(log.created_at)}</Td>
                                                                 <Td>{sys}</Td>
                                                                 <Td>{dia}</Td>
                                                                 <Td><Badge colorScheme={color}>{lbl}</Badge></Td>

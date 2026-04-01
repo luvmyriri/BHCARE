@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AppointmentCalendar from './components/AppointmentCalendar';
+import { formatSystemTime } from './utils/dateFormatter';
 import {
     Box,
     Flex,
@@ -575,7 +576,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                         {filteredQueue.length > 0 ? (
                                             filteredQueue.map((item) => (
                                                 <Tr key={item.id} bg={item.status === 'serving' ? 'green.50' : 'white'}>
-                                                    <Td fontWeight="bold">{item.appointment_time}</Td>
+                                                    <Td fontWeight="bold">{formatSystemTime(item.appointment_time)}</Td>
                                                     <Td>
                                                         <VStack align="start" spacing={0}>
                                                             <Text fontWeight="600">{item.first_name} {item.last_name}</Text>

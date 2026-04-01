@@ -541,31 +541,21 @@ def get_queue():
         
         cursor.close()
         conn.close()
-        
-        from datetime import datetime, timedelta
-        now = datetime.now()
-        # Cut-off time is 1 hour from now
-        threshold_time = (now + timedelta(hours=1)).time()
-        
         filtered_queue = []
         
-        # Format time objects to string and filter future ones
+        # Format time objects to string
         for item in queue:
-            appt_time = item['appointment_time']
-            if isinstance(appt_time, str):
+            if isinstance(item['appointment_time'], (datetime, time)):
+                item['appointment_time'] = item['appointment_time'].strftime('%H:%M')
+            elif isinstance(item['appointment_time'], str):
                  try:
-                     appt_time = datetime.strptime(appt_time, '%H:%M:%S').time()
+                     # ensure format is HH:MM
+                     parsed = datetime.strptime(item['appointment_time'], '%H:%M:%S').time()
+                     item['appointment_time'] = parsed.strftime('%H:%M')
                  except Exception:
                      pass
-            elif hasattr(appt_time, 'time'):
-                 appt_time = appt_time.time()
-
-            # keep if it's already serving/arrived OR if the scheduled time is within 1 hour from now
-            if item['status'] in ('serving', 'arrived') or (isinstance(appt_time, time) and appt_time <= threshold_time):
-                # format the original object for json return
-                if isinstance(item['appointment_time'], (datetime, time)):
-                    item['appointment_time'] = item['appointment_time'].strftime('%H:%M')
-                filtered_queue.append(item)
+            
+            filtered_queue.append(item)
                 
         return jsonify(filtered_queue), 200
         

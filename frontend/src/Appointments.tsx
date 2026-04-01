@@ -24,6 +24,7 @@ import {
     Select,
 } from '@chakra-ui/react';
 import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw, FiList, FiActivity, FiXCircle } from 'react-icons/fi';
+import { formatSystemDate, formatSystemDateTime } from './utils/dateFormatter';
 
 interface Service {
     id: number;
@@ -835,33 +836,56 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                 Select a Service
                                             </Heading>
                                             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
-                                                {services.map(service => (
-                                                    <Box
-                                                        key={service.id}
-                                                        onClick={() => setSelectedService(service)}
-                                                        p={4}
-                                                        borderRadius="xl"
-                                                        border="2px solid"
-                                                        borderColor={selectedService?.id === service.id ? 'teal.400' : 'gray.200'}
-                                                        bg={selectedService?.id === service.id ? 'teal.50' : 'white'}
-                                                        cursor="pointer"
-                                                        transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                                                        _hover={{
-                                                            borderColor: 'teal.400',
-                                                            transform: 'translateY(-4px)',
-                                                            boxShadow: 'xl'
-                                                        }}
-                                                        boxShadow={selectedService?.id === service.id ? 'lg' : 'sm'}
-                                                    >
-                                                        <HStack align="center" spacing={3}>
-                                                            <Icon as={FiActivity} boxSize={6} color="teal.500" />
-                                                            <VStack align="start" flex={1} spacing={0}>
-                                                                <Heading size="sm" color="gray.900" fontWeight="700">{service.name}</Heading>
-                                                                <Text fontSize="xs" color="gray.600" lineHeight="1.2" noOfLines={2}>{service.description}</Text>
-                                                            </VStack>
-                                                        </HStack>
-                                                    </Box>
-                                                ))}
+                                                {services.map(service => {
+                                                    const SERVICE_SCHEDULES: Record<string, string> = {
+                                                        'Consultation': 'Monday to Friday',
+                                                        'General Consultation': 'Monday to Friday',
+                                                        'Prenatal Check Up': 'Tuesday and Thursday',
+                                                        'Prenatal Care': 'Tuesday and Thursday',
+                                                        'Vaccination (Bakuna)': 'Wednesday and Friday',
+                                                        'Immunization': 'Wednesday and Friday',
+                                                        'Dental Services': 'Monday, Wednesday & Friday',
+                                                        'Dental Care': 'Monday, Wednesday & Friday',
+                                                        'Family Planning': 'Monday to Friday 1 PM',
+                                                        'Dots Center': 'Monday to Friday 1 PM',
+                                                        'TB DOTS': 'Monday to Friday 1 PM',
+                                                        'Cervical Screening': 'Monday 8 AM',
+                                                        'Nutrition Counseling': 'Monday to Friday',
+                                                    };
+                                                    const schedule = SERVICE_SCHEDULES[service.name] || 'Select to view availability';
+                                                    
+                                                    return (
+                                                        <Box
+                                                            key={service.id}
+                                                            onClick={() => setSelectedService(service)}
+                                                            p={4}
+                                                            borderRadius="xl"
+                                                            border="2px solid"
+                                                            borderColor={selectedService?.id === service.id ? 'teal.400' : 'gray.200'}
+                                                            bg={selectedService?.id === service.id ? 'teal.50' : 'white'}
+                                                            cursor="pointer"
+                                                            transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                                                            _hover={{
+                                                                borderColor: 'teal.400',
+                                                                transform: 'translateY(-4px)',
+                                                                boxShadow: 'xl'
+                                                            }}
+                                                            boxShadow={selectedService?.id === service.id ? 'lg' : 'sm'}
+                                                        >
+                                                            <HStack align="center" spacing={3}>
+                                                                <Icon as={FiActivity} boxSize={6} color="teal.500" />
+                                                                <VStack align="start" flex={1} spacing={0}>
+                                                                    <Heading size="sm" color="gray.900" fontWeight="700">{service.name}</Heading>
+                                                                    <Text fontSize="xs" color="gray.600" lineHeight="1.2" noOfLines={2} mb={1}>{service.description}</Text>
+                                                                    <HStack spacing={1} color="teal.500" pt={1}>
+                                                                        <Icon as={FiClock} boxSize={3} />
+                                                                        <Text fontSize="xs" fontWeight="600">{schedule}</Text>
+                                                                    </HStack>
+                                                                </VStack>
+                                                            </HStack>
+                                                        </Box>
+                                                    );
+                                                })}
                                             </SimpleGrid>
                                             <Button
                                                 isDisabled={!selectedService || (user?.gender === 'Female' && (isPregnant === null || (isPregnant === true && !pregnancyWeeks)))}
@@ -1102,9 +1126,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                     <Flex justify="space-between" align="center">
                                                         <Text color="gray.600" fontWeight="600">Date:</Text>
                                                         <Text fontWeight="800" color="gray.900" fontSize="lg">
-                                                            {new Date(selectedDate).toLocaleDateString('en-US', {
-                                                                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                                                            })}
+                                                            {formatSystemDate(selectedDate)}
                                                         </Text>
                                                     </Flex>
                                                     <Divider borderColor="teal.200" />
@@ -1281,11 +1303,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                         <HStack spacing={6} mb={4} fontSize="md" color="gray.600" fontWeight="600">
                                                             <HStack>
                                                                 <Icon as={FiCalendar} boxSize={5} />
-                                                                <Text>{new Date(apt.appointment_date).toLocaleDateString()}</Text>
-                                                            </HStack>
-                                                            <HStack>
-                                                                <Icon as={FiClock} boxSize={5} />
-                                                                <Text>{apt.appointment_time}</Text>
+                                                                <Text>{formatSystemDateTime(apt.appointment_date, apt.appointment_time)}</Text>
                                                             </HStack>
                                                         </HStack>
                                                         {/* Past appointment → Reschedule */}

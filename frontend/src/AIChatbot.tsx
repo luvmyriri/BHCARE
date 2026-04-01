@@ -310,7 +310,12 @@ const AIChatbot: React.FC = () => {
                                                     border="1px solid"
                                                     borderColor={msg.sender === 'user' ? 'teal.500' : 'gray.100'}
                                                 >
-                                                    <Text fontSize="sm">{msg.text}</Text>
+                                                    <Text fontSize="sm" whiteSpace="pre-wrap">{msg.text}</Text>
+                                                    {msg.sender === 'bot' && (
+                                                        <Text fontSize="10px" color="gray.400" mt={2} pt={2} borderTop="1px solid" borderColor="gray.100" lineHeight="1.2">
+                                                            <i>*Disclaimer: For professional medical advice and better understanding, please visit the BHCare Health Center.</i>
+                                                        </Text>
+                                                    )}
                                                 </Box>
                                             </Flex>
                                         ))}

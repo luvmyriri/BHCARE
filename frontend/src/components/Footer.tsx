@@ -11,6 +11,14 @@ import {
     Heading,
     Divider,
     Image,
+    Modal,
+    ModalOverlay,
+    ModalContent,
+    ModalHeader,
+    ModalCloseButton,
+    ModalBody,
+    useDisclosure,
+    Button
 } from '@chakra-ui/react';
 
 const FacebookIcon = (props: any) => (
@@ -45,6 +53,8 @@ const MapPinIcon = (props: any) => (
 
 const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => {
     const currentYear = new Date().getFullYear();
+    const { isOpen: isPrivacyOpen, onOpen: onPrivacyOpen, onClose: onPrivacyClose } = useDisclosure();
+    const { isOpen: isTermsOpen, onOpen: onTermsOpen, onClose: onTermsClose } = useDisclosure();
 
     return (
         <Box bg="rgba(23, 25, 35, 0.9)" backdropFilter="blur(10px)" color="white" mt="auto">
@@ -60,17 +70,17 @@ const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => 
                             Barangay 174 Health Center provides quality healthcare services to our community with compassion and excellence.
                         </Text>
                         <Flex gap={3} mt={2}>
-                            <Link href="#" _hover={{ transform: 'translateY(-2px)' }} transition="all 0.2s">
+                            <Link href="https://www.facebook.com/profile.php?id=100066788617992" target="_blank" rel="noopener noreferrer" _hover={{ transform: 'translateY(-2px)' }} transition="all 0.2s">
                                 <Box bg="whiteAlpha.200" p={2} borderRadius="lg" _hover={{ bg: 'whiteAlpha.300' }}>
                                     <FacebookIcon boxSize={5} />
                                 </Box>
                             </Link>
-                            <Link href="#" _hover={{ transform: 'translateY(-2px)' }} transition="all 0.2s">
+                            <Link href="https://twitter.com/CaloocanCityGov" target="_blank" rel="noopener noreferrer" _hover={{ transform: 'translateY(-2px)' }} transition="all 0.2s">
                                 <Box bg="whiteAlpha.200" p={2} borderRadius="lg" _hover={{ bg: 'whiteAlpha.300' }}>
                                     <TwitterIcon boxSize={5} />
                                 </Box>
                             </Link>
-                            <Link href="#" _hover={{ transform: 'translateY(-2px)' }} transition="all 0.2s">
+                            <Link href="mailto:bhcarehealthcenter@gmail.com" _hover={{ transform: 'translateY(-2px)' }} transition="all 0.2s">
                                 <Box bg="whiteAlpha.200" p={2} borderRadius="lg" _hover={{ bg: 'whiteAlpha.300' }}>
                                     <EmailIcon boxSize={5} />
                                 </Box>
@@ -114,14 +124,14 @@ const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => 
                         </Flex>
                         <Flex alignItems="center" gap={3}>
                             <PhoneIcon boxSize={5} color="teal.400" />
-                            <Link href="tel:+6289611234" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>
-                                (02) 8961-1234
+                            <Link href="tel:0288825664" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>
+                                (02) 888-25664
                             </Link>
                         </Flex>
                         <Flex alignItems="center" gap={3}>
                             <EmailIcon boxSize={5} color="teal.400" />
-                            <Link href="mailto:info@brgy174hc.gov.ph" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>
-                                info@brgy174hc.gov.ph
+                            <Link href="mailto:bhcarehealthcenter@gmail.com" fontSize="sm" color="gray.400" _hover={{ color: 'white' }}>
+                                bhcarehealthcenter@gmail.com
                             </Link>
                         </Flex>
                         <Box>
@@ -145,10 +155,10 @@ const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => 
                         © {currentYear} Barangay 174 Health Center. All rights reserved.
                     </Text>
                     <Flex justifyContent={{ base: 'start', md: 'end' }} gap={6}>
-                        <Link href="#" fontSize="sm" color="gray.500" _hover={{ color: 'white' }}>
+                        <Link onClick={onPrivacyOpen} cursor="pointer" fontSize="sm" color="gray.500" _hover={{ color: 'white' }}>
                             Privacy Policy
                         </Link>
-                        <Link href="#" fontSize="sm" color="gray.500" _hover={{ color: 'white' }}>
+                        <Link onClick={onTermsOpen} cursor="pointer" fontSize="sm" color="gray.500" _hover={{ color: 'white' }}>
                             Terms of Service
                         </Link>
                         <Link
@@ -190,6 +200,97 @@ const Footer = ({ onAppointmentClick }: { onAppointmentClick?: () => void }) => 
                     </Box>
                 </Flex>
             </Container>
+
+            {/* Privacy Policy Modal */}
+            <Modal isOpen={isPrivacyOpen} onClose={onPrivacyClose} size="xl" scrollBehavior="inside">
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.300" />
+                <ModalContent borderRadius="xl" bg="white" color="gray.800">
+                    <ModalHeader borderBottom="1px solid" borderColor="gray.100" py={4}>
+                        <Heading size="md" color="teal.600">Privacy Policy</Heading>
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
+                        <Stack spacing={4}>
+                            <Text fontWeight="bold">1. Information Collection</Text>
+                            <Text fontSize="sm">
+                                We collect personal information that you voluntarily provide to us when you register on the website, express an interest in obtaining information about us or our products and services, or otherwise when you contact us. The personal information that we collect depends on the context of your interactions with us and the website, the choices you make and the products and features you use.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>2. How We Use Your Information</Text>
+                            <Text fontSize="sm">
+                                We process your information for purposes based on legitimate business interests, the fulfillment of our contract with you, compliance with our legal obligations, and/or your consent. Specifically, we use the information we collect or receive to facilitate account creation and logon processes, send administrative information to you, fulfill and manage your orders or appointments, and to post testimonials.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>3. Patient Confidentiality</Text>
+                            <Text fontSize="sm">
+                                As a healthcare provider, we strictly adhere to medical confidentiality standards and relevant data privacy laws in the Philippines (Data Privacy Act of 2012). Your health records, consultation notes, and all related medical data are stored securely and only accessible by authorized medical personnel directly involved in your care.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>4. Information Sharing</Text>
+                            <Text fontSize="sm">
+                                We only share information with your consent, to comply with laws, to provide you with services, to protect your rights, or to fulfill business obligations. We may share your data with third-party vendors, service providers, contractors or agents who perform services for us or on our behalf and require access to such information to do that work.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>5. Data Retention</Text>
+                            <Text fontSize="sm">
+                                We will only keep your personal information for as long as it is necessary for the purposes set out in this privacy notice, unless a longer retention period is required or permitted by law (such as tax, accounting or other legal requirements).
+                            </Text>
+                        </Stack>
+                    </ModalBody>
+                    <Divider borderColor="gray.100" />
+                    <Flex justify="flex-end" p={4} bg="gray.50" borderBottomRadius="xl">
+                        <Button colorScheme="teal" onClick={onPrivacyClose} size="md">Acknowledge</Button>
+                    </Flex>
+                </ModalContent>
+            </Modal>
+
+            {/* Terms of Service Modal */}
+            <Modal isOpen={isTermsOpen} onClose={onTermsClose} size="xl" scrollBehavior="inside">
+                <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.300" />
+                <ModalContent borderRadius="xl" bg="white" color="gray.800">
+                    <ModalHeader borderBottom="1px solid" borderColor="gray.100" py={4}>
+                        <Heading size="md" color="teal.600">Terms of Service</Heading>
+                    </ModalHeader>
+                    <ModalCloseButton mt={2} />
+                    <ModalBody py={6}>
+                        <Stack spacing={4}>
+                            <Text fontWeight="bold">1. Agreement to Terms</Text>
+                            <Text fontSize="sm">
+                                By accessing our website, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any part of these terms, you are prohibited from using this site and our digital services.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>2. Use License</Text>
+                            <Text fontSize="sm">
+                                Permission is granted to temporarily download one copy of the materials (information or software) on BHCare Brgy. 174's website for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:
+                                <br />• modify or copy the materials;
+                                <br />• use the materials for any commercial purpose, or for any public display (commercial or non-commercial);
+                                <br />• attempt to decompile or reverse engineer any software contained on BHCare Brgy. 174's website;
+                                <br />• remove any copyright or other proprietary notations from the materials; or
+                                <br />• transfer the materials to another person or "mirror" the materials on any other server.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>3. Medical Disclaimer</Text>
+                            <Text fontSize="sm">
+                                The content provided on BHCare Brgy. 174's website is for informational purposes only and is not intended as a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition. Do not disregard professional medical advice or delay in seeking it because of something you have read on our digital platforms.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>4. Appointments and Cancellations</Text>
+                            <Text fontSize="sm">
+                                By booking an appointment through our system, you commit to arriving at the scheduled time. If you need to cancel or reschedule, you must do so at least 24 hours in advance.
+                            </Text>
+
+                            <Text fontWeight="bold" mt={4}>5. Limitations of Liability</Text>
+                            <Text fontSize="sm">
+                                In no event shall BHCare Brgy. 174 or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the materials on our website, even if we have been notified orally or in writing of the possibility of such damage.
+                            </Text>
+                        </Stack>
+                    </ModalBody>
+                    <Divider borderColor="gray.100" />
+                    <Flex justify="flex-end" p={4} bg="gray.50" borderBottomRadius="xl">
+                        <Button colorScheme="teal" onClick={onTermsClose} size="md">I Agree</Button>
+                    </Flex>
+                </ModalContent>
+            </Modal>
         </Box>
     );
 };

@@ -29,6 +29,7 @@ import {
     FiPlus,
     FiTrash2
 } from 'react-icons/fi';
+import { formatSystemDate } from '../utils/dateFormatter';
 
 interface SoapNoteFormProps {
     patientId: number;
@@ -221,7 +222,7 @@ const SoapNoteForm: React.FC<SoapNoteFormProps> = ({ patientId, doctorEmail, onS
                         border="1px solid"
                         borderColor="whiteAlpha.300"
                     >
-                        {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        {formatSystemDate(new Date().toISOString())}
                     </Box>
                 </Flex>
             </Box>

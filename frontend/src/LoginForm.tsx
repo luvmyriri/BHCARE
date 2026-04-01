@@ -154,6 +154,8 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
   const [confirmPw, setConfirmPw] = useState('');
   const [changePwError, setChangePwError] = useState('');
   const [changePwLoading, setChangePwLoading] = useState(false);
+  const [newPwVisible, setNewPwVisible] = useState(false);
+  const [forceConfirmPwVisible, setForceConfirmPwVisible] = useState(false);
 
   const handleForcedPasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2758,27 +2760,45 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>
                   New Password
                 </label>
-                <input
-                  type="password"
-                  value={newPw}
-                  onChange={(e) => setNewPw(e.target.value)}
-                  placeholder="Minimum 8 characters"
-                  required
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={newPwVisible ? 'text' : 'password'}
+                    value={newPw}
+                    onChange={(e) => setNewPw(e.target.value)}
+                    placeholder="Minimum 8 characters"
+                    required
+                    style={{ width: '100%', padding: '10px 40px 10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNewPwVisible(!newPwVisible)}
+                    style={{ position: 'absolute', right: '10px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#718096', padding: '4px', display: 'flex', alignItems: 'center' }}
+                  >
+                    {newPwVisible ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
               </div>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>
                   Confirm New Password
                 </label>
-                <input
-                  type="password"
-                  value={confirmPw}
-                  onChange={(e) => setConfirmPw(e.target.value)}
-                  placeholder="Re-enter your new password"
-                  required
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
-                />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={forceConfirmPwVisible ? 'text' : 'password'}
+                    value={confirmPw}
+                    onChange={(e) => setConfirmPw(e.target.value)}
+                    placeholder="Re-enter your new password"
+                    required
+                    style={{ width: '100%', padding: '10px 40px 10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForceConfirmPwVisible(!forceConfirmPwVisible)}
+                    style={{ position: 'absolute', right: '10px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#718096', padding: '4px', display: 'flex', alignItems: 'center' }}
+                  >
+                    {forceConfirmPwVisible ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
               </div>
               {changePwError && (
                 <div style={{ background: '#FFF5F5', color: '#C53030', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>

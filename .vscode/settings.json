@@ -12,5 +12,10 @@
             "[a-zA-Z]*ClassName['\"`]\\s*:\\s*['\"`]([^'\"`]*)['\"`]",
             "([a-zA-Z0-9\\-:]+)"
         ]
+    ],
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/backend",
+        "${workspaceFolder}/backEnd"
     ]
 }

@@ -27,11 +27,11 @@ if __name__ == '__main__':
         cursor = conn.cursor()
         cursor.execute('SELECT version();')
         db_version = cursor.fetchone()
-        print(f"✅ Database connection successful!")
+        print(f"Database connection successful!")
         print(f"PostgreSQL version: {db_version[0]}")
         cursor.close()
         conn.close()
-        print("\n💡 To create/update tables, run: python -m alembic upgrade head")
+        print("\nTo create/update tables, run: python -m alembic upgrade head")
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"Database connection failed: {e}")
 

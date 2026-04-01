@@ -36,34 +36,34 @@ if choice == "1":
     print_section("Create New Migration")
     message = input("Enter migration description (e.g., 'add_phone_column'): ").strip()
     if message:
-        print(f"\n🔨 Creating migration: {message}")
+        print(f"\nCreating migration: {message}")
         os.system(f'python -m alembic revision -m "{message}"')
-        print("\n✅ Migration file created!")
-        print("📝 Edit the migration file in migrations/versions/")
-        print("💡 Then run 'Apply Migrations' to apply it")
+        print("\nMigration file created!")
+        print("Edit the migration file in migrations/versions/")
+        print("Then run 'Apply Migrations' to apply it")
     else:
-        print("❌ Migration description cannot be empty")
+        print("Migration description cannot be empty")
 
 elif choice == "2":
     print_section("Apply Pending Migrations")
-    print("🔨 Applying all pending migrations...")
+    print("Applying all pending migrations...")
     os.system('python -m alembic upgrade head')
-    print("\n✅ Migrations applied!")
+    print("\nMigrations applied!")
 
 elif choice == "3":
     print_section("Check Migration Status")
     os.system('python -m alembic current')
-    print("\n💡 To see all migrations, choose 'History'")
+    print("\nTo see all migrations, choose 'History'")
 
 elif choice == "4":
     print_section("Rollback Last Migration")
-    confirm = input("⚠️  Are you sure you want to rollback? (yes/no): ").strip().lower()
+    confirm = input("Are you sure you want to rollback? (yes/no): ").strip().lower()
     if confirm == "yes":
-        print("🔨 Rolling back last migration...")
+        print("Rolling back last migration...")
         os.system('python -m alembic downgrade -1')
-        print("\n✅ Rollback complete!")
+        print("\nRollback complete!")
     else:
-        print("❌ Rollback cancelled")
+        print("Rollback cancelled")
 
 elif choice == "5":
     print_section("Migration History")
@@ -72,7 +72,7 @@ elif choice == "5":
 elif choice == "6":
     print_section("Migration Guide")
     print("""
-📚 How to Use Database Migrations:
+ How to Use Database Migrations:
 
 1. WHEN SOMEONE ADDS A NEW COLUMN:
    - They create a migration: python manage_migrations.py → choice 1
@@ -90,16 +90,16 @@ elif choice == "6":
    Step 6: Push to Git
 
 3. IMPORTANT RULES:
-   ✅ Always pull before creating new migrations
-   ✅ Never edit old migration files
-   ✅ Always commit migration files to Git
-   ✅ Run migrations before starting work
-   ✅ Test migrations before pushing
+   Always pull before creating new migrations
+   Never edit old migration files
+   Always commit migration files to Git
+   Run migrations before starting work
+   Test migrations before pushing
 
 For detailed guide, see: docs/DATABASE_MIGRATIONS.md
     """)
 
 else:
-    print("❌ Invalid choice")
+    print("Invalid choice")
 
 print("\n" + "=" * 60)
