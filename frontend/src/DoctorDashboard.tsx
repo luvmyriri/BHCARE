@@ -185,6 +185,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
     const [pdfPreviewPageData, setPdfPreviewPageData] = useState<{ patient: any; records: any[] } | null>(null);
     const [selectedCard, setSelectedCard] = useState('');
     const [soapPatientId, setSoapPatientId] = useState<any>(null);
+    const [soapAppointmentId, setSoapAppointmentId] = useState<any>(null);
 
     // Inventory Add Item State
     const { isOpen: isAddInventoryOpen, onOpen: onAddInventoryOpen, onClose: onAddInventoryClose } = useDisclosure();
@@ -435,8 +436,10 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
     React.useEffect(() => {
         const fetchData = async () => {
             try {
-                // Get today's date in YYYY-MM-DD
-                const today = new Date().toISOString().split('T')[0];
+                // Get today's local date in YYYY-MM-DD
+                const localDate = new Date();
+                localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
+                const today = localDate.toISOString().split('T')[0];
 
                 // Fetch Appointments (Queue)
                 const queueRes = await fetch(`/api/appointments?date=${today}`);
@@ -488,8 +491,36 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
         onOpen();
     };
 
-    const handleOpenSoap = (patientId: any) => {
+    const handleMarkPriority = async (id: number, field: 'staff_verified_pregnant' | 'staff_verified_pwd', value: boolean) => {
+        try {
+            const response = await fetch(`/api/appointments/${id}/mark-priority`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: value })
+            });
+            if (response.ok) {
+                const label = field === 'staff_verified_pregnant' ? 'Pregnant' : 'PWD';
+                toast({
+                    title: value ? `✓ Marked as ${label}` : `${label} priority removed`,
+                    status: value ? 'success' : 'info',
+                    duration: 3000,
+                    isClosable: true,
+                });
+                // Refresh the queue
+                const today = new Date().toISOString().split('T')[0];
+                const queueRes = await fetch(`/api/appointments?date=${today}`);
+                if (queueRes.ok) setPatientsQueue(await queueRes.json());
+            } else {
+                toast({ title: 'Error', description: 'Failed to update priority', status: 'error', duration: 3000, isClosable: true });
+            }
+        } catch (error) {
+            console.error('Error marking priority:', error);
+        }
+    };
+
+    const handleOpenSoap = (patientId: any, appointmentId?: any) => {
         setSoapPatientId(patientId);
+        setSoapAppointmentId(appointmentId || null);
         setSelectedCard('soap-form');
         onOpen();
     };
@@ -529,7 +560,23 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                         <SoapNoteForm
                             patientId={soapPatientId}
                             doctorEmail={user?.email}
-                            onSuccess={() => {
+                            onSuccess={async () => {
+                                if (soapAppointmentId) {
+                                    try {
+                                        await fetch(`/api/appointments/${soapAppointmentId}/status`, {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ status: 'completed' })
+                                        });
+                                        const localDate = new Date();
+                                        localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
+                                        const today = localDate.toISOString().split('T')[0];
+                                        const queueRes = await fetch(`/api/appointments?date=${today}`);
+                                        if (queueRes.ok) setPatientsQueue(await queueRes.json());
+                                    } catch (e) {
+                                        console.error('Failed to update status', e);
+                                    }
+                                }
                                 onClose();
                                 setActiveTab('records'); // Redirect to Medical History records
                             }}
@@ -553,23 +600,54 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         <Tr>
                                             <Th py={4} color="gray.600">Time</Th>
                                             <Th py={4} color="gray.600">Patient</Th>
+                                            <Th py={4} color="gray.600">Priority</Th>
                                             <Th py={4} color="gray.600">Status</Th>
                                             <Th py={4} color="gray.600">Action</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {patientsQueue.length > 0 ? (
-                                            patientsQueue.map((p) => (
-                                                <Tr key={p.id} _hover={{ bg: "gray.50", transition: "0.2s" }}>
+                                        {patientsQueue.filter(p => !['completed', 'done', 'cancelled'].includes(p.status?.toLowerCase())).length > 0 ? (
+                                            patientsQueue.filter(p => !['completed', 'done', 'cancelled'].includes(p.status?.toLowerCase())).map((p) => (
+                                                <Tr key={p.id} _hover={{ bg: "gray.50", transition: "0.2s" }} bg={(p.staff_verified_pregnant || p.staff_verified_pwd) ? 'purple.50' : 'white'}>
                                                     <Td>{formatSystemTime(p.appointment_time)}</Td>
-                                                    <Td fontWeight="700" color="teal.700">{p.first_name} {p.last_name}</Td>
+                                                    <Td fontWeight="700" color="teal.700">
+                                                        <VStack align="start" spacing={0}>
+                                                            <Text>{p.first_name} {p.last_name}</Text>
+                                                            {p.gender?.toLowerCase() === 'female' && p.is_pregnant && !p.staff_verified_pregnant && (
+                                                                <Badge colorScheme="pink" variant="subtle" fontSize="0.6em" borderRadius="full">Claims Pregnant</Badge>
+                                                            )}
+                                                            {p.user_is_pwd && !p.staff_verified_pwd && (
+                                                                <Badge colorScheme="purple" variant="subtle" fontSize="0.6em" borderRadius="full">Claims PWD</Badge>
+                                                            )}
+                                                        </VStack>
+                                                    </Td>
+                                                    <Td>
+                                                        <VStack align="start" spacing={1}>
+                                                            {p.gender?.toLowerCase() === 'female' && (
+                                                                <Button size="xs" colorScheme="pink"
+                                                                    variant={p.staff_verified_pregnant ? 'solid' : 'outline'}
+                                                                    borderRadius="full"
+                                                                    onClick={() => handleMarkPriority(p.id, 'staff_verified_pregnant', !p.staff_verified_pregnant)}
+                                                                >
+                                                                    {p.staff_verified_pregnant ? '✓ Pregnant' : '+ Pregnant'}
+                                                                </Button>
+                                                            )}
+                                                            <Button size="xs" colorScheme="purple"
+                                                                variant={p.staff_verified_pwd ? 'solid' : 'outline'}
+                                                                borderRadius="full"
+                                                                onClick={() => handleMarkPriority(p.id, 'staff_verified_pwd', !p.staff_verified_pwd)}
+                                                            >
+                                                                {p.staff_verified_pwd ? '✓ PWD' : '+ PWD'}
+                                                            </Button>
+                                                        </VStack>
+                                                    </Td>
                                                     <Td>
                                                         <Badge colorScheme={p.status === 'consulting' ? 'green' : p.status === 'waiting' ? 'orange' : 'gray'} px={3} py={1} borderRadius="full">
                                                             {p.status}
                                                         </Badge>
                                                     </Td>
                                                     <Td>
-                                                        <Button size="sm" colorScheme="teal" onClick={() => handleOpenSoap(p.user_id)} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>
+                                                        <Button size="sm" colorScheme="teal" onClick={() => handleOpenSoap(p.user_id, p.id)} _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }}>
                                                             SOAP
                                                         </Button>
                                                     </Td>
@@ -577,7 +655,7 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={4} py={10}>
+                                                <Td colSpan={5} py={10}>
                                                     <VStack color="gray.400" spacing={3}>
                                                         <Icon as={FiUsers} boxSize={12} color="gray.300" />
                                                         <Text fontSize="md" fontWeight="500">No patients in the queue for today.</Text>
@@ -744,7 +822,12 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         {selectedHistory.records.map((record: any, index: number) => (
                                             <Box key={index} p={5} bg="white" borderWidth="1px" borderRadius="xl" borderColor="gray.200" boxShadow="sm" _hover={{ boxShadow: 'md', borderColor: 'teal.200', transition: '0.2s' }}>
                                                 <Flex justify="space-between" align="center" mb={4}>
-                                                    <Text fontWeight="bold" fontSize="sm" color="teal.600">{formatSystemDate(record.created_at)}</Text>
+                                                    <HStack spacing={3}>
+                                                        <Text fontWeight="bold" fontSize="sm" color="teal.600">{formatSystemDate(record.created_at)}</Text>
+                                                        {record.service_type && (
+                                                            <Badge colorScheme="blue" borderRadius="full" px={2} py={0.5} fontSize="xs">{record.service_type}</Badge>
+                                                        )}
+                                                    </HStack>
                                                     <Badge colorScheme="purple" borderRadius="full" px={3} py={1}>{record.doctor_name || 'Medical Officer'}</Badge>
                                                 </Flex>
                                                 <VStack align="start" spacing={2} pl={4} borderLeft="3px solid" borderColor="teal.200">
@@ -857,17 +940,48 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                         <Tr>
                                             <Th>Patient Name</Th>
                                             <Th>Appt. Time</Th>
+                                            <Th>Priority</Th>
                                             <Th>Reason</Th>
                                             <Th>Status</Th>
                                             <Th>Action</Th>
                                         </Tr>
                                     </Thead>
                                     <Tbody>
-                                        {patientsQueue.length > 0 ? (
-                                            patientsQueue.map(p => (
-                                                <Tr key={p.id}>
-                                                    <Td fontWeight="600">{p.first_name} {p.last_name}</Td>
+                                        {patientsQueue.filter(p => !['completed', 'done', 'cancelled'].includes(p.status?.toLowerCase())).length > 0 ? (
+                                            patientsQueue.filter(p => !['completed', 'done', 'cancelled'].includes(p.status?.toLowerCase())).map(p => (
+                                                <Tr key={p.id} bg={(p.staff_verified_pregnant || p.staff_verified_pwd) ? 'purple.50' : 'white'}>
+                                                    <Td fontWeight="600">
+                                                        <VStack align="start" spacing={0}>
+                                                            <Text>{p.first_name} {p.last_name}</Text>
+                                                            {p.gender?.toLowerCase() === 'female' && p.is_pregnant && !p.staff_verified_pregnant && (
+                                                                <Badge colorScheme="pink" variant="subtle" fontSize="0.6em" borderRadius="full">Claims Pregnant</Badge>
+                                                            )}
+                                                            {p.user_is_pwd && !p.staff_verified_pwd && (
+                                                                <Badge colorScheme="purple" variant="subtle" fontSize="0.6em" borderRadius="full">Claims PWD</Badge>
+                                                            )}
+                                                        </VStack>
+                                                    </Td>
                                                     <Td>{formatSystemTime(p.appointment_time)}</Td>
+                                                    <Td>
+                                                        <VStack align="start" spacing={1}>
+                                                            {p.gender?.toLowerCase() === 'female' && (
+                                                                <Button size="xs" colorScheme="pink"
+                                                                    variant={p.staff_verified_pregnant ? 'solid' : 'outline'}
+                                                                    borderRadius="full"
+                                                                    onClick={() => handleMarkPriority(p.id, 'staff_verified_pregnant', !p.staff_verified_pregnant)}
+                                                                >
+                                                                    {p.staff_verified_pregnant ? '✓ Pregnant' : '+ Pregnant'}
+                                                                </Button>
+                                                            )}
+                                                            <Button size="xs" colorScheme="purple"
+                                                                variant={p.staff_verified_pwd ? 'solid' : 'outline'}
+                                                                borderRadius="full"
+                                                                onClick={() => handleMarkPriority(p.id, 'staff_verified_pwd', !p.staff_verified_pwd)}
+                                                            >
+                                                                {p.staff_verified_pwd ? '✓ PWD' : '+ PWD'}
+                                                            </Button>
+                                                        </VStack>
+                                                    </Td>
                                                     <Td>{p.reason || 'N/A'}</Td>
                                                     <Td>
                                                         <Badge
@@ -880,13 +994,13 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                                                     </Td>
                                                     <Td>
                                                         <Button size="xs" colorScheme="teal" variant="ghost" onClick={() => handleViewHistory(p.user_id)}>View Details</Button>
-                                                        <Button size="xs" colorScheme="blue" ml={2} onClick={() => handleOpenSoap(p.user_id)}>SOAP</Button>
+                                                        <Button size="xs" colorScheme="blue" ml={2} onClick={() => handleOpenSoap(p.user_id, p.id)}>SOAP</Button>
                                                     </Td>
                                                 </Tr>
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={5} textAlign="center" py={4} color="gray.500">
+                                                <Td colSpan={6} textAlign="center" py={4} color="gray.500">
                                                     No patients in queue
                                                 </Td>
                                             </Tr>

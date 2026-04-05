@@ -448,7 +448,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         first_name: '',
         last_name: '',
         email: '',
-        contact_number: ''
+        contact_number: '',
+        super_admin_password: ''
     });
     const [admins, setAdmins] = useState<any[]>([]);
 
@@ -527,7 +528,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     // Fetch Today's Appointments
     const fetchAppointments = async () => {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            // Get today's local date in YYYY-MM-DD
+            const localDate = new Date();
+            localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
+            const today = localDate.toISOString().split('T')[0];
             const response = await fetch(`/api/appointments?date=${today}`);
             if (response.ok) {
                 const data = await response.json();
@@ -785,11 +789,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             return;
         }
 
+        if (!newAdmin.super_admin_password) {
+            toast({ title: "Validation Error", description: "Super Admin Password is required for authorization.", status: "warning", duration: 4000, isClosable: true });
+            return;
+        }
+
         try {
+            const payload = {
+                ...newAdmin,
+                super_admin_email: user?.email
+            };
             const response = await fetch('/api/admin/create-admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newAdmin)
+                body: JSON.stringify(payload)
             });
             if (response.ok) {
                 toast({ title: "Success", description: "Administrator account created successfully.", status: "success" });
@@ -798,7 +811,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     first_name: '',
                     last_name: '',
                     email: '',
-                    contact_number: ''
+                    contact_number: '',
+                    super_admin_password: ''
                 });
                 fetchAdmins();
                 fetchUsers();
@@ -3021,6 +3035,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                 <Input
                                     value={newAdmin.contact_number}
                                     onChange={(e) => setNewAdmin({ ...newAdmin, contact_number: e.target.value })}
+                                />
+                            </FormControl>
+                            <Divider />
+                            <FormControl isRequired>
+                                <FormLabel>Authorization</FormLabel>
+                                <Input
+                                    type="password"
+                                    placeholder="Enter your Super Admin Password"
+                                    value={newAdmin.super_admin_password}
+                                    onChange={(e) => setNewAdmin({ ...newAdmin, super_admin_password: e.target.value })}
                                 />
                             </FormControl>
                         </VStack>

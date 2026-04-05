@@ -299,7 +299,6 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
   const [confirmPwVisible, setConfirmPwVisible] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [isPwd, setIsPwd] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
 
@@ -576,7 +575,6 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
     // to allow users to keep their credentials if they swap modes,
     // but they can be added if the user specifically wants a total wipe.
     setConfirmPassword('');
-    setIsPwd(false);
   };
 
   const identifyIDType = (text: string) => {
@@ -1103,8 +1101,6 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
     formData.append('subdivision', subdivision);
     formData.append('zip_code', zipCode);
     formData.append('full_address', fullAddress);
-    formData.append('is_pwd', isPwd ? 'true' : 'false');
-
 
     setLoading(true);
     try {
@@ -2112,37 +2108,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                         </label>
                       </div>
 
-                      {/* PWD Checkbox */}
-                      <div style={{ marginTop: '12px', marginBottom: '4px' }}>
-                        <label style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '10px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          color: '#4a5568',
-                          lineHeight: '1.5'
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={isPwd}
-                            onChange={(e) => setIsPwd(e.target.checked)}
-                            style={{
-                              marginTop: '2px',
-                              width: '16px',
-                              height: '16px',
-                              accentColor: '#805ad5',
-                              flexShrink: 0,
-                              cursor: 'pointer'
-                            }}
-                          />
-                          <span>
-                            I am a{' '}
-                            <strong style={{ color: '#805ad5' }}>Person with Disability (PWD)</strong>
-                            {' '}— checking this will flag my account for PWD-priority services.
-                          </span>
-                        </label>
-                      </div>
+                      {/* PWD Checkbox Removed */}
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' }}>
                         <button type="button" onClick={() => { setOcrProcessed(false); resetFormFields(); }} style={{ flex: 1, padding: '14px', background: '#edf2f7', border: 'none', borderRadius: '12px', cursor: 'pointer', color: '#4a5568', fontWeight: 700, fontSize: '14px' }}>

@@ -191,7 +191,15 @@ def get_patient_history(user_id):
                     WHEN u.id IS NOT NULL THEN 'Dr. ' || u.first_name || ' ' || u.last_name
                     WHEN au.id IS NOT NULL THEN 'Dr. ' || au.username
                     ELSE NULL
-                END as doctor_name
+                END as doctor_name,
+                (
+                    SELECT a.service_type 
+                    FROM appointments a 
+                    WHERE a.user_id = sn.patient_id 
+                    AND a.appointment_date = DATE(sn.created_at)
+                    ORDER BY a.appointment_time DESC 
+                    LIMIT 1
+                ) as service_type
             FROM soap_notes sn
             LEFT JOIN users u ON sn.doctor_id = u.id
             LEFT JOIN admin_users au ON sn.doctor_id = au.id AND u.id IS NULL

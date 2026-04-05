@@ -21,7 +21,6 @@ import {
     ModalHeader,
     ModalBody,
     ModalCloseButton,
-    Select,
 } from '@chakra-ui/react';
 import { FiCalendar, FiClock, FiCheckCircle, FiChevronLeft, FiChevronRight, FiRefreshCw, FiList, FiActivity, FiXCircle } from 'react-icons/fi';
 import { formatSystemDate, formatSystemDateTime } from './utils/dateFormatter';
@@ -70,15 +69,12 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
     const [statusFilter, setStatusFilter] = useState<'pending' | 'completed' | 'cancelled'>('pending');
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-    const [isPregnant, setIsPregnant] = useState<boolean | null>(null);
-    const [pregnancyWeeks, setPregnancyWeeks] = useState(0);
+
 
     useEffect(() => {
         if (isOpen) {
             setView(initialView);
             setStep(1); // Reset step to 1 when opening
-            setIsPregnant(null);
-            setPregnancyWeeks(0);
         }
     }, [isOpen, initialView]);
     const toast = useToast();
@@ -201,8 +197,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                     appointment_date: selectedDate,
                     appointment_time: selectedTime,
                     reason: reason,
-                    is_pregnant: isPregnant === true,
-                    pregnancy_weeks: pregnancyWeeks
                 })
             });
 
@@ -221,8 +215,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                 setSelectedDate('');
                 setSelectedTime('');
                 setReason('');
-                setIsPregnant(null);
-                setPregnancyWeeks(0);
                 setReschedulingAppointmentId(null);
                 fetchMyAppointments();
                 setView('my-appointments');
@@ -785,52 +777,6 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                     {/* Step 1: Select Service */}
                                     {step === 1 && (
                                         <VStack align="stretch" spacing={4}>
-                                            {user?.gender === 'Female' && (
-                                                <Box bg="white" p={4} borderRadius="xl" boxShadow="sm" border="1px solid" borderColor="pink.100">
-                                                    <Text fontWeight="700" color="gray.700" fontSize="md" mb={2}>Are you currently pregnant?</Text>
-                                                    <HStack spacing={3}>
-                                                        <Button 
-                                                            colorScheme={isPregnant === true ? "pink" : "gray"} 
-                                                            variant={isPregnant === true ? "solid" : "outline"}
-                                                            onClick={() => setIsPregnant(true)}
-                                                            size="sm"
-                                                            px={6}
-                                                        >
-                                                            Yes
-                                                        </Button>
-                                                        <Button 
-                                                            colorScheme={isPregnant === false ? "teal" : "gray"} 
-                                                            variant={isPregnant === false ? "solid" : "outline"}
-                                                            onClick={() => { setIsPregnant(false); setPregnancyWeeks(0); }}
-                                                            size="sm"
-                                                            px={6}
-                                                        >
-                                                            No
-                                                        </Button>
-                                                    </HStack>
-                                                    
-                                                    {isPregnant === true && (
-                                                        <Flex mt={3} p={3} bg="pink.50" borderRadius="lg" border="1px solid" borderColor="pink.200" align="center" gap={4}>
-                                                            <Text fontSize="sm" fontWeight="700" color="pink.800">How many weeks pregnant are you?</Text>
-                                                            <Select 
-                                                                placeholder="Select weeks" 
-                                                                value={pregnancyWeeks || ''} 
-                                                                onChange={(e) => setPregnancyWeeks(parseInt(e.target.value))}
-                                                                borderColor="pink.300"
-                                                                _hover={{ borderColor: 'pink.400' }}
-                                                                focusBorderColor="pink.500"
-                                                                bg="white"
-                                                                w="140px"
-                                                                size="sm"
-                                                            >
-                                                                {[...Array(42)].map((_, i) => (
-                                                                    <option key={i+1} value={i+1}>{i+1} weeks</option>
-                                                                ))}
-                                                            </Select>
-                                                        </Flex>
-                                                    )}
-                                                </Box>
-                                            )}
 
                                             <Heading size="md" bgGradient="linear(to-r, green.600, teal.600)" bgClip="text" mt={0}>
                                                 Select a Service
@@ -888,7 +834,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                                                 })}
                                             </SimpleGrid>
                                             <Button
-                                                isDisabled={!selectedService || (user?.gender === 'Female' && (isPregnant === null || (isPregnant === true && !pregnancyWeeks)))}
+                                                isDisabled={!selectedService}
                                                 onClick={() => setStep(2)}
                                                 bgGradient="linear(to-r, green.500, teal.500)"
                                                 color="white"

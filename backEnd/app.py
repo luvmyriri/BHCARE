@@ -136,6 +136,26 @@ try:
         cur.execute("ALTER TABLE appointments ADD COLUMN pregnancy_weeks INT DEFAULT 0")
         conn.commit()
 
+    # Ensure staff_verified_pregnant column exists in appointments
+    cur.execute("""
+        SELECT count(*) FROM information_schema.columns 
+        WHERE table_name = 'appointments' AND column_name = 'staff_verified_pregnant'
+    """)
+    if cur.fetchone()[0] == 0:
+        print("Adding 'staff_verified_pregnant' column to appointments table...")
+        cur.execute("ALTER TABLE appointments ADD COLUMN staff_verified_pregnant BOOLEAN DEFAULT FALSE")
+        conn.commit()
+
+    # Ensure staff_verified_pwd column exists in appointments
+    cur.execute("""
+        SELECT count(*) FROM information_schema.columns 
+        WHERE table_name = 'appointments' AND column_name = 'staff_verified_pwd'
+    """)
+    if cur.fetchone()[0] == 0:
+        print("Adding 'staff_verified_pwd' column to appointments table...")
+        cur.execute("ALTER TABLE appointments ADD COLUMN staff_verified_pwd BOOLEAN DEFAULT FALSE")
+        conn.commit()
+
     conn.close()
     print("Database connection verified and schema updated.")
 
@@ -2273,24 +2293,48 @@ def create_admin():
         last_name = data.get('last_name')
         contact = data.get('contact_number', '')
         
-        # Verify it's an admin/super admin making the request
-        # (Assuming the frontend passes the currently logged-in user's role or we trust the dashboard)
-        
-        # Auto-generate a 10-character secure temporary password
-        import secrets
-        import string
-        alphabet = string.ascii_letters + string.digits
-        temporary_password = ''.join(secrets.choice(alphabet) for i in range(10))
-        
+        super_admin_email = data.get('super_admin_email')
+        super_admin_password = data.get('super_admin_password')
+
+        if not super_admin_email or not super_admin_password:
+            return jsonify({"error": "Super Admin credentials required for authentication."}), 401
+
         conn = get_db()
         cur = conn.cursor()
-        
-        # Check if email exists
+
+        # Verify Super Admin
+        cur.execute("SELECT password_hash, role FROM users WHERE LOWER(email) = LOWER(%s)", (super_admin_email,))
+        sa_user = cur.fetchone()
+
+        if not sa_user:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Super admin account not found."}), 401
+
+        sa_password_hash, sa_role = sa_user
+
+        if 'super' not in (sa_role or '').lower():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Only super admins can create administrators."}), 403
+
+        if not bcrypt.check_password_hash(sa_password_hash, super_admin_password):
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid super admin password."}), 401
+
+        # Check if new email exists
         cur.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
         if cur.fetchone():
             cur.close()
             conn.close()
             return jsonify({"error": "Email already registered"}), 409
+
+        # Auto-generate a 10-character secure temporary password
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits
+        temporary_password = ''.join(secrets.choice(alphabet) for i in range(10))
             
         hashed_password = bcrypt.generate_password_hash(temporary_password).decode('utf-8')
             
@@ -2738,7 +2782,7 @@ def get_admin_activities():
             SELECT a.id, a.appointment_date, a.appointment_time, a.status, u.first_name, u.last_name, a.service_type, a.reason
             FROM appointments a
             JOIN users u ON a.user_id = u.id
-            ORDER BY a.appointment_date DESC, a.appointment_time DESC
+            ORDER BY a.id DESC
             LIMIT 5
         """)
         appt_recs = cur.fetchall()

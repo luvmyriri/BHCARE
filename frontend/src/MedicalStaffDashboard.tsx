@@ -401,6 +401,33 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
         }
     };
 
+    const handleMarkPriority = async (id: number, field: 'staff_verified_pregnant' | 'staff_verified_pwd', value: boolean) => {
+        try {
+            const response = await fetch(`/api/appointments/${id}/mark-priority`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [field]: value })
+            });
+            if (response.ok) {
+                const label = field === 'staff_verified_pregnant' ? 'Pregnant' : 'PWD';
+                toast({
+                    title: value ? `✓ Marked as ${label}` : `${label} priority removed`,
+                    description: value
+                        ? `Patient has been granted ${label} priority in the queue.`
+                        : `${label} priority flag removed from this appointment.`,
+                    status: value ? 'success' : 'info',
+                    duration: 3000,
+                    isClosable: true,
+                });
+                fetchQueue();
+            } else {
+                toast({ title: 'Error', description: 'Failed to update priority', status: 'error', duration: 3000, isClosable: true });
+            }
+        } catch (error) {
+            console.error('Error marking priority:', error);
+        }
+    };
+
     const filteredQueue = queue.filter(item =>
         item.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.first_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -568,6 +595,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                             <Th>Time</Th>
                                             <Th>Patient Name</Th>
                                             <Th>Service</Th>
+                                            <Th>Priority Flags</Th>
                                             <Th>Status</Th>
                                             <Th>Actions</Th>
                                         </Tr>
@@ -575,16 +603,21 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                     <Tbody>
                                         {filteredQueue.length > 0 ? (
                                             filteredQueue.map((item) => (
-                                                <Tr key={item.id} bg={item.status === 'serving' ? 'green.50' : 'white'}>
+                                                <Tr key={item.id} bg={item.status === 'serving' ? 'green.50' : (item.staff_verified_pregnant || item.staff_verified_pwd) ? 'purple.50' : 'white'}>
                                                     <Td fontWeight="bold">{formatSystemTime(item.appointment_time)}</Td>
                                                     <Td>
-                                                        <VStack align="start" spacing={0}>
+                                                        <VStack align="start" spacing={1}>
                                                             <Text fontWeight="600">{item.first_name} {item.last_name}</Text>
-                                                            <HStack spacing={2}>
+                                                            <HStack spacing={2} flexWrap="wrap">
                                                                 <Text fontSize="xs" color="gray.500">{item.gender}</Text>
-                                                                {item.is_pregnant && (
-                                                                    <Badge colorScheme="pink" variant="subtle" fontSize="0.65em" borderRadius="full">
-                                                                        Priority {item.pregnancy_weeks ? `(${item.pregnancy_weeks} Weeks)` : ''}
+                                                                {item.gender?.toLowerCase() === 'female' && item.is_pregnant && (
+                                                                    <Badge colorScheme="pink" variant="subtle" fontSize="0.6em" borderRadius="full">
+                                                                        Claims Pregnant{item.pregnancy_weeks ? ` (${item.pregnancy_weeks}w)` : ''}
+                                                                    </Badge>
+                                                                )}
+                                                                {item.is_pwd && (
+                                                                    <Badge colorScheme="purple" variant="subtle" fontSize="0.6em" borderRadius="full">
+                                                                        Claims PWD
                                                                     </Badge>
                                                                 )}
                                                             </HStack>
@@ -592,6 +625,30 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                                     </Td>
                                                     <Td>
                                                         <Badge colorScheme="blue" borderRadius="full" px={2}>{item.service_type}</Badge>
+                                                    </Td>
+                                                    <Td>
+                                                        <VStack align="start" spacing={1}>
+                                                            {item.gender?.toLowerCase() === 'female' && (
+                                                                <Button
+                                                                    size="xs"
+                                                                    colorScheme="pink"
+                                                                    variant={item.staff_verified_pregnant ? 'solid' : 'outline'}
+                                                                    borderRadius="full"
+                                                                    onClick={() => handleMarkPriority(item.id, 'staff_verified_pregnant', !item.staff_verified_pregnant)}
+                                                                >
+                                                                    {item.staff_verified_pregnant ? '✓ Pregnant' : '+ Pregnant'}
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                size="xs"
+                                                                colorScheme="purple"
+                                                                variant={item.staff_verified_pwd ? 'solid' : 'outline'}
+                                                                borderRadius="full"
+                                                                onClick={() => handleMarkPriority(item.id, 'staff_verified_pwd', !item.staff_verified_pwd)}
+                                                            >
+                                                                {item.staff_verified_pwd ? '✓ PWD' : '+ PWD'}
+                                                            </Button>
+                                                        </VStack>
                                                     </Td>
                                                     <Td>
                                                         <Badge
@@ -630,7 +687,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ onLogout 
                                             ))
                                         ) : (
                                             <Tr>
-                                                <Td colSpan={5} textAlign="center" py={8} color="gray.500">
+                                                <Td colSpan={6} textAlign="center" py={8} color="gray.500">
                                                     No patients in queue for today.
                                                 </Td>
                                             </Tr>

@@ -161,7 +161,9 @@ def get_appointments():
             SELECT a.*, 
                    COALESCE(u.first_name, 'Walk-in') as first_name, 
                    COALESCE(u.last_name, a.reason) as last_name, 
-                   s.description as service_description
+                   s.description as service_description,
+                   u.gender,
+                   COALESCE(u.is_pwd, false) as user_is_pwd
             FROM appointments a
             LEFT JOIN users u ON a.user_id = u.id
             LEFT JOIN services s ON a.service_type = s.name
@@ -526,14 +528,21 @@ def get_queue():
                 a.status,
                 a.is_pregnant,
                 a.pregnancy_weeks,
+                COALESCE(a.staff_verified_pregnant, false) as staff_verified_pregnant,
+                COALESCE(a.staff_verified_pwd, false) as staff_verified_pwd,
                 u.first_name, 
                 u.last_name,
-                u.gender
+                u.gender,
+                COALESCE(u.is_pwd, false) as is_pwd
             FROM appointments a
             JOIN users u ON a.user_id = u.id
             WHERE a.appointment_date = %s
               AND a.status IN ('pending', 'confirmed', 'serving')
-            ORDER BY a.is_pregnant DESC NULLS LAST, a.appointment_time ASC
+            ORDER BY 
+                COALESCE(a.staff_verified_pregnant, false) DESC,
+                COALESCE(a.staff_verified_pwd, false) DESC,
+                a.is_pregnant DESC NULLS LAST,
+                a.appointment_time ASC
         """
         
         cursor.execute(query, (today,))
@@ -592,3 +601,42 @@ def update_appointment_status(appointment_id):
     except Exception as e:
         print(f"Error updating appointment status: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@appointments_bp.route('/api/appointments/<int:appointment_id>/mark-priority', methods=['PUT'])
+def mark_priority(appointment_id):
+    """Staff marks/unmarks an appointment as verified pregnant or verified PWD for priority queuing."""
+    try:
+        data = request.get_json() or {}
+
+        fields = []
+        values = []
+
+        if 'staff_verified_pregnant' in data:
+            fields.append('staff_verified_pregnant = %s')
+            values.append(bool(data['staff_verified_pregnant']))
+
+        if 'staff_verified_pwd' in data:
+            fields.append('staff_verified_pwd = %s')
+            values.append(bool(data['staff_verified_pwd']))
+
+        if not fields:
+            return jsonify({'error': 'No priority fields provided'}), 400
+
+        values.append(appointment_id)
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE appointments SET {', '.join(fields)}, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            values
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'message': 'Priority status updated successfully'}), 200
+
+    except Exception as e:
+        print(f"Error marking priority: {e}")
+        return jsonify({'error': str(e)}), 500
