@@ -156,6 +156,26 @@ try:
         cur.execute("ALTER TABLE appointments ADD COLUMN staff_verified_pwd BOOLEAN DEFAULT FALSE")
         conn.commit()
 
+    # Ensure on_duty column exists in medical_staff_details
+    cur.execute("""
+        SELECT count(*) FROM information_schema.columns 
+        WHERE table_name = 'medical_staff_details' AND column_name = 'on_duty'
+    """)
+    if cur.fetchone()[0] == 0:
+        print("Adding 'on_duty' column to medical_staff_details table...")
+        cur.execute("ALTER TABLE medical_staff_details ADD COLUMN on_duty BOOLEAN DEFAULT FALSE")
+        conn.commit()
+
+    # Ensure duty_toggled_at column exists in medical_staff_details
+    cur.execute("""
+        SELECT count(*) FROM information_schema.columns 
+        WHERE table_name = 'medical_staff_details' AND column_name = 'duty_toggled_at'
+    """)
+    if cur.fetchone()[0] == 0:
+        print("Adding 'duty_toggled_at' column to medical_staff_details table...")
+        cur.execute("ALTER TABLE medical_staff_details ADD COLUMN duty_toggled_at TIMESTAMP")
+        conn.commit()
+
     conn.close()
     print("Database connection verified and schema updated.")
 
@@ -199,15 +219,16 @@ def preprocess_image(image_bytes):
     enhancer = ImageEnhance.Sharpness(img)
     img = enhancer.enhance(1.8)  # Reverted slightly from 2.5 to prevent artifacts
     
-    # 5. Convert to grayscale
+    # 5. Convert to grayscale and boost contrast moderately for text isolation
     img = img.convert('L')
+    img = ImageEnhance.Contrast(img).enhance(1.4) # Lowered from 1.8 to prevent merging
     
-    # Save to bytes (quality 85 to ensure 1400px image stays under 1000KB)
+    # Save to bytes (quality 85 to ensure image stays under 1000KB)
     output = io.BytesIO()
-    img.save(output, format='JPEG', quality=85)
+    img.save(output, format='JPEG', quality=90)
     
     size_kb = len(output.getvalue()) / 1024
-    print(f"[OCR PREPROCESSOR] Final image width: {img.width}px, File size: {size_kb:.1f} KB")
+    print(f"[OCR PREPROCESSOR] Final: {img.width}x{img.height}, {size_kb:.1f} KB")
     
     return output.getvalue()
 
@@ -301,6 +322,25 @@ class PHIDParser:
         }
         self.confidence = {}
     
+    def _fuzzy_label(self, line, keywords):
+        """Check if a line contains a label using fuzzy/subset matching to handle OCR errors"""
+        ul = line.upper()
+        # Direct check
+        if any(k in ul for k in keywords):
+            return True
+        # Check for common OCR misreads (fuzzier)
+        for k in keywords:
+            # If 80% of characters in keyword are in the line in order
+            if len(k) > 5:
+                # Remove spaces and non-alpha from line
+                clean_ul = re.sub(r'[^A-Z]', '', ul)
+                if k.replace(' ', '') in clean_ul: return True
+                # Very basic "looks like" check for specific labels
+                if k == 'SURNAME' and any(x in ul for x in ['SU RNAME', 'SURNAM E', 'SURNA ME']): return True
+                if k == 'GIVEN NAME' and any(x in ul for x in ['GIVEN AMQ', 'GIVEN NAM']): return True
+                if k == 'MIDDLE NAME' and any(x in ul for x in ['MIDDLE NAM', 'MIDLE NAME']): return True
+        return False
+    
     def parse(self, text):
         """Parse OCR text with confidence scoring"""
         print("\n>>> INITIALIZING V4 PARSER (Address Precision Patch) <<<")
@@ -331,10 +371,16 @@ class PHIDParser:
 
         # 5c. Extract PhilHealth ID
         self._extract_philhealth_id(clean_text)
+        
+        # 5d. Extract PDL License No.
+        self._extract_pdl_license(text)
 
         # 6. Extract Address
         self._extract_address(lines, clean_text)
         
+        # 7. Post-Processing Cleanup (Redistribute merged names)
+        self._redistribute_names()
+
         return self.fields, self.confidence
     
     def _identify_id_type(self, text):
@@ -389,6 +435,14 @@ class PHIDParser:
                      print(f"[CRN] Found via next-line search: {self.fields['crn']}")
                      return
 
+    def _extract_pdl_license(self, text):
+        """Extract Driver's License Number (Format: XNN-NN-NNNNNN)"""
+        match = re.search(r'\b([A-Z]\d{2}-\d{2}-\d{6})\b', text.upper())
+        if match:
+            self.fields['crn'] = match.group(1)
+            self.confidence['crn'] = 0.95
+            print(f"[PDL] License No: {self.fields['crn']}")
+
     def _extract_philhealth_id(self, text):
         """Extract PhilHealth ID (Format: XX-XXXXXXXXX-X)"""
         # Look for 12 digits potentially with dashes or common OCR errors (O for 0, I/l for 1)
@@ -427,41 +481,96 @@ class PHIDParser:
             self.confidence['email'] = 0.95
             print(f"[EMAIL] Found: {self.fields['email']}")
 
-    def _extract_names(self, lines):
-        """Extract names with broader header and label detection for all PH IDs"""
+    def _redistribute_names(self):
+        """If names are all merged into one field (e.g. Middle Name), redistribute them"""
+        # Scenario: Last and First were empty, but Middle has 3+ words (e.g. "SALVACION LANCE ALDRIC")
+        f, m, l = self.fields.get('first_name'), self.fields.get('middle_name'), self.fields.get('last_name')
         
-        # NATIONAL ID SPECIFIC LOGIC (Top Priority, no header labels)
-        if self.fields.get('id_type') == "National ID":
-             # Find "National ID" or "Republika" line
-             start_idx = -1
-             for i, line in enumerate(lines):
-                 if any(k in line.upper() for k in ['NATIONAL ID', 'PHILID', 'REPUBLIKA']):
-                     start_idx = i
-             
-             if start_idx != -1:
-                 # Names are usually the next 3 lines
-                 idx = start_idx + 1
-                 if idx < len(lines):
-                     last, _ = FieldValidator.validate_name(lines[idx])
-                     self.fields['last_name'] = last
-                     self.confidence['last_name'] = 0.90
-                 
-                 idx += 1
-                 if idx < len(lines):
-                     first, _ = FieldValidator.validate_name(lines[idx])
-                     self.fields['first_name'] = first
-                     self.confidence['first_name'] = 0.90
-                 
-                 idx += 1
-                 if idx < len(lines) and 'SEX' not in lines[idx].upper() and 'DATE' not in lines[idx].upper():
-                     middle, _ = FieldValidator.validate_name(lines[idx])
-                     self.fields['middle_name'] = middle
-                     self.confidence['middle_name'] = 0.90
-                 
-                 print(f"[NAMES] Extracted via National ID rules: {self.fields['first_name']} {self.fields['middle_name']} {self.fields['last_name']}")
-                 return
-                 
-        # TIN ID SPECIFIC LOGIC
+        if m and not f and not l:
+            words = [w.strip() for w in m.split(' ') if w.strip()]
+            if len(words) >= 3:
+                # Assuming format: LAST FIRST MIDDLE (common in merged catches)
+                self.fields['last_name'] = words[0]
+                self.fields['middle_name'] = words[-1]
+                self.fields['first_name'] = ' '.join(words[1:-1])
+                print(f"[NAMES] Redistributed merged Middle Name: {self.fields['last_name']}, {self.fields['first_name']} {self.fields['middle_name']}")
+            elif len(words) == 2:
+                self.fields['last_name'] = words[0]
+                self.fields['first_name'] = words[1]
+                self.fields['middle_name'] = None
+                print(f"[NAMES] Redistributed merged Middle Name (2-word): {self.fields['last_name']}, {self.fields['first_name']}")
+
+    def _extract_names(self, lines):
+        """Extract names using template-specific labels and fuzzy matching"""
+        
+        # 1. PHILIPPINE DRIVER'S LICENSE (PDL) - Comma Separated Header Look-up
+        # Pattern: "Last Name, First Name, Middle Name" followed by "SURNAME, GIVEN MIDDLE"
+        for i, line in enumerate(lines):
+            ul = line.upper()
+            if 'LAST' in ul and 'FIRST' in ul and 'MIDDLE' in ul:
+                # Value is usually on the next line
+                if i + 1 < len(lines):
+                    val = lines[i+1].strip()
+                    if ',' in val:
+                        parts = [p.strip() for p in val.split(',', 1)]
+                        # Last Name
+                        self.fields['last_name'], _ = FieldValidator.validate_name(parts[0])
+                        self.confidence['last_name'] = 0.95
+                        
+                        # First and Middle
+                        if len(parts) > 1:
+                            rest = [p.strip() for p in parts[1].split(' ') if p.strip()]
+                            if len(rest) > 1:
+                                # Last word is Middle Name
+                                self.fields['middle_name'], _ = FieldValidator.validate_name(rest[-1])
+                                self.fields['first_name'], _ = FieldValidator.validate_name(' '.join(rest[:-1]))
+                                self.confidence['first_name'] = 0.95
+                                self.confidence['middle_name'] = 0.90
+                            elif len(rest) == 1:
+                                self.fields['first_name'], _ = FieldValidator.validate_name(rest[0])
+                                self.confidence['first_name'] = 0.95
+                        print(f"[NAMES] Extracted via PDL Header: {self.fields['first_name']} {self.fields['last_name']}")
+                        return
+
+        # 2. PHILID / NATIONAL ID - Bilingual Labels
+        last_labels = ['APELYIDO', 'LAST NAME', 'SURNAME']
+        first_labels = ['MGA PANGALAN', 'GIVEN NAME', 'FIRST NAME']
+        mid_labels = ['GITNANG APELYIDO', 'MIDDLE NAME']
+
+        for i, line in enumerate(lines):
+            if self._fuzzy_label(line, last_labels) and not self.fields['last_name']:
+                # Value is often below (next 2 lines for misreads)
+                search_scope = lines[i+1:i+3]
+                for l in search_scope:
+                    val, _ = FieldValidator.validate_name(l)
+                    if val and not any(x in l.upper() for x in first_labels + mid_labels):
+                        self.fields['last_name'] = val
+                        self.confidence['last_name'] = 0.95
+                        break
+            
+            if self._fuzzy_label(line, first_labels) and not self.fields['first_name']:
+                search_scope = lines[i+1:i+3]
+                for l in search_scope:
+                    val, _ = FieldValidator.validate_name(l)
+                    if val and not any(x in l.upper() for x in last_labels + mid_labels):
+                        self.fields['first_name'] = val
+                        self.confidence['first_name'] = 0.95
+                        break
+            
+            if self._fuzzy_label(line, mid_labels) and not self.fields['middle_name']:
+                search_scope = lines[i+1:i+3]
+                for l in search_scope:
+                    val, _ = FieldValidator.validate_name(l)
+                    if val and not any(x in l.upper() for x in last_labels + first_labels):
+                        self.fields['middle_name'] = val
+                        self.confidence['middle_name'] = 0.95
+                        break
+        
+        if self.fields['first_name'] and self.fields['last_name']:
+             print(f"[NAMES] Extracted via Template Labels: {self.fields['first_name']} {self.fields['last_name']}")
+             return
+
+        # 3. TIN ID SPECIFIC LOGIC
         if self.fields.get('id_type') == "TIN ID":
              for i, line in enumerate(lines):
                  if re.match(r'^TIN\s*:?\s*\d{3}', line.upper().strip()):
@@ -732,7 +841,7 @@ class PHIDParser:
                 # Check if it might be an issuance/expiry date (heuristic: close to today)
                 dt = datetime.strptime(date_str, '%Y-%m-%d')
                 age = (datetime.now() - dt).days / 365.25
-                if 10 < age < 120:
+                if 0 < age < 130:
                     self.fields['dob'] = date_str
                     self.confidence['dob'] = conf * 0.7 
                     print(f"[DOB] Found via age validation: {date_str}")
@@ -753,6 +862,8 @@ class PHIDParser:
         patterns = [
             (r'(\d{4})[/-](\d{2})[/-](\d{2})', '%Y-%m-%d', 0.95),
             (r'(\d{2})[/-](\d{2})[/-](\d{4})', '%m/%d/%Y', 0.90),
+            # Driver's License uses space-separated: "2002 07 23"
+            (r'(\d{4})\s(\d{2})\s(\d{2})', '%Y-%m-%d', 0.88),
         ]
         
         for pattern, fmt, conf in patterns:
@@ -783,8 +894,8 @@ class PHIDParser:
             
             age_years = (today - birth_date).days / 365.25
             
-            # Birth date should be between 10 and 120 years ago
-            if 10 <= age_years <= 120:
+            # Birth date should be between 0 and 130 years ago
+            if 0 <= age_years <= 130:
                 return True
             else:
                 print(f"[DOB] Rejected {date_str} (age would be {age_years:.1f} years)")
@@ -990,23 +1101,57 @@ class PHIDParser:
             self.confidence['province_name'] = 0.95
             self.confidence['city_code'] = 0.95
         
-        # Barangay Extraction
+        # Barangay Extraction (Enhanced Greedy Search)
+        # Handles "BRGY 1 74", "BRGY. 174", "BRGY BAGONG SILANG"
+        # Also handles OCR misreads like "BARANGAY f 74" (f=1), "BARANGAY I74" (I=1)
         barangay_patterns = [
-            r'BARANGAY\s+(\d+)',
-            r'BRGY\.?\s*(\d+)',
-            r'BRG?Y\s+(\d+)',
-            r'\bBRGY\s+NO\.?\s*(\d+)',
+            r'BARANGAY\s*([\d\s]{1,6})(?=\b)', # Numeric with spaces (looking for word boundary)
+            r'BRG?Y\.?\s*([\d\s]{1,6})(?=\b)',
+            r'BARANGAY\s*([A-Z0-9\s]{1,6})(?=,|\.|\n|CALOOCAN|CITY)',  # Broader catch for OCR noise (f74 etc)
+            r'BARANGAY\s+([A-Z0-9\s]{3,30}?)(?=,|$|\n|CALOOCAN|CITY)', # Named with lookahead terminators
+            r'BRG?Y\.?\s*([A-Z0-9\s]{3,30}?)(?=,|$|\n|CALOOCAN|CITY)'
         ]
         
         for pattern in barangay_patterns:
             match = re.search(pattern, upper_text)
             if match:
-                brgy_num = match.group(1)
-                self.fields['barangay'] = f'Barangay {brgy_num}'
-                self.confidence['barangay'] = 0.95
-                if brgy_num == '174':
-                    self.fields['barangay_code'] = '137404174'
-                break
+                raw_brgy = match.group(1).strip(' ,.')
+                # Normalize common OCR misreads before extracting digits
+                # f→1, l→1, I→1, O→0 when mixed with digits or solo
+                ocr_normalized = raw_brgy
+                ocr_normalized = re.sub(r'\bf\b', '1', ocr_normalized, flags=re.I)
+                ocr_normalized = re.sub(r'(?<![A-Z])F(?=\s*\d)', '1', ocr_normalized, flags=re.I)
+                ocr_normalized = re.sub(r'(?<=\d)\s*F(?![A-Z])', '1', ocr_normalized, flags=re.I)
+                ocr_normalized = re.sub(r'\bI\b(?=\s*\d)', '1', ocr_normalized, flags=re.I)
+                ocr_normalized = re.sub(r'\bl\b(?=\s*\d)', '1', ocr_normalized, flags=re.I)
+
+                # Check if it's numeric (possibly with OCR noise chars)
+                digits_only = re.sub(r'[^\d]', '', ocr_normalized)
+                has_digits = bool(digits_only)
+                letters_only = re.sub(r'[\d\s]', '', ocr_normalized)
+                purely_alphabetic = bool(letters_only) and not has_digits
+
+                if has_digits and not purely_alphabetic:
+                    brgy_num = digits_only
+                    if brgy_num and 1 <= len(brgy_num) <= 3:
+                        self.fields['barangay'] = f'Barangay {int(brgy_num)}'
+                        self.confidence['barangay'] = 0.95
+                        # Caloocan PSGC pattern: 137404 + 3-digit brgy number
+                        self.fields['barangay_code'] = f'137404{brgy_num.zfill(3)}'
+                        print(f"[ADDRESS] Found Numeric Barangay: {self.fields['barangay']} (Code: {self.fields['barangay_code']})")
+                        break
+                else:
+                    # Named Barangay
+                    if len(raw_brgy) > 3:
+                        self.fields['barangay'] = raw_brgy.title()
+                        self.confidence['barangay'] = 0.90
+                        # Common named mappings for Caloocan
+                        if 'BAGONG SILANG' in raw_brgy.upper():
+                            self.fields['barangay_code'] = '137404176'
+                        elif 'TALA' in raw_brgy.upper():
+                            self.fields['barangay_code'] = '137404188'
+                        print(f"[ADDRESS] Found Named Barangay: {self.fields['barangay']}")
+                        break
         
         # Full Address Extraction (Multi-Line Focus)
         address_keywords = ['ADDRESS', 'RESIDENCE', 'HOME', 'STREET', 'CITY', 'PROVINCE']
@@ -1024,7 +1169,7 @@ class PHIDParser:
                 if addr_line_idx is not None and search_idx < len(lines):
                     l = lines[addr_line_idx + j].strip()
                     # Stop merging if we hit these labels which indicate the end of the address block
-                    if any(k in l.upper() for k in ['ID NO', 'DATE OF', 'LICENSE NO', 'EXPIRATION', 'AGENCY CODE']):
+                    if any(k in l.upper() for k in ['ID NO', 'DATE OF', 'LICENSE NO', 'EXPIRATION', 'AGENCY CODE', 'ISSUED', 'OFFICE', 'SIGNATURE']):
                         break
                     if len(l) > 3:
                         candidates.append(l)
@@ -1065,13 +1210,38 @@ class PHIDParser:
         if self.fields.get('city') == 'Caloocan City':
             ext_zip = str(self.fields.get('zip_code') or '')
             if not ext_zip.isdigit() or not (1400 <= int(ext_zip) <= 1428):
-                if self.fields.get('barangay') == 'Barangay 174':
+                # Try to find a valid Caloocan ZIP in the full text first
+                zip_search = re.findall(r'\b(1[34][0-9]{2})\b', upper_text)
+                found_zip = next((z for z in zip_search if 1400 <= int(z) <= 1428), None)
+                if found_zip:
+                    self.fields['zip_code'] = found_zip
+                    print(f"[ADDRESS] Found Caloocan ZIP from text: {found_zip}")
+                elif self.fields.get('barangay') == 'Barangay 174':
                     self.fields['zip_code'] = '1423'
                 else:
                     self.fields['zip_code'] = '1400'
                 self.confidence['zip_code'] = 0.95
-                print(f"[ADDRESS] Adjusted Caloocan ZIP: {self.fields['zip_code']}")
+                print(f"[ADDRESS] Final Caloocan ZIP: {self.fields['zip_code']}")
+
     
+    def _is_noise(self, text):
+        """Check if a string is likely OCR noise or an agency name rather than an address component"""
+        if not text: return True
+        ul = text.upper()
+        # Common agency/header keywords that should not be in address fields
+        noise_keywords = [
+            'REPUBLIC OF', 'DEPARTMENT OF', 'LAND TRANSPORTATION', 'OFFICE', 
+            'DRIVERS LICENSE', 'LICENSE NO', 'EXPIRATION', 'AGENCY CODE',
+            'SOCIAL SECURITY', 'SSS NO', 'PHILIPPINE IDENTIFICATION', 
+            'DATE OF BIRTH', 'SEX', 'HEIGHT', 'WEIGHT', 'SERIAL NUMBER'
+        ]
+        if any(k in ul for k in noise_keywords):
+            return True
+        # If it's just numbers or noise characters
+        if re.match(r'^[\d\s\-\.\/#]+$', text) and len(text) < 4:
+            return True
+        return False
+
     def _parse_address_components(self, address_text):
         """Parse detailed address components from full address string"""
         upper_addr = address_text.upper()
@@ -1105,27 +1275,29 @@ class PHIDParser:
             # Clean up
             if 'BLK' not in raw_street and 'LOT' not in raw_street:
                  clean = re.sub(r'\b(Lts?|No\.)\s*[\d\-A-Z]+', '', raw_street).strip()
-                 if len(clean) > 3:
+                 if len(clean) > 3 and not self._is_noise(clean):
                     self.fields['street_name'] = clean.title()
                     self.confidence['street_name'] = 0.95
                     print(f"[ADDRESS] Street: {self.fields['street_name']}")
 
         # Fallback Street (before Location)
         if not self.fields.get('street_name'):
-             # More flexible pattern for area-based streets like "BAGUMBONG"
-             fallback = re.search(r'(?:\d+\b)?\s*([A-Z\s]{3,25})[,\s]+(?:BRGY|BARANGAY|CALOOCAN)', upper_addr)
+             # More flexible pattern for area-based streets: handles "2680, MAGNOLIA. BARANGAY 174"
+             fallback = re.search(r'(?:\d+[,\s]+)?\s*([A-Z][A-Z\s]{2,24})[,\.\s]+(?:BRGY|BARANGAY|CALOOCAN)', upper_addr)
              if fallback:
                  cand = fallback.group(1).strip()
-                 if not any(k in cand for k in ['LOT', 'BLK', 'BLOCK', 'NO.', 'ID ']):
+                 if not any(k in cand for k in ['LOT', 'BLK', 'BLOCK', 'NO.', 'ID ']) and not self._is_noise(cand):
                      self.fields['street_name'] = cand.title()
                      self.confidence['street_name'] = 0.85
                      print(f"[ADDRESS] Street (Fallback): {self.fields['street_name']}")
+
                      
         # House Number
         house_patterns = [
             r'\b(?:HOUSE|HS)[\.\s]*NO\.?[\s#]*([0-9A-Z\-]+)\b',
             r'\bNO\.?\s*([0-9]+[A-Z\-]*)\b', # Requires at least one digit
             r'^#\s*([0-9A-Z\-]+)', # Starting with #
+            r'([0-9]{1,5}[A-Z]?)[,\s]+(?=[A-Z])', # Number + comma/space + letters (e.g. 2680, MAGNOLIA)
             r'^\b([0-9]{1,4}[A-Z]?)\b\s+(?=[A-Z])' # Starting with a number
         ]
         for pattern in house_patterns:
@@ -1154,7 +1326,8 @@ class PHIDParser:
         # Subdivision/Village
         subdiv_patterns = [
             r'([A-Z0-9][A-Z0-9\s]+?)\s+(HOMES|VILLAGE|VILL\.?|SUBDIVISION|SUBD\.?|VILLAS|HEIGHTS|ESTATES|RESIDENCES)',
-            r'(NORTHVILLE\s*[A-Z0-9\s]*)' # National ID specific
+            r'(NORTHVILLE\s*[A-Z0-9\s]*)', # National ID specific
+            r'LOT\s+\d+\s+([A-Z0-9\s]{3,30}?)(?=\s+(?:BAGUMBONG|BARANGAY)|,|$)' # PhilID specific layout
         ]
         for pattern in subdiv_patterns:
             match = re.search(pattern, upper_addr)
@@ -1403,6 +1576,68 @@ def ocr():
     except Exception as e:
         print(f"Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# ============= DOCTOR DUTY STATUS ENDPOINTS =============
+@app.route("/api/doctors/<int:user_id>/duty-status", methods=["PUT"])
+def toggle_duty_status(user_id):
+    """Toggle a doctor/staff member's on-duty status."""
+    try:
+        data = request.json or {}
+        on_duty = data.get('on_duty')
+        if on_duty is None:
+            return jsonify({"error": "on_duty field is required"}), 400
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Ensure medical_staff_details row exists for this user
+        cur.execute("SELECT 1 FROM medical_staff_details WHERE user_id = %s", (user_id,))
+        if not cur.fetchone():
+            cur.execute(
+                "INSERT INTO medical_staff_details (user_id, on_duty, duty_toggled_at) VALUES (%s, %s, %s)",
+                (user_id, on_duty, datetime.now())
+            )
+        else:
+            cur.execute(
+                "UPDATE medical_staff_details SET on_duty = %s, duty_toggled_at = %s WHERE user_id = %s",
+                (on_duty, datetime.now(), user_id)
+            )
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        status_label = "On Duty" if on_duty else "Off Duty"
+        print(f"[DUTY] User {user_id} is now: {status_label}")
+        return jsonify({"message": f"Status updated to {status_label}", "on_duty": on_duty}), 200
+
+    except Exception as e:
+        print(f"[DUTY] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/doctors/on-duty", methods=["GET"])
+def get_on_duty_doctors():
+    """Return all staff members currently marked as on duty."""
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT u.id, u.first_name, u.last_name, u.role, 
+                   d.on_duty, d.duty_toggled_at, d.specialization, d.clinic_room
+            FROM users u
+            JOIN medical_staff_details d ON u.id = d.user_id
+            WHERE d.on_duty = TRUE AND u.status = 'Active'
+            ORDER BY u.last_name
+        """)
+        doctors = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return jsonify(doctors), 200
+    except Exception as e:
+        print(f"[DUTY] Error fetching on-duty: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 # ============= EXISTING ROUTES =============
 @app.route("/api/login", methods=["POST"])
@@ -1966,7 +2201,7 @@ def forgot_password():
         # Check if email exists in DB
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, email FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
+        cur.execute("SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER(%s)", (email,))
         user_exists = cur.fetchone()
         cur.close()
         conn.close()
@@ -1987,7 +2222,7 @@ def forgot_password():
 
         # Send email
         print(f"[FORGOT DEBUG] Attempting to send email...")
-        send_password_reset_email(mail, email, code)
+        send_password_reset_email(mail, email, user_exists[2], code)
         print(f"[FORGOT DEBUG] Email sent successfully to {email}")
 
         # Always return the same generic success message

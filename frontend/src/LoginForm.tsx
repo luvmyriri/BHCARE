@@ -36,7 +36,7 @@ const Input: FC<
   <div style={{ marginBottom: '16px', position: 'relative' }}>
     <label style={{ fontSize: '12px', fontWeight: 700, color: '#4a5568', display: 'flex', alignItems: 'center', marginBottom: '6px', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
       {label}
-      {confidence !== undefined && confidence > 0 && (
+      {confidence !== undefined && confidence > 0 && props.value && (
         <span style={{
           fontSize: '10px',
           padding: '2px 6px',
@@ -56,8 +56,8 @@ const Input: FC<
       style={{
         display: 'flex',
         alignItems: 'center',
-        background: confidence && confidence > 0 ? 'rgba(198,246,213,0.3)' : '#f7fafc',
-        border: invalid ? '2px solid #e53e3e' : confidence && confidence > 0 ? '2px solid #48bb78' : '1px solid #e2e8f0',
+        background: confidence && confidence > 0 && props.value ? 'rgba(198,246,213,0.3)' : '#f7fafc',
+        border: invalid ? '2px solid #e53e3e' : confidence && confidence > 0 && props.value ? '2px solid #48bb78' : '1px solid #e2e8f0',
         borderRadius: '8px',
         padding: '10px 14px',
         transition: 'all 0.2s ease',
@@ -92,7 +92,7 @@ const Select: FC<
     <div style={{ marginBottom: '16px' }}>
       <label style={{ fontSize: '12px', fontWeight: 700, color: '#4a5568', display: 'flex', alignItems: 'center', marginBottom: '6px', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         {label}
-        {confidence !== undefined && confidence > 0 && (
+        {confidence !== undefined && confidence > 0 && props.value && (
           <span style={{
             fontSize: '10px',
             padding: '2px 6px',
@@ -112,8 +112,8 @@ const Select: FC<
         style={{
           display: 'flex',
           alignItems: 'center',
-          background: confidence && confidence > 0 ? 'rgba(198,246,213,0.3)' : '#f7fafc',
-          border: invalid ? '2px solid #e53e3e' : confidence && confidence > 0 ? '2px solid #48bb78' : '1px solid #e2e8f0',
+          background: confidence && confidence > 0 && props.value ? 'rgba(198,246,213,0.3)' : '#f7fafc',
+          border: invalid ? '2px solid #e53e3e' : confidence && confidence > 0 && props.value ? '2px solid #48bb78' : '1px solid #e2e8f0',
           borderRadius: '8px',
           padding: '10px 14px',
           boxShadow: 'none'
@@ -643,6 +643,20 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
         }
       }
 
+      if (field === 'dob' && value) {
+        const birthDate = new Date(value);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        if (age < 0 || age > 130) {
+          newErrors[field] = true;
+          isValid = false;
+        }
+      }
+
       if (field === 'contact' && value) {
         if (value.length < 13) {
           newErrors[field] = true;
@@ -874,17 +888,29 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                   const resBrgy = await fetch(`https://psgc.cloud/api/cities-municipalities/${cityMatch.code}/barangays`);
                   const fetchedBrgys = await resBrgy.json();
 
-                  if (fields.barangay) {
-                    const cleanBrgy = fields.barangay.toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
-                    const brgyMatch = fetchedBrgys.find((b: any) => {
-                      const apiBrgy = b.name.toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
-                      return apiBrgy === cleanBrgy || apiBrgy.includes(cleanBrgy);
-                    });
+                  if (fields.barangay || fields.zip_code) {
+                    const cleanBrgy = (fields.barangay || '').toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
+                    const ocrZip = fields.zip_code || '';
+
+                    let brgyMatch = null;
+                    
+                    // HIGH PRIORITY: Force matching for special Zip Codes (e.g. Caloocan Brgy 174)
+                    if (cityMatch.name.toUpperCase().includes('CALOOCAN') && ocrZip === '1423') {
+                      brgyMatch = fetchedBrgys.find((b: any) => b.name.includes('174'));
+                    }
+
+                    // Only search by name if not already found via Zip priority
+                    if (!brgyMatch) {
+                      brgyMatch = fetchedBrgys.find((b: any) => {
+                        const apiBrgy = b.name.toUpperCase().replace('BARANGAY', '').replace('BRGY', '').replace(/[\s.]/g, '');
+                        return apiBrgy === cleanBrgy || apiBrgy.includes(cleanBrgy) || (cleanBrgy && cleanBrgy.includes(apiBrgy));
+                      });
+                    }
 
                     if (brgyMatch) {
                       setSelectedBarangay(brgyMatch.code);
                       handleInputChange('barangay', brgyMatch.name, setBarangay);
-                    } else {
+                    } else if (fields.barangay) {
                       // Fallback string if code not found
                       handleInputChange('barangay', fields.barangay, setBarangay);
                     }
@@ -963,7 +989,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
         }
       };
 
-      resolveAddress();
+      await resolveAddress();
 
       // Auto-populate detailed street address fields
       if (fields.house_number) setHouseNumber(fields.house_number);
@@ -1871,6 +1897,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                         setSelectedRegion(e.target.value);
                         if (errors.region) setErrors(prev => ({ ...prev, region: false }));
                       }}
+                      confidence={confidence.region || confidence.region_name}
                       invalid={errors.region}
                       required
                     />
@@ -1888,6 +1915,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                       }}
                       disabled={selectedRegion === '1300000000' || provinces.length === 0}
                       required={selectedRegion !== '1300000000'}
+                      confidence={confidence.province || confidence.province_name}
                       invalid={errors.province}
                       placeholder={selectedRegion === '1300000000' ? "Metro Manila (NCR)" : "Select Province"}
                     />
@@ -1910,6 +1938,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                         }
                       }}
                       disabled={cities.length === 0}
+                      confidence={confidence.city || confidence.municipality}
                       invalid={errors.city}
                       required
                     />
@@ -1936,6 +1965,7 @@ function LoginForm({ onLoginSuccess, initialMode = 'login', expectedType = 'pati
                         }
                       }}
                       disabled={barangays.length === 0}
+                      confidence={confidence.barangay}
                       invalid={errors.barangay}
                       required
                     />

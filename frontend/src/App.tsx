@@ -1,7 +1,6 @@
 import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import './App.css';
-import LoginForm from './LoginForm';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import LocationShowcase from './components/LocationShowcase';
@@ -17,7 +16,6 @@ import MedicalStaffDashboard from './MedicalStaffDashboard';
 import SecurityDashboard from './SecurityDashboard';
 import FloatingActions from './components/FloatingActions';
 import DedicatedLogin from './DedicatedLogin';
-
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: any) {
@@ -42,32 +40,26 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
         </div>
       );
     }
-
     return this.props.children;
   }
 }
 
 function App() {
-  const [showLogin, setShowLogin] = useState(false);
   const [loginMode, setLoginMode] = useState<'login' | 'register'>('login');
   const [user, setUser] = useState(() => {
     try {
       const u = localStorage.getItem('bh_user');
       if (!u) return null;
-      let userData = JSON.parse(u);
-
-      return userData;
+      return JSON.parse(u);
     } catch {
       return null;
     }
   });
 
-  // Fetch fresh user data from backend on mount to ensure profile picture is loaded
   useEffect(() => {
     const refreshUserData = async () => {
       const storedUser = localStorage.getItem('bh_user');
       if (!storedUser) return;
-
       try {
         const userData = JSON.parse(storedUser);
         const response = await fetch(`/user/${userData.id}`);
@@ -80,120 +72,99 @@ function App() {
         console.error('Failed to refresh user data:', error);
       }
     };
-
     refreshUserData();
   }, []);
 
-  const openLogin = (mode: 'login' | 'register' = 'login') => {
-    setLoginMode(mode);
-    setShowLogin(true);
-  };
-  const closeLogin = () => setShowLogin(false);
-
   const onLoginSuccess = (u: any) => {
     setUser(u);
-    setShowLogin(false);
   };
 
   const onLogoutClick = () => {
-    try {
-      localStorage.removeItem('bh_user');
-    } catch { }
+    try { localStorage.removeItem('bh_user'); } catch { }
     setUser(null);
   };
 
-  // If logged in, show the appropriate Dashboard hub
+  // If logged in, route to the correct dashboard
   if (user) {
     const roleLower = (user.role || '').toLowerCase();
 
     if (['admin', 'administrator', 'super admin', 'superadmin'].includes(roleLower)) {
       return (
         <ErrorBoundary>
-          <AdminDashboard
-            user={user}
-            onLogout={onLogoutClick}
-          />
+          <AdminDashboard user={user} onLogout={onLogoutClick} />
         </ErrorBoundary>
       );
     }
-    // Check for "Medical Staff" role group (Nurses, Midwives, Health Workers)
     if (['Nurse', 'Midwife', 'Health Worker', 'Medical Staff'].includes(user.role)) {
-      return (
-        <MedicalStaffDashboard
-          user={user}
-          onLogout={onLogoutClick}
-        />
-      );
+      return <MedicalStaffDashboard user={user} onLogout={onLogoutClick} />;
     }
-    // Check for "Doctor" role
     if (user.role === 'doctor' || user.role === 'Doctor') {
-      return (
-        <DoctorDashboard
-          user={user}
-          onLogout={onLogoutClick}
-          onUserUpdated={setUser}
-        />
-      );
+      return <DoctorDashboard user={user} onLogout={onLogoutClick} onUserUpdated={setUser} />;
     }
     if (user.role === 'security' || user.role === 'Security') {
-      return (
-        <SecurityDashboard
-          user={user}
-          onLogout={onLogoutClick}
-        />
-      );
+      return <SecurityDashboard user={user} onLogout={onLogoutClick} />;
     }
-    return (
-      <Dashboard
-        user={user}
-        onLogout={onLogoutClick}
-        onUserUpdated={setUser}
-      />
-    );
+    return <Dashboard user={user} onLogout={onLogoutClick} onUserUpdated={setUser} />;
   }
 
-  // Otherwise show the landing page or password reset pages
+  // Not logged in — show landing page or dedicated portals
   return (
     <Routes>
-      <Route path="/Admin" element={<DedicatedLogin role="Admin" onLoginSuccess={onLoginSuccess} />} />
+      <Route path="/Admin"    element={<DedicatedLogin role="Admin" onLoginSuccess={onLoginSuccess} />} />
       <Route path="/Employee" element={<DedicatedLogin role="Employee" onLoginSuccess={onLoginSuccess} />} />
-
+      <Route path="/login"    element={
+        <DedicatedLogin
+          role="Patient"
+          onLoginSuccess={onLoginSuccess}
+          initialMode={loginMode}
+          setLoginMode={setLoginMode}
+        />
+      } />
       <Route path="/*" element={
-        <div className="app">
-          <FloatingImages />
-          <FloatingParticles />
-          <Navbar
-            onLoginClick={() => openLogin('login')}
-            onLogoutClick={onLogoutClick}
-            onProfileClick={() => { }}
-            onAppointmentClick={() => openLogin('login')}
-            user={user}
-          />
-          <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
-          <LocationShowcase />
-          <Services onServiceClick={() => openLogin('login')} />
-          <ContactForm />
-          <Footer onAppointmentClick={() => openLogin('login')} />
-          <FloatingActions />
-
-          {showLogin && (
-            <div className="modal-overlay" onClick={closeLogin}>
-              <div
-                className="modal-content"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button className="modal-close" onClick={closeLogin} aria-label="Close modal">
-                  ×
-                </button>
-                <div className="form-scroll">
-                  <LoginForm onLoginSuccess={onLoginSuccess} initialMode={loginMode} />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <LandingPage
+          user={user}
+          onLogoutClick={onLogoutClick}
+          setLoginMode={setLoginMode}
+        />
       } />
     </Routes>
+  );
+}
+
+function LandingPage({
+  user,
+  onLogoutClick,
+  setLoginMode
+}: {
+  user: any;
+  onLogoutClick: () => void;
+  setLoginMode: (m: 'login' | 'register') => void;
+}) {
+  const navigate = useNavigate();
+
+  const openLogin = (mode: 'login' | 'register' = 'login') => {
+    setLoginMode(mode);
+    navigate('/login');
+  };
+
+  return (
+    <div className="app">
+      <FloatingImages />
+      <FloatingParticles />
+      <Navbar
+        onLoginClick={() => openLogin('login')}
+        onLogoutClick={onLogoutClick}
+        onProfileClick={() => { }}
+        onAppointmentClick={() => openLogin('login')}
+        user={user}
+      />
+      <Hero onRegisterClick={() => openLogin('register')} onLoginClick={() => openLogin('login')} />
+      <LocationShowcase />
+      <Services onServiceClick={() => openLogin('login')} />
+      <ContactForm />
+      <Footer onAppointmentClick={() => openLogin('login')} />
+      <FloatingActions />
+    </div>
   );
 }
 

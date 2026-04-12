@@ -114,7 +114,7 @@ def check_forgot_cooldown(email: str, cooldown_seconds: int = 60, max_per_hour: 
     }
     return True, None, None
 
-def send_password_reset_email(mail, recipient_email, reset_token):
+def send_password_reset_email(mail, recipient_email, first_name, reset_token):
     """Send password reset email with 6-digit code"""
     
     msg = Message(
@@ -132,7 +132,7 @@ def send_password_reset_email(mail, recipient_email, reset_token):
                     
                     <h2 style="color: #2c5282; text-align: center;">Verify Your Identity</h2>
                     
-                    <p>Hello,</p>
+                    <p>Hello <strong>{first_name}</strong>,</p>
                     
                     <p>We received a request to reset your password. Please use the following code to complete the process:</p>
                     
@@ -143,7 +143,7 @@ def send_password_reset_email(mail, recipient_email, reset_token):
                     <p style="text-align: center; color: #666;">This code will expire in 10 minutes.</p>
                     
                     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 12px;">
-                        <p><strong>⚠️ Important:</strong></p>
+                        <p><strong>Important:</strong></p>
                         <ul>
                             <li>Do not share this code with anyone.</li>
                             <li>If you didn't request this reset, please ignore this email.</li>
@@ -440,9 +440,9 @@ def send_appointment_confirmation_email(mail, recipient_email, first_name, date,
                     <p>Your appointment has been successfully scheduled. We look forward to seeing you!</p>
                     
                     <div style="margin: 20px 0; padding: 20px; background: #f0f4f8; border-radius: 8px; border-left: 5px solid #38b2ac;">
-                        <p style="margin: 5px 0;"><strong>📅 Date:</strong> {date}</p>
-                        <p style="margin: 5px 0;"><strong>⏰ Time:</strong> {time}</p>
-                        <p style="margin: 5px 0;"><strong>🏥 Service:</strong> {service}</p>
+                        <p style="margin: 5px 0;"><strong>Date:</strong> {date}</p>
+                        <p style="margin: 5px 0;"><strong>Time:</strong> {time}</p>
+                        <p style="margin: 5px 0;"><strong>Service:</strong> {service}</p>
                     </div>
                     
                     <p><strong>Reminders:</strong></p>
@@ -490,9 +490,9 @@ def send_appointment_reminder_email(mail, recipient_email, first_name, date, tim
                     <p>This is a friendly reminder that you have an upcoming appointment scheduled at our health center.</p>
                     
                     <div style="margin: 20px 0; padding: 20px; background: #fffaf0; border-radius: 8px; border-left: 5px solid #ed8936;">
-                        <p style="margin: 5px 0;"><strong>📅 Date:</strong> {date}</p>
-                        <p style="margin: 5px 0;"><strong>⏰ Time:</strong> {time}</p>
-                        <p style="margin: 5px 0;"><strong>🏥 Service:</strong> {service}</p>
+                        <p style="margin: 5px 0;"><strong>Date:</strong> {date}</p>
+                        <p style="margin: 5px 0;"><strong>Time:</strong> {time}</p>
+                        <p style="margin: 5px 0;"><strong>Service:</strong> {service}</p>
                     </div>
                     
                     <p>If you cannot make it, please cancel or reschedule as soon as possible so we can offer the slot to other patients.</p>

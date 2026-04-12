@@ -69,6 +69,7 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
     const [statusFilter, setStatusFilter] = useState<'pending' | 'completed' | 'cancelled'>('pending');
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+    const [onDutyDoctors, setOnDutyDoctors] = useState<any[]>([]);
 
 
     useEffect(() => {
@@ -84,6 +85,11 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
         if (user) {
             fetchMyAppointments();
         }
+        // Always fetch on-duty doctors
+        fetch('/api/doctors/on-duty')
+            .then(r => r.ok ? r.json() : [])
+            .then(data => setOnDutyDoctors(Array.isArray(data) ? data : []))
+            .catch(() => setOnDutyDoctors([]));
     }, [user]);
 
     useEffect(() => {
@@ -664,6 +670,39 @@ const Appointments: React.FC<AppointmentsProps> = ({ user, onClose, isOpen, init
                         borderRadius="lg"
                     />
                     <ModalBody p={5} bg="gray.50">
+                        {/* No Doctor On Duty Warning Banner */}
+                        {(() => {
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            const hasTodayAppt = myAppointments.some(a =>
+                                a.appointment_date === todayStr &&
+                                ['pending', 'waiting', 'confirmed'].includes(a.status.toLowerCase())
+                            );
+                            if (hasTodayAppt && onDutyDoctors.length === 0) {
+                                return (
+                                    <Box
+                                        bg="orange.50"
+                                        border="1px solid"
+                                        borderColor="orange.300"
+                                        borderRadius="xl"
+                                        p={4}
+                                        mb={4}
+                                    >
+                                        <HStack spacing={3} align="flex-start">
+                                            <Icon as={FiActivity} color="orange.500" boxSize={5} mt={0.5} />
+                                            <VStack align="start" spacing={1}>
+                                                <Text fontWeight="700" color="orange.700" fontSize="sm">
+                                                    No Doctor on Duty
+                                                </Text>
+                                                <Text color="orange.600" fontSize="sm">
+                                                    You have an appointment scheduled for today, but no doctor is currently on duty. Your appointment may be affected. Please contact the health center for assistance.
+                                                </Text>
+                                            </VStack>
+                                        </HStack>
+                                    </Box>
+                                );
+                            }
+                            return null;
+                        })()}
                         <Box bg="white" borderRadius="2xl" p={4} boxShadow="sm">
                             {/* View Toggle */}
                             <HStack spacing={3} mb={5} bg="gray.100" p={2} borderRadius="xl">

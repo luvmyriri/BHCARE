@@ -352,6 +352,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     };
     const [users, setUsers] = useState<any[]>([]);
     const [medicalStaff, setMedicalStaff] = useState<any[]>([]);
+    const [onDutyIds, setOnDutyIds] = useState<Set<number>>(new Set());
     const [appointments, setAppointments] = useState<any[]>([]);
     const [contactTickets, setContactTickets] = useState<any[]>([]);
     const [ticketFilter, setTicketFilter] = useState<'open' | 'resolved'>('open');
@@ -709,6 +710,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             fetchActivities(),
             fetchContactTickets()
         ]);
+        // Refresh on-duty status
+        fetch('/api/doctors/on-duty')
+            .then(r => r.ok ? r.json() : [])
+            .then((data: any[]) => setOnDutyIds(new Set(data.map((d: any) => d.id))))
+            .catch(() => {});
         setLastUpdated(new Date());
     };
 
@@ -1054,6 +1060,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                 <Th py={3}>Name</Th>
                                                 <Th py={3}>Role</Th>
                                                 <Th py={3}>Status</Th>
+                                                <Th py={3}>Duty</Th>
                                             </Tr>
                                         </Thead>
                                         <Tbody>
@@ -1063,10 +1070,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                                                         <Td py={3} fontWeight="500">{staff.first_name} {staff.last_name}</Td>
                                                         <Td py={3} color="gray.600">{staff.specialization || staff.role}</Td>
                                                         <Td py={3}><Badge colorScheme="green" borderRadius="full" px={2}>Active</Badge></Td>
+                                                        <Td py={3}>
+                                                            <Badge
+                                                                colorScheme={onDutyIds.has(staff.id) ? 'teal' : 'gray'}
+                                                                borderRadius="full"
+                                                                px={2}
+                                                                variant={onDutyIds.has(staff.id) ? 'solid' : 'outline'}
+                                                            >
+                                                                {onDutyIds.has(staff.id) ? 'On Duty' : 'Off Duty'}
+                                                            </Badge>
+                                                        </Td>
                                                     </Tr>
                                                 ))
                                             ) : (
-                                                <Tr><Td colSpan={3} py={5} textAlign="center" color="gray.500">No medical staff found.</Td></Tr>
+                                                <Tr><Td colSpan={4} py={5} textAlign="center" color="gray.500">No medical staff found.</Td></Tr>
                                             )}
                                         </Tbody>
                                     </Table>

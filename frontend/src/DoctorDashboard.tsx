@@ -413,6 +413,37 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
 
     const [medicalRecords, setMedicalRecords] = useState<any[]>([]); // New state for history tab
 
+    // On Duty State
+    const [onDuty, setOnDuty] = useState(false);
+    const [dutyLoading, setDutyLoading] = useState(false);
+
+    const handleToggleDuty = async () => {
+        setDutyLoading(true);
+        const newStatus = !onDuty;
+        try {
+            const res = await fetch(`/api/doctors/${user?.id}/duty-status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ on_duty: newStatus }),
+            });
+            if (res.ok) {
+                setOnDuty(newStatus);
+                toast({
+                    title: newStatus ? 'You are now On Duty' : 'You are now Off Duty',
+                    status: newStatus ? 'success' : 'info',
+                    duration: 3000,
+                    isClosable: true,
+                });
+            } else {
+                toast({ title: 'Failed to update duty status', status: 'error', duration: 3000, isClosable: true });
+            }
+        } catch (e) {
+            toast({ title: 'Connection error', status: 'error', duration: 3000, isClosable: true });
+        } finally {
+            setDutyLoading(false);
+        }
+    };
+
     const handleViewHistory = async (userId: number) => {
         try {
             // First get patient details from patients list or fetch if needed
@@ -474,6 +505,19 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
                 if (invRes.ok) {
                     const invData = await invRes.json();
                     setInventory(invData);
+                }
+
+                // Fetch initial duty status
+                const dutyRes = await fetch(`/api/user/${user?.id}`);
+                if (dutyRes.ok) {
+                    const userData = await dutyRes.json();
+                    // on_duty lives in medical_staff_details, fetch from on-duty list
+                }
+                const onDutyRes = await fetch('/api/doctors/on-duty');
+                if (onDutyRes.ok) {
+                    const onDutyData = await onDutyRes.json();
+                    const isOnDuty = onDutyData.some((d: any) => d.id === user?.id);
+                    setOnDuty(isOnDuty);
                 }
 
             } catch (error) {
@@ -911,11 +955,58 @@ const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, onLogout, onUse
             case 'overview':
                 return (
                     <VStack align="stretch" spacing={10}>
-                        <PageHero
-                            badge="CLINIC ACTIVE"
-                            title={`Dr. ${user?.last_name || 'Medical Officer'}'s Station `}
-                            description={`You have ${patientsQueue.length} appointments scheduled for today. ${patientsQueue.filter(p => p.status === 'waiting' || p.status === 'pending').length} patients are currently in the waiting area.`}
+                        <Box
+                        bg="linear-gradient(135deg, #38b2ac 0%, #ed8936 100%)"
+                        p={{ base: 8, md: 12 }}
+                        borderRadius={{ base: "2xl", md: "3xl" }}
+                        color="white"
+                        boxShadow="xl"
+                        position="relative"
+                        overflow="hidden"
+                        mb={8}
+                    >
+                        <Box position="relative" zIndex={1}>
+                            <HStack spacing={4} mb={2} justify="space-between" align="flex-start">
+                                <HStack spacing={4}>
+                                    <Badge colorScheme={onDuty ? 'green' : 'red'} variant="solid" px={3} borderRadius="full">
+                                        {onDuty ? 'ON DUTY' : 'OFF DUTY'}
+                                    </Badge>
+                                    <Text fontSize="xs" fontWeight="600" opacity={0.8}>Brgy. 174 Health Center</Text>
+                                </HStack>
+                                <Button
+                                    size="sm"
+                                    onClick={handleToggleDuty}
+                                    isLoading={dutyLoading}
+                                    colorScheme={onDuty ? 'red' : 'green'}
+                                    variant="solid"
+                                    bg={onDuty ? 'rgba(229,62,62,0.85)' : 'rgba(56,178,93,0.85)'}
+                                    color="white"
+                                    borderRadius="full"
+                                    px={5}
+                                    _hover={{ opacity: 0.9 }}
+                                    fontWeight={700}
+                                    backdropFilter="blur(4px)"
+                                >
+                                    {onDuty ? 'Go Off Duty' : 'Go On Duty'}
+                                </Button>
+                            </HStack>
+                            <Heading size={{ base: "lg", md: "xl" }} mb={4} lineHeight="1.2">
+                                {`Dr. ${user?.last_name || 'Medical Officer'}'s Station`}
+                            </Heading>
+                            <Text fontSize={{ base: "md", lg: "lg" }} opacity={0.9} maxW="lg">
+                                {`You have ${patientsQueue.length} appointments scheduled for today. ${patientsQueue.filter(p => p.status === 'waiting' || p.status === 'pending').length} patients are currently in the waiting area.`}
+                            </Text>
+                        </Box>
+                        <Icon
+                            as={FiActivity}
+                            position="absolute"
+                            right="-20px"
+                            bottom="-20px"
+                            boxSize={{ base: "150px", md: "200px" }}
+                            opacity={0.15}
+                            transform="rotate(-15deg)"
                         />
+                    </Box>
 
                         <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={8}>
                             <DoctorStatCard label="Patients Today" value={patientsQueue.length || "0"} icon={FiUsers} color="teal" onClick={() => handleCardClick('patients')} />
